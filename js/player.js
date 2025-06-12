@@ -192,9 +192,18 @@ export class AudioPlayer {
   }
   
   updatePlayButton() {
-    const icon = this.elements.playBtn.querySelector('.icon');
-    icon.textContent = this.isPlaying ? '⏸️' : '▶️';
-    this.elements.playBtn.title = this.isPlaying ? '暫停 (空白鍵)' : '播放 (空白鍵)';
+      const playIcon = this.elements.playBtn.querySelector('.icon-play');
+      const pauseIcon = this.elements.playBtn.querySelector('.icon-pause');
+      
+      if (this.isPlaying) {
+          playIcon.style.display = 'none';
+          pauseIcon.style.display = 'block';
+          this.elements.playBtn.title = '暫停 (空白鍵)';
+      } else {
+          playIcon.style.display = 'block';
+          pauseIcon.style.display = 'none';
+          this.elements.playBtn.title = '播放 (空白鍵)';
+      }
   }
   
   // 進度控制
