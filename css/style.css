@@ -417,14 +417,41 @@ body {
   color: var(--text-secondary);
 }
 
-.speed-control select {
-  padding: var(--spacing-xs) var(--spacing-sm);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-  font-size: 0.875rem;
+.speed-control input[type="range"] {
+  width: 120px;
+  height: 4px;
+  background-color: var(--bg-tertiary);
+  border-radius: var(--radius-full);
+  -webkit-appearance: none;
+  appearance: none;
   cursor: pointer;
+}
+
+.speed-control input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  background-color: var(--primary-color);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.speed-control input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  background-color: var(--primary-color);
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}
+
+#speedValue {
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  font-weight: 500;
+  min-width: 40px;
+  text-align: center;
 }
 
 .volume-control input[type="range"] {

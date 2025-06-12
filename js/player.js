@@ -24,7 +24,8 @@ export class AudioPlayer {
       totalTimeEl: null,
       audioName: null,
       audioDuration: null,
-      speedSelect: null,
+      speedSlider: null,
+      speedValue: null,
       volumeSlider: null,
       transcriptionSection: null
     };
@@ -52,7 +53,8 @@ export class AudioPlayer {
     this.elements.totalTimeEl = document.getElementById('totalTime');
     this.elements.audioName = document.getElementById('audioName');
     this.elements.audioDuration = document.getElementById('audioDuration');
-    this.elements.speedSelect = document.getElementById('speedSelect');
+    this.elements.speedSlider = document.getElementById('speedSlider');
+    this.elements.speedValue = document.getElementById('speedValue');
     this.elements.volumeSlider = document.getElementById('volumeSlider');
     this.elements.transcriptionSection = document.getElementById('transcriptionSection');
     
@@ -83,7 +85,7 @@ export class AudioPlayer {
     this.elements.progressBar.addEventListener('input', this.handleProgressChange.bind(this));
     
     // 速度控制
-    this.elements.speedSelect.addEventListener('change', this.handleSpeedChange.bind(this));
+    this.elements.speedSlider.addEventListener('input', this.handleSpeedChange.bind(this));
     
     // 音量控制
     this.elements.volumeSlider.addEventListener('input', this.handleVolumeChange.bind(this));
@@ -217,7 +219,15 @@ export class AudioPlayer {
   
   // 速度控制
   handleSpeedChange(e) {
-    this.audioElement.playbackRate = parseFloat(e.target.value);
+    const speed = parseFloat(e.target.value);
+    this.audioElement.playbackRate = speed;
+    this.updateSpeedDisplay(speed);
+  }
+  
+  updateSpeedDisplay(speed) {
+    if (this.elements.speedValue) {
+      this.elements.speedValue.textContent = speed.toFixed(1) + 'x';
+    }
   }
   
   // 音量控制
@@ -291,10 +301,11 @@ export class AudioPlayer {
   
   changeSpeed(delta) {
     const currentSpeed = this.audioElement.playbackRate;
-    const newSpeed = Math.max(Config.player.minSpeed, 
-                              Math.min(Config.player.maxSpeed, currentSpeed + delta));
+    const newSpeed = Math.max(0.75, 
+                              Math.min(3.0, currentSpeed + delta));
     this.audioElement.playbackRate = newSpeed;
-    this.elements.speedSelect.value = newSpeed;
+    this.elements.speedSlider.value = newSpeed;
+    this.updateSpeedDisplay(newSpeed);
   }
   
   // 工具函數

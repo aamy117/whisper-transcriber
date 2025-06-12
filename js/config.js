@@ -19,8 +19,8 @@ const Config = {
   // 播放器設定
   player: {
     skipSeconds: 3,
-    speedStep: 0.1,
-    minSpeed: 0.5,
+    speedStep: 1.0,  // 改為每次增減1
+    minSpeed: 0.75,
     maxSpeed: 3.0,
   },
   
