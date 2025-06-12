@@ -1,0 +1,45 @@
+# API Keys
+.env
+config.local.js
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+
+# Test files
+test-audio/
+*.mp3
+*.wav
+*.m4a
+*.flac
+*.ogg
+
+# Temporary files
+*.tmp
+temp/
+tmp/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Cache
+.cache/
+*.bak
+
+# Secrets
+secrets.json
+*.key
+*.pem

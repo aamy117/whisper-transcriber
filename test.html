@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>速度測試</title>
+</head>
+<body>
+    <h1>播放速度測試</h1>
+    <p>測試速度選項是否正確顯示：</p>
+    
+    <select id="speedTest">
+        <option value="0.5">0.5x</option>
+        <option value="0.75">0.75x</option>
+        <option value="1" selected>1.0x</option>
+        <option value="1.25">1.25x</option>
+        <option value="1.5">1.5x</option>
+        <option value="1.75">1.75x</option>
+        <option value="2">2.0x</option>
+        <option value="2.5">2.5x</option>
+        <option value="3">3.0x</option>
+    </select>
+    
+    <script>
+        document.getElementById('speedTest').addEventListener('change', function(e) {
+            alert('選擇的速度: ' + e.target.value + 'x');
+        });
+    </script>
+</body>
+</html>

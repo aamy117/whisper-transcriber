@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Whisper 聽打工具 - 基於 OpenAI Whisper API 的專業音訊轉譯工具，支援即時編輯、時間軸同步與多格式匯出">
+    <meta name="keywords" content="whisper, 語音轉文字, 聽打工具, 音訊轉譯, OpenAI">
+    <meta name="author" content="Whisper Transcriber">
+    
+    <title>Whisper 聽打工具 - 專業音訊轉譯編輯器</title>
+    
+    <!-- Preconnect to external domains -->
+    <link rel="preconnect" href="https://api.openai.com">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/style.css">
+    
+    <!-- Open Graph meta tags -->
+    <meta property="og:title" content="Whisper 聽打工具">
+    <meta property="og:description" content="專業的音訊轉譯與編輯工具">
+    <meta property="og:type" content="website">
+    
+    <!-- Favicon (將來可添加) -->
+    <!-- <link rel="icon" type="image/x-icon" href="assets/icons/favicon.ico"> -->
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="container">
+                <h1 class="app-title">Whisper 聽打工具</h1>
+                <nav class="app-nav">
+                    <button class="nav-btn" id="settingsBtn" title="設定">
+                        <span class="icon">⚙️</span>
+                    </button>
+                    <button class="nav-btn" id="helpBtn" title="使用說明">
+                        <span class="icon">❓</span>
+                    </button>
+                </nav>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="app-main">
+            <div class="container">
+                <!-- Audio Player Section -->
+                <section class="player-section" id="playerSection">
+                    <div class="upload-area" id="uploadArea">
+                        <div class="upload-content">
+                            <span class="upload-icon">🎵</span>
+                            <h2>上傳音訊檔案</h2>
+                            <p>拖放檔案到此處，或點擊選擇檔案</p>
+                            <p class="upload-hint">支援格式：MP3, WAV, M4A, FLAC, OGG (最大 50MB)</p>
+                            <input type="file" id="audioInput" accept="audio/*" hidden>
+                            <button class="btn btn-primary" id="selectFileBtn">選擇檔案</button>
+                        </div>
+                    </div>
+                    
+                    <div class="player-controls" id="playerControls" style="display: none;">
+                        <audio id="audioPlayer"></audio>
+                        <div class="audio-info">
+                            <span class="audio-name" id="audioName"></span>
+                            <span class="audio-duration" id="audioDuration">00:00</span>
+                        </div>
+                        
+                        <div class="control-buttons">
+                            <button class="control-btn" id="playBtn" title="播放/暫停 (空白鍵)">
+                                <span class="icon">▶️</span>
+                            </button>
+                            <button class="control-btn" id="backwardBtn" title="快退 3 秒 (Ctrl+←)">
+                                <span class="icon">⏪</span>
+                            </button>
+                            <button class="control-btn" id="forwardBtn" title="快進 3 秒 (Ctrl+→)">
+                                <span class="icon">⏩</span>
+                            </button>
+                        </div>
+                        
+                        <div class="progress-container">
+                            <input type="range" id="progressBar" class="progress-bar" value="0" min="0" max="100">
+                            <div class="time-display">
+                                <span id="currentTime">00:00</span> / <span id="totalTime">00:00</span>
+                            </div>
+                        </div>
+                        
+                        <div class="player-options">
+                            <div class="speed-control">
+                                <label>速度：</label>
+                                <select id="speedSelect">
+                                    <option value="0.5">0.5x</option>
+                                    <option value="0.75">0.75x</option>
+                                    <option value="1" selected>1.0x</option>
+                                    <option value="1.25">1.25x</option>
+                                    <option value="1.5">1.5x</option>
+                                    <option value="1.75">1.75x</option>
+                                    <option value="2">2.0x</option>
+                                    <option value="2.5">2.5x</option>
+                                    <option value="3">3.0x</option>
+                                </select>
+                            </div>
+                            
+                            <div class="volume-control">
+                                <label>音量：</label>
+                                <input type="range" id="volumeSlider" min="0" max="100" value="100">
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Transcription Section -->
+                <section class="transcription-section" id="transcriptionSection" style="display: none;">
+                    <div class="section-header">
+                        <h2>轉譯控制</h2>
+                        <button class="btn btn-primary" id="transcribeBtn">開始轉譯</button>
+                    </div>
+                    
+                    <div class="transcription-status" id="transcriptionStatus" style="display: none;">
+                        <div class="status-message" id="statusMessage"></div>
+                        <div class="progress-indicator" id="progressIndicator"></div>
+                    </div>
+                </section>
+
+                <!-- Editor Section -->
+                <section class="editor-section" id="editorSection" style="display: none;">
+                    <div class="section-header">
+                        <h2>編輯器</h2>
+                        <div class="editor-toolbar">
+                            <button class="toolbar-btn" id="searchBtn" title="搜尋 (Ctrl+F)">
+                                <span class="icon">🔍</span>
+                            </button>
+                            <button class="toolbar-btn" id="exportBtn" title="匯出 (Ctrl+E)">
+                                <span class="icon">💾</span>
+                            </button>
+                            <button class="toolbar-btn" id="saveBtn" title="儲存 (Ctrl+S)">
+                                <span class="icon">✅</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="search-bar" id="searchBar" style="display: none;">
+                        <input type="text" id="searchInput" placeholder="搜尋文字...">
+                        <button class="search-btn" id="searchCloseBtn">✕</button>
+                    </div>
+                    
+                    <div class="editor-content" id="editorContent">
+                        <!-- 轉譯結果將顯示在這裡 -->
+                    </div>
+                </section>
+            </div>
+        </main>
+
+        <!-- Settings Modal -->
+        <div class="modal" id="settingsModal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>設定</h2>
+                    <button class="modal-close" id="settingsCloseBtn">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="setting-group">
+                        <label for="apiKeyInput">OpenAI API Key：</label>
+                        <input type="password" id="apiKeyInput" placeholder="sk-...">
+                        <p class="setting-hint">您的 API Key 將安全地儲存在本地瀏覽器中</p>
+                    </div>
+                    
+                    <div class="setting-group">
+                        <label for="themeSelect">主題：</label>
+                        <select id="themeSelect">
+                            <option value="light">淺色模式</option>
+                            <option value="dark">深色模式</option>
+                            <option value="auto">跟隨系統</option>
+                        </select>
+                    </div>
+                    
+                    <div class="setting-group">
+                        <label>
+                            <input type="checkbox" id="autoSaveCheck" checked>
+                            自動儲存編輯內容
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary" id="saveSettingsBtn">儲存設定</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Help Modal -->
+        <div class="modal" id="helpModal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>使用說明</h2>
+                    <button class="modal-close" id="helpCloseBtn">✕</button>
+                </div>
+                <div class="modal-body">
+                    <h3>快捷鍵</h3>
+                    <ul class="hotkey-list">
+                        <li><kbd>Space</kbd> - 播放/暫停</li>
+                        <li><kbd>Ctrl + ←</kbd> - 快退 3 秒</li>
+                        <li><kbd>Ctrl + →</kbd> - 快進 3 秒</li>
+                        <li><kbd>Ctrl + ↑</kbd> - 加速播放</li>
+                        <li><kbd>Ctrl + ↓</kbd> - 減速播放</li>
+                        <li><kbd>Ctrl + T</kbd> - 插入時間戳</li>
+                        <li><kbd>Ctrl + S</kbd> - 儲存編輯</li>
+                        <li><kbd>Ctrl + F</kbd> - 搜尋文字</li>
+                        <li><kbd>Ctrl + E</kbd> - 匯出檔案</li>
+                    </ul>
+                    
+                    <h3>使用步驟</h3>
+                    <ol>
+                        <li>設定您的 OpenAI API Key（點擊右上角設定按鈕）</li>
+                        <li>上傳音訊檔案（支援 MP3、WAV 等格式，最大 50MB）</li>
+                        <li>點擊「開始轉譯」按鈕</li>
+                        <li>等待轉譯完成後，即可編輯文字內容</li>
+                        <li>點擊段落可跳轉到對應時間點播放</li>
+                        <li>編輯完成後可匯出為多種格式</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+
+        <!-- Export Modal -->
+        <div class="modal" id="exportModal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>匯出選項</h2>
+                    <button class="modal-close" id="exportCloseBtn">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="export-options">
+                        <label class="export-option">
+                            <input type="radio" name="exportFormat" value="txt" checked>
+                            <span>純文字 (.txt)</span>
+                        </label>
+                        <label class="export-option">
+                            <input type="radio" name="exportFormat" value="srt">
+                            <span>SRT 字幕檔 (.srt)</span>
+                        </label>
+                        <label class="export-option">
+                            <input type="radio" name="exportFormat" value="vtt">
+                            <span>WebVTT 字幕檔 (.vtt)</span>
+                        </label>
+                        <label class="export-option">
+                            <input type="radio" name="exportFormat" value="txt-timestamps">
+                            <span>含時間戳文字 (.txt)</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary" id="confirmExportBtn">確認匯出</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
