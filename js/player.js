@@ -194,19 +194,16 @@ export class AudioPlayer {
   updatePlayButton() {
     if (!this.elements.playBtn) return;
     
+    const playIcon = this.elements.playBtn.querySelector('.icon-play');
+    const pauseIcon = this.elements.playBtn.querySelector('.icon-pause');
+    
     if (this.isPlaying) {
-        this.elements.playBtn.innerHTML = `
-            <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
-            </svg>
-        `;
+        if (playIcon) playIcon.style.display = 'none';
+        if (pauseIcon) pauseIcon.style.display = 'block';
         this.elements.playBtn.title = '暫停 (空白鍵)';
     } else {
-        this.elements.playBtn.innerHTML = `
-            <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M8 5v14l11-7z"/>
-            </svg>
-        `;
+        if (playIcon) playIcon.style.display = 'block';
+        if (pauseIcon) pauseIcon.style.display = 'none';
         this.elements.playBtn.title = '播放 (空白鍵)';
     }
   }
