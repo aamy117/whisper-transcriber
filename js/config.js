@@ -36,6 +36,7 @@ const Config = {
   // 快捷鍵設定
   hotkeys: {
     playPause: ' ', // 空白鍵
+    restart: 'Home',
     backward: 'ArrowLeft',
     forward: 'ArrowRight',
     speedUp: 'ArrowUp',

@@ -31,6 +31,7 @@ export class AudioPlayer {
       playerControls: null,
       audioInput: null,
       selectFileBtn: null,
+      restartBtn: null,
       playBtn: null,
       backwardBtn: null,
       forwardBtn: null,
@@ -65,6 +66,7 @@ export class AudioPlayer {
     this.elements.playerControls = document.getElementById('playerControls');
     this.elements.audioInput = document.getElementById('audioInput');
     this.elements.selectFileBtn = document.getElementById('selectFileBtn');
+    this.elements.restartBtn = document.getElementById('restartBtn');
     this.elements.playBtn = document.getElementById('playBtn');
     this.elements.backwardBtn = document.getElementById('backwardBtn');
     this.elements.forwardBtn = document.getElementById('forwardBtn');
@@ -102,6 +104,7 @@ export class AudioPlayer {
     this.elements.uploadArea.addEventListener('drop', this.handleDrop.bind(this));
     
     // 播放控制事件
+    this.elements.restartBtn.addEventListener('click', this.restart.bind(this));
     this.elements.playBtn.addEventListener('click', this.togglePlayPause.bind(this));
     this.elements.backwardBtn.addEventListener('click', () => this.skip(-Config.player.skipSeconds));
     this.elements.forwardBtn.addEventListener('click', () => this.skip(Config.player.skipSeconds));
@@ -244,6 +247,13 @@ export class AudioPlayer {
     this.audioElement.currentTime = Math.max(0, Math.min(newTime, this.duration));
   }
   
+  restart() {
+    this.audioElement.currentTime = 0;
+    if (!this.isPlaying) {
+      this.play();
+    }
+  }
+  
   updatePlayButton() {
     if (!this.elements.playBtn) return;
     
@@ -367,6 +377,10 @@ export class AudioPlayer {
       case ' ':
         e.preventDefault();
         this.togglePlayPause();
+        break;
+      case 'Home':
+        e.preventDefault();
+        this.restart();
         break;
       case 'ArrowLeft':
         if (e.ctrlKey) {
