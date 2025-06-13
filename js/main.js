@@ -21,6 +21,12 @@ class WhisperApp {
   }
   
   setup() {
+    // 確保所有 modal 在初始化時都是關閉狀態
+    document.querySelectorAll('.modal').forEach(modal => {
+      modal.classList.remove('show');
+      modal.style.display = 'none';
+    });
+    
     // 初始化播放器
     this.player = new AudioPlayer();
     
@@ -35,11 +41,6 @@ class WhisperApp {
     
     // 載入上次的專案（如果有）
     this.loadLastProject();
-    
-    // 關閉所有初始的 modal
-    document.querySelectorAll('.modal').forEach(modal => {
-      modal.classList.remove('show');
-    });
   }
   
   bindUIEvents() {
@@ -134,9 +135,11 @@ class WhisperApp {
     document.querySelectorAll('.modal.show').forEach(m => {
       if (m !== modal) {
         m.classList.remove('show');
+        m.style.display = '';  // 恢復到 CSS 控制
       }
     });
     
+    modal.style.display = '';  // 確保移除內聯樣式
     modal.classList.add('show');
     document.body.style.overflow = 'hidden';
   }
@@ -145,6 +148,7 @@ class WhisperApp {
     if (!modal) return;
     
     modal.classList.remove('show');
+    modal.style.display = '';  // 恢復到 CSS 控制
     
     // 檢查是否還有其他 modal 開啟
     const hasOpenModal = document.querySelector('.modal.show');
@@ -219,7 +223,10 @@ class WhisperApp {
       // 延遲顯示設定視窗，讓使用者先看到介面
       setTimeout(() => {
         this.showNotification('請先設定您的 OpenAI API Key', 'warning');
-        this.showModal(document.getElementById('settingsModal'));
+        const settingsModal = document.getElementById('settingsModal');
+        if (settingsModal) {
+          this.showModal(settingsModal);
+        }
       }, 1000);
     }
   }
