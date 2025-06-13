@@ -394,6 +394,27 @@ body {
   border: 0;
 }
 
+/* 音質優化狀態指示器 */
+.optimization-status {
+  display: inline-block;
+  margin-left: var(--spacing-sm);
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
+  transition: all 0.3s ease;
+}
+
+.optimization-status.active {
+  background-color: #10b981;
+  color: white;
+}
+
+.optimization-status:empty {
+  display: none;
+}
+
 /* Main Content */
 .app-main {
   padding: var(--spacing-xl) 0;

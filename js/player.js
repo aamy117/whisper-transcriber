@@ -15,6 +15,15 @@ export class AudioPlayer {
       point2: null
     };
     
+    // Web Audio API 相關
+    this.webAudioSupported = this.detectWebAudioSupport();
+    this.audioContext = null;
+    this.sourceNode = null;
+    this.filterNode = null;
+    this.gainNode = null;
+    this.currentPlaybackMode = 'native'; // 'native' | 'webaudio'
+    this.isWebAudioConnected = false;
+    
     // DOM 元素
     this.elements = {
       audioPlayer: null,
@@ -37,7 +46,8 @@ export class AudioPlayer {
       bookmark1Btn: null,
       bookmark2Btn: null,
       gotoBookmark1Btn: null,
-      gotoBookmark2Btn: null
+      gotoBookmark2Btn: null,
+      audioOptimizationStatus: null
     };
     
     this.init();
@@ -71,6 +81,7 @@ export class AudioPlayer {
     this.elements.bookmark2Btn = document.getElementById('bookmark2Btn');
     this.elements.gotoBookmark1Btn = document.getElementById('gotoBookmark1Btn');
     this.elements.gotoBookmark2Btn = document.getElementById('gotoBookmark2Btn');
+    this.elements.audioOptimizationStatus = document.getElementById('audioOptimizationStatus');
     
     this.audioElement = this.elements.audioPlayer;
   }
@@ -149,11 +160,21 @@ export class AudioPlayer {
   }
   
   loadAudioFile(file) {
+    // 斷開現有的 Web Audio 連接
+    if (this.isWebAudioConnected) {
+      this.disconnectWebAudio();
+    }
+    
     this.currentFile = file;
     const url = URL.createObjectURL(file);
     
     this.audioElement.src = url;
     this.audioElement.load();
+    
+    // 重置播放速度到預設值
+    this.audioElement.playbackRate = 1.0;
+    this.elements.speedSlider.value = 1.0;
+    this.updateSpeedDisplay(1.0);
     
     // 更新 UI
     this.elements.audioName.textContent = file.name;
@@ -200,6 +221,11 @@ export class AudioPlayer {
   }
   
   play() {
+    // 如果有 AudioContext 且處於暫停狀態，恢復它
+    if (this.audioContext && this.audioContext.state === 'suspended') {
+      this.audioContext.resume();
+    }
+    
     this.audioElement.play();
     this.isPlaying = true;
     this.updatePlayButton();
@@ -209,6 +235,8 @@ export class AudioPlayer {
     this.audioElement.pause();
     this.isPlaying = false;
     this.updatePlayButton();
+    
+    // 不需要暫停 AudioContext，保持其活躍以便快速恢復
   }
   
   skip(seconds) {
@@ -243,19 +271,64 @@ export class AudioPlayer {
   // 速度控制
   handleSpeedChange(e) {
     const speed = parseFloat(e.target.value);
-    this.audioElement.playbackRate = speed;
+    this.setPlaybackRate(speed);
     this.updateSpeedDisplay(speed);
+  }
+  
+  setPlaybackRate(speed) {
+    // 先設定播放速度
+    this.audioElement.playbackRate = speed;
+    
+    // 判斷是否需要切換播放模式
+    if (this.shouldUseWebAudio(speed)) {
+      if (this.currentPlaybackMode !== 'webaudio') {
+        this.switchPlaybackMode('webaudio');
+      }
+      // 更新濾波器設定
+      this.updateFilterSettings(speed);
+    } else {
+      if (this.currentPlaybackMode !== 'native') {
+        this.switchPlaybackMode('native');
+      }
+    }
   }
   
   updateSpeedDisplay(speed) {
     if (this.elements.speedValue) {
       this.elements.speedValue.textContent = speed.toFixed(1) + 'x';
     }
+    
+    // 更新音質優化狀態顯示
+    this.updateOptimizationStatus();
+  }
+  
+  updateOptimizationStatus() {
+    if (!this.elements.audioOptimizationStatus) return;
+    
+    if (this.currentPlaybackMode === 'webaudio' && this.isWebAudioConnected) {
+      this.elements.audioOptimizationStatus.textContent = '音質優化中';
+      this.elements.audioOptimizationStatus.classList.add('active');
+      this.elements.audioOptimizationStatus.title = '已啟用 Web Audio API 音質優化';
+    } else {
+      this.elements.audioOptimizationStatus.textContent = '';
+      this.elements.audioOptimizationStatus.classList.remove('active');
+      this.elements.audioOptimizationStatus.title = '音質優化未啟用（速度 < 1.5x）';
+    }
   }
   
   // 音量控制
   handleVolumeChange(e) {
-    this.audioElement.volume = e.target.value / 100;
+    const volume = e.target.value / 100;
+    this.setVolume(volume);
+  }
+  
+  setVolume(volume) {
+    this.audioElement.volume = volume;
+    
+    // 如果使用 Web Audio，同時調整 gainNode
+    if (this.gainNode && this.isWebAudioConnected) {
+      this.gainNode.gain.setValueAtTime(volume, this.audioContext.currentTime);
+    }
   }
   
   // 音訊事件處理
@@ -346,7 +419,7 @@ export class AudioPlayer {
     const currentSpeed = this.audioElement.playbackRate;
     const newSpeed = Math.max(0.75, 
                               Math.min(3.0, currentSpeed + delta));
-    this.audioElement.playbackRate = newSpeed;
+    this.setPlaybackRate(newSpeed);
     this.elements.speedSlider.value = newSpeed;
     this.updateSpeedDisplay(newSpeed);
   }
@@ -467,5 +540,165 @@ export class AudioPlayer {
         this.updateBookmarkButtons();
       }
     }
+  }
+  
+  // Web Audio API 方法
+  detectWebAudioSupport() {
+    try {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) return false;
+      
+      const testContext = new AudioContextClass();
+      testContext.close();
+      return true;
+    } catch (error) {
+      console.warn('Web Audio API not supported:', error);
+      return false;
+    }
+  }
+  
+  shouldUseWebAudio(playbackRate) {
+    return playbackRate >= 1.5 && this.webAudioSupported;
+  }
+  
+  initWebAudio() {
+    if (!this.webAudioSupported || this.isWebAudioConnected) return false;
+    
+    try {
+      // 建立音頻上下文
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      this.audioContext = new AudioContextClass({
+        latencyHint: 'interactive',
+        sampleRate: 44100
+      });
+      
+      // 建立音頻節點
+      this.sourceNode = this.audioContext.createMediaElementSource(this.audioElement);
+      this.filterNode = this.audioContext.createBiquadFilter();
+      this.gainNode = this.audioContext.createGain();
+      
+      // 設定濾波器初始參數
+      this.filterNode.type = 'lowpass';
+      this.filterNode.frequency.value = 3500;
+      this.filterNode.Q.value = 0.7;
+      
+      // 設定增益節點初始音量（與音頻元素同步）
+      this.gainNode.gain.value = this.audioElement.volume;
+      
+      // 連接音頻節點
+      this.sourceNode.connect(this.filterNode);
+      this.filterNode.connect(this.gainNode);
+      this.gainNode.connect(this.audioContext.destination);
+      
+      this.isWebAudioConnected = true;
+      this.currentPlaybackMode = 'webaudio';
+      console.log('Web Audio API initialized successfully');
+      
+      // 更新狀態顯示
+      this.updateOptimizationStatus();
+      
+      return true;
+    } catch (error) {
+      console.error('Web Audio API initialization failed:', error);
+      this.fallbackToNative();
+      return false;
+    }
+  }
+  
+  disconnectWebAudio() {
+    if (!this.isWebAudioConnected) return;
+    
+    try {
+      // 斷開所有連接
+      if (this.sourceNode) {
+        this.sourceNode.disconnect();
+      }
+      if (this.filterNode) {
+        this.filterNode.disconnect();
+      }
+      if (this.gainNode) {
+        this.gainNode.disconnect();
+      }
+      
+      // 關閉音頻上下文
+      if (this.audioContext && this.audioContext.state !== 'closed') {
+        this.audioContext.close();
+      }
+      
+      // 重設變數
+      this.audioContext = null;
+      this.sourceNode = null;
+      this.filterNode = null;
+      this.gainNode = null;
+      this.isWebAudioConnected = false;
+      this.currentPlaybackMode = 'native';
+      
+      // 重要：當斷開 Web Audio 後，音頻元素會自動恢復直接輸出到揚聲器
+      // 這是因為 createMediaElementSource 只是暫時改變音頻路由
+      
+      console.log('Web Audio API disconnected');
+      
+      // 更新狀態顯示
+      this.updateOptimizationStatus();
+    } catch (error) {
+      console.error('Error disconnecting Web Audio:', error);
+    }
+  }
+  
+  switchPlaybackMode(targetMode) {
+    if (this.currentPlaybackMode === targetMode) return;
+    
+    const currentTime = this.audioElement.currentTime;
+    const isPlaying = !this.audioElement.paused;
+    const volume = this.audioElement.volume;
+    
+    // 暫停播放以避免切換時的雜音
+    if (isPlaying) {
+      this.audioElement.pause();
+    }
+    
+    // 切換模式
+    if (targetMode === 'webaudio' && this.shouldUseWebAudio(this.audioElement.playbackRate)) {
+      this.initWebAudio();
+    } else {
+      this.disconnectWebAudio();
+    }
+    
+    // 恢復播放狀態
+    this.audioElement.currentTime = currentTime;
+    this.audioElement.volume = volume;
+    
+    if (isPlaying) {
+      // 延遲一點恢復播放，確保切換完成
+      setTimeout(() => {
+        this.audioElement.play().catch(e => console.warn('Resume playback failed:', e));
+      }, 50);
+    }
+  }
+  
+  updateFilterSettings(playbackRate) {
+    if (!this.filterNode || !this.isWebAudioConnected) return;
+    
+    // 根據播放速度動態調整濾波器頻率
+    let frequency;
+    if (playbackRate < 1.5) {
+      frequency = null; // 不應該在這個速度使用 Web Audio
+    } else if (playbackRate <= 2.0) {
+      frequency = 3500; // 1.5x-2.0x: 3.5kHz
+    } else if (playbackRate <= 2.5) {
+      frequency = 3200; // 2.0x-2.5x: 3.2kHz  
+    } else {
+      frequency = 3000; // >2.5x: 3.0kHz
+    }
+    
+    if (frequency) {
+      this.filterNode.frequency.setValueAtTime(frequency, this.audioContext.currentTime);
+    }
+  }
+  
+  fallbackToNative() {
+    console.log('Falling back to native audio playback');
+    this.disconnectWebAudio();
+    this.webAudioSupported = false; // 標記為不支援，避免重複嘗試
   }
 }
