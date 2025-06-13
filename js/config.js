@@ -19,7 +19,7 @@ const Config = {
   // 播放器設定
   player: {
     skipSeconds: 3,
-    speedStep: 1.0,  // 改為每次增減1
+    speedStep: 0.1,  // 每次增減0.1
     minSpeed: 0.75,
     maxSpeed: 3.0,
   },
@@ -43,7 +43,11 @@ const Config = {
     insertTimestamp: 't',
     save: 's',
     search: 'f',
-    export: 'e'
+    export: 'e',
+    bookmark1: '1',
+    bookmark2: '2',
+    gotoBookmark1: '!', // Shift+1
+    gotoBookmark2: '@'  // Shift+2
   }
 };
 

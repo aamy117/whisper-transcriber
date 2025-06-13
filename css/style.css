@@ -265,6 +265,30 @@ body {
   border-color: var(--primary-color);
 }
 
+/* 標註點按鈕禁用狀態 */
+.control-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  border-color: var(--border-color);
+}
+
+.control-btn:disabled:hover {
+  background-color: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+/* 已設定標註點的按鈕狀態 */
+.control-btn.bookmark-set {
+  background-color: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
+}
+
+.control-btn.bookmark-set:hover {
+  background-color: var(--primary-hover);
+  border-color: var(--primary-hover);
+}
+
 /* Main Content */
 .app-main {
   padding: var(--spacing-xl) 0;

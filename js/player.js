@@ -9,6 +9,12 @@ export class AudioPlayer {
     this.duration = 0;
     this.currentTime = 0;
     
+    // 標註點資料
+    this.bookmarks = {
+      point1: null,
+      point2: null
+    };
+    
     // DOM 元素
     this.elements = {
       audioPlayer: null,
@@ -27,7 +33,11 @@ export class AudioPlayer {
       speedSlider: null,
       speedValue: null,
       volumeSlider: null,
-      transcriptionSection: null
+      transcriptionSection: null,
+      bookmark1Btn: null,
+      bookmark2Btn: null,
+      gotoBookmark1Btn: null,
+      gotoBookmark2Btn: null
     };
     
     this.init();
@@ -57,6 +67,10 @@ export class AudioPlayer {
     this.elements.speedValue = document.getElementById('speedValue');
     this.elements.volumeSlider = document.getElementById('volumeSlider');
     this.elements.transcriptionSection = document.getElementById('transcriptionSection');
+    this.elements.bookmark1Btn = document.getElementById('bookmark1Btn');
+    this.elements.bookmark2Btn = document.getElementById('bookmark2Btn');
+    this.elements.gotoBookmark1Btn = document.getElementById('gotoBookmark1Btn');
+    this.elements.gotoBookmark2Btn = document.getElementById('gotoBookmark2Btn');
     
     this.audioElement = this.elements.audioPlayer;
   }
@@ -89,6 +103,12 @@ export class AudioPlayer {
     
     // 音量控制
     this.elements.volumeSlider.addEventListener('input', this.handleVolumeChange.bind(this));
+    
+    // 標註點事件
+    this.elements.bookmark1Btn.addEventListener('click', () => this.setBookmark(1));
+    this.elements.bookmark2Btn.addEventListener('click', () => this.setBookmark(2));
+    this.elements.gotoBookmark1Btn.addEventListener('click', () => this.gotoBookmark(1));
+    this.elements.gotoBookmark2Btn.addEventListener('click', () => this.gotoBookmark(2));
     
     // 音訊事件
     this.audioElement.addEventListener('loadedmetadata', this.handleLoadedMetadata.bind(this));
@@ -143,6 +163,9 @@ export class AudioPlayer {
     
     // 儲存到 localStorage
     this.saveCurrentProject();
+    
+    // 載入標註點
+    this.loadBookmarks();
   }
   
   // 拖放處理
@@ -296,6 +319,26 @@ export class AudioPlayer {
           this.changeSpeed(-Config.player.speedStep);
         }
         break;
+      case '1':
+        if (!e.shiftKey && !e.ctrlKey) {
+          e.preventDefault();
+          this.setBookmark(1);
+        }
+        break;
+      case '2':
+        if (!e.shiftKey && !e.ctrlKey) {
+          e.preventDefault();
+          this.setBookmark(2);
+        }
+        break;
+      case '!':
+        e.preventDefault();
+        this.gotoBookmark(1);
+        break;
+      case '@':
+        e.preventDefault();
+        this.gotoBookmark(2);
+        break;
     }
   }
   
@@ -347,5 +390,82 @@ export class AudioPlayer {
   
   getCurrentFile() {
     return this.currentFile;
+  }
+  
+  // 標註點功能
+  setBookmark(pointNumber) {
+    const currentTime = this.audioElement.currentTime;
+    const bookmarkKey = `point${pointNumber}`;
+    
+    // 如果已經設定過，再次點擊就清除
+    if (this.bookmarks[bookmarkKey] !== null) {
+      this.bookmarks[bookmarkKey] = null;
+    } else {
+      this.bookmarks[bookmarkKey] = currentTime;
+    }
+    
+    this.updateBookmarkButtons();
+    this.saveBookmarks();
+  }
+  
+  gotoBookmark(pointNumber) {
+    const time = this.bookmarks[`point${pointNumber}`];
+    if (time !== null) {
+      this.audioElement.currentTime = time;
+    }
+  }
+  
+  updateBookmarkButtons() {
+    // 更新標記按鈕 1
+    if (this.bookmarks.point1 !== null) {
+      this.elements.bookmark1Btn.classList.add('bookmark-set');
+      this.elements.bookmark1Btn.title = `清除標記點 1 (${this.formatTime(this.bookmarks.point1)})`;
+      this.elements.gotoBookmark1Btn.disabled = false;
+      this.elements.gotoBookmark1Btn.title = `跳轉到標記點 1 (${this.formatTime(this.bookmarks.point1)})`;
+    } else {
+      this.elements.bookmark1Btn.classList.remove('bookmark-set');
+      this.elements.bookmark1Btn.title = '設定標記點 1';
+      this.elements.gotoBookmark1Btn.disabled = true;
+      this.elements.gotoBookmark1Btn.title = '跳轉到標記點 1';
+    }
+    
+    // 更新標記按鈕 2
+    if (this.bookmarks.point2 !== null) {
+      this.elements.bookmark2Btn.classList.add('bookmark-set');
+      this.elements.bookmark2Btn.title = `清除標記點 2 (${this.formatTime(this.bookmarks.point2)})`;
+      this.elements.gotoBookmark2Btn.disabled = false;
+      this.elements.gotoBookmark2Btn.title = `跳轉到標記點 2 (${this.formatTime(this.bookmarks.point2)})`;
+    } else {
+      this.elements.bookmark2Btn.classList.remove('bookmark-set');
+      this.elements.bookmark2Btn.title = '設定標記點 2';
+      this.elements.gotoBookmark2Btn.disabled = true;
+      this.elements.gotoBookmark2Btn.title = '跳轉到標記點 2';
+    }
+  }
+  
+  saveBookmarks() {
+    if (!this.currentFile) return;
+    
+    const bookmarksData = {
+      fileName: this.currentFile.name,
+      bookmarks: this.bookmarks,
+      lastModified: new Date().toISOString()
+    };
+    
+    localStorage.setItem(Config.storage.prefix + 'bookmarks', JSON.stringify(bookmarksData));
+  }
+  
+  loadBookmarks() {
+    if (!this.currentFile) return;
+    
+    const storedData = localStorage.getItem(Config.storage.prefix + 'bookmarks');
+    if (storedData) {
+      const bookmarksData = JSON.parse(storedData);
+      // 只有當檔案名稱相同時才載入標記點
+      if (bookmarksData.fileName === this.currentFile.name) {
+        this.bookmarks = bookmarksData.bookmarks;
+        this.updateBookmarkButtons();
+      }
+    }
   }
 }
