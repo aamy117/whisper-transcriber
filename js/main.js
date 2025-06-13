@@ -24,8 +24,11 @@ class WhisperApp {
     // 確保所有 modal 在初始化時都是關閉狀態
     document.querySelectorAll('.modal').forEach(modal => {
       modal.classList.remove('show');
-      modal.style.display = 'none';
+      modal.style.display = '';
     });
+    
+    // 重置 body overflow
+    document.body.style.overflow = '';
     
     // 初始化播放器
     this.player = new AudioPlayer();
@@ -36,7 +39,7 @@ class WhisperApp {
     // 綁定 UI 事件
     this.bindUIEvents();
     
-    // 檢查 API Key
+    // 檢查 API Key（這會在需要時顯示設定視窗）
     this.checkApiKey();
     
     // 載入上次的專案（如果有）
@@ -82,20 +85,24 @@ class WhisperApp {
     const exportCloseBtn = document.getElementById('exportCloseBtn');
     const confirmExportBtn = document.getElementById('confirmExportBtn');
     
-    if (exportBtn) {
-      exportBtn.addEventListener('click', () => {
+    if (exportBtn && exportModal) {
+      exportBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        console.log('Export button clicked');
         this.showModal(exportModal);
       });
     }
     
-    if (exportCloseBtn) {
-      exportCloseBtn.addEventListener('click', () => {
+    if (exportCloseBtn && exportModal) {
+      exportCloseBtn.addEventListener('click', (e) => {
+        e.preventDefault();
         this.hideModal(exportModal);
       });
     }
     
-    if (confirmExportBtn) {
-      confirmExportBtn.addEventListener('click', () => {
+    if (confirmExportBtn && exportModal) {
+      confirmExportBtn.addEventListener('click', (e) => {
+        e.preventDefault();
         this.handleExport();
         this.hideModal(exportModal);
       });
@@ -222,9 +229,16 @@ class WhisperApp {
     if (!this.apiKey) {
       // 延遲顯示設定視窗，讓使用者先看到介面
       setTimeout(() => {
+        // 確保關閉所有其他 modal
+        document.querySelectorAll('.modal').forEach(modal => {
+          modal.classList.remove('show');
+          modal.style.display = '';
+        });
+        
         this.showNotification('請先設定您的 OpenAI API Key', 'warning');
         const settingsModal = document.getElementById('settingsModal');
         if (settingsModal) {
+          console.log('Opening settings modal for API key setup');
           this.showModal(settingsModal);
         }
       }, 1000);
