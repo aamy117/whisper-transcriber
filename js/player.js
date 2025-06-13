@@ -21,7 +21,7 @@ export class AudioPlayer {
     this.sourceNode = null;
     this.filterNode = null;
     this.gainNode = null;
-    this.currentPlaybackMode = 'native'; // 'native' | 'webaudio'
+    // Web Audio 連接狀態
     this.isWebAudioConnected = false;
     
     // DOM 元素
@@ -163,11 +163,6 @@ export class AudioPlayer {
   }
   
   loadAudioFile(file) {
-    // 斷開現有的 Web Audio 連接
-    if (this.isWebAudioConnected) {
-      this.disconnectWebAudio();
-    }
-    
     this.currentFile = file;
     const url = URL.createObjectURL(file);
     
@@ -190,6 +185,11 @@ export class AudioPlayer {
     
     // 載入標註點
     this.loadBookmarks();
+    
+    // 如果支援 Web Audio，立即初始化（保持永遠連接）
+    if (this.webAudioSupported && !this.isWebAudioConnected) {
+      this.initWebAudio();
+    }
   }
   
   // 拖放處理
@@ -286,20 +286,39 @@ export class AudioPlayer {
   }
   
   setPlaybackRate(speed) {
-    // 先設定播放速度
+    // 設定播放速度
     this.audioElement.playbackRate = speed;
     
-    // 判斷是否需要切換播放模式
-    if (this.shouldUseWebAudio(speed)) {
-      if (this.currentPlaybackMode !== 'webaudio') {
-        this.switchPlaybackMode('webaudio');
-      }
-      // 更新濾波器設定
+    // 如果 Web Audio 已連接，根據速度決定是否使用濾波器
+    if (this.isWebAudioConnected) {
+      this.updateAudioRouting(speed);
       this.updateFilterSettings(speed);
-    } else {
-      if (this.currentPlaybackMode !== 'native') {
-        this.switchPlaybackMode('native');
+    }
+  }
+  
+  updateAudioRouting(playbackRate) {
+    if (!this.isWebAudioConnected) return;
+    
+    try {
+      // 先斷開所有連接
+      this.sourceNode.disconnect();
+      this.filterNode.disconnect();
+      
+      if (playbackRate >= 1.5) {
+        // 高速播放：使用濾波器
+        this.sourceNode.connect(this.filterNode);
+        this.filterNode.connect(this.gainNode);
+        console.log('Audio routing: Using filter for high-speed playback');
+      } else {
+        // 低速播放：繞過濾波器
+        this.sourceNode.connect(this.gainNode);
+        console.log('Audio routing: Bypassing filter for normal-speed playback');
       }
+      
+      // 更新狀態顯示
+      this.updateOptimizationStatus();
+    } catch (error) {
+      console.error('Error updating audio routing:', error);
     }
   }
   
@@ -315,7 +334,7 @@ export class AudioPlayer {
   updateOptimizationStatus() {
     if (!this.elements.audioOptimizationStatus) return;
     
-    if (this.currentPlaybackMode === 'webaudio' && this.isWebAudioConnected) {
+    if (this.isWebAudioConnected && this.audioElement.playbackRate >= 1.5) {
       this.elements.audioOptimizationStatus.textContent = '音質優化中';
       this.elements.audioOptimizationStatus.classList.add('active');
       this.elements.audioOptimizationStatus.title = '已啟用 Web Audio API 音質優化';
@@ -599,13 +618,17 @@ export class AudioPlayer {
       // 設定增益節點初始音量（與音頻元素同步）
       this.gainNode.gain.value = this.audioElement.volume;
       
-      // 連接音頻節點
-      this.sourceNode.connect(this.filterNode);
-      this.filterNode.connect(this.gainNode);
+      // 初始連接：如果速度 < 1.5x，繞過濾波器
+      if (this.audioElement.playbackRate < 1.5) {
+        this.sourceNode.connect(this.gainNode);
+      } else {
+        this.sourceNode.connect(this.filterNode);
+        this.filterNode.connect(this.gainNode);
+      }
       this.gainNode.connect(this.audioContext.destination);
       
       this.isWebAudioConnected = true;
-      this.currentPlaybackMode = 'webaudio';
+      // Web Audio 已成功初始化
       console.log('Web Audio API initialized successfully');
       
       // 更新狀態顯示
@@ -619,6 +642,7 @@ export class AudioPlayer {
     }
   }
   
+  // 保留 disconnectWebAudio 方法，但只在必要時使用（如切換音訊檔案時）
   disconnectWebAudio() {
     if (!this.isWebAudioConnected) return;
     
@@ -645,10 +669,7 @@ export class AudioPlayer {
       this.filterNode = null;
       this.gainNode = null;
       this.isWebAudioConnected = false;
-      this.currentPlaybackMode = 'native';
-      
-      // 重要：當斷開 Web Audio 後，音頻元素會自動恢復直接輸出到揚聲器
-      // 這是因為 createMediaElementSource 只是暫時改變音頻路由
+      // Web Audio 已斷開連接
       
       console.log('Web Audio API disconnected');
       
@@ -659,36 +680,8 @@ export class AudioPlayer {
     }
   }
   
-  switchPlaybackMode(targetMode) {
-    if (this.currentPlaybackMode === targetMode) return;
-    
-    const currentTime = this.audioElement.currentTime;
-    const isPlaying = !this.audioElement.paused;
-    const volume = this.audioElement.volume;
-    
-    // 暫停播放以避免切換時的雜音
-    if (isPlaying) {
-      this.audioElement.pause();
-    }
-    
-    // 切換模式
-    if (targetMode === 'webaudio' && this.shouldUseWebAudio(this.audioElement.playbackRate)) {
-      this.initWebAudio();
-    } else {
-      this.disconnectWebAudio();
-    }
-    
-    // 恢復播放狀態
-    this.audioElement.currentTime = currentTime;
-    this.audioElement.volume = volume;
-    
-    if (isPlaying) {
-      // 延遲一點恢復播放，確保切換完成
-      setTimeout(() => {
-        this.audioElement.play().catch(e => console.warn('Resume playback failed:', e));
-      }, 50);
-    }
-  }
+  // switchPlaybackMode 已棄用 - Web Audio 現在保持永遠連接
+  // 如果需要切換音訊處理模式，請使用 updateAudioRouting() 方法
   
   updateFilterSettings(playbackRate) {
     if (!this.filterNode || !this.isWebAudioConnected) return;
