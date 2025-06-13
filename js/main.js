@@ -35,6 +35,11 @@ class WhisperApp {
     
     // 載入上次的專案（如果有）
     this.loadLastProject();
+    
+    // 關閉所有初始的 modal
+    document.querySelectorAll('.modal').forEach(modal => {
+      modal.classList.remove('show');
+    });
   }
   
   bindUIEvents() {
@@ -82,14 +87,18 @@ class WhisperApp {
       });
     }
     
-    exportCloseBtn.addEventListener('click', () => {
-      this.hideModal(exportModal);
-    });
+    if (exportCloseBtn) {
+      exportCloseBtn.addEventListener('click', () => {
+        this.hideModal(exportModal);
+      });
+    }
     
-    confirmExportBtn.addEventListener('click', () => {
-      this.handleExport();
-      this.hideModal(exportModal);
-    });
+    if (confirmExportBtn) {
+      confirmExportBtn.addEventListener('click', () => {
+        this.handleExport();
+        this.hideModal(exportModal);
+      });
+    }
     
     // 轉譯按鈕
     const transcribeBtn = document.getElementById('transcribeBtn');
@@ -119,13 +128,29 @@ class WhisperApp {
   
   // Modal 控制
   showModal(modal) {
+    if (!modal) return;
+    
+    // 先關閉所有其他 modal
+    document.querySelectorAll('.modal.show').forEach(m => {
+      if (m !== modal) {
+        m.classList.remove('show');
+      }
+    });
+    
     modal.classList.add('show');
     document.body.style.overflow = 'hidden';
   }
   
   hideModal(modal) {
+    if (!modal) return;
+    
     modal.classList.remove('show');
-    document.body.style.overflow = '';
+    
+    // 檢查是否還有其他 modal 開啟
+    const hasOpenModal = document.querySelector('.modal.show');
+    if (!hasOpenModal) {
+      document.body.style.overflow = '';
+    }
   }
   
   // 設定管理
@@ -233,7 +258,10 @@ class WhisperApp {
   // 匯出功能
   handleExport() {
     const format = document.querySelector('input[name="exportFormat"]:checked')?.value;
-    if (!format) return;
+    if (!format) {
+      alert('請選擇匯出格式');
+      return;
+    }
     
     // TODO: 實作匯出功能
     this.showNotification(`匯出功能 (${format}) 將在後續階段實作`, 'info');

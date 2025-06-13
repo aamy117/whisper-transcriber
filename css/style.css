@@ -415,6 +415,40 @@ body {
   display: none;
 }
 
+/* Modal 背景遮罩改善 */
+.modal {
+  z-index: 1000;
+}
+
+.modal-content {
+  z-index: 1001;
+  position: relative;
+}
+
+/* Modal 關閉按鈕樣式改善 */
+.modal-close {
+  position: absolute;
+  right: var(--spacing-md);
+  top: var(--spacing-md);
+  width: 32px;
+  height: 32px;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s;
+}
+
+.modal-close:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
 /* Main Content */
 .app-main {
   padding: var(--spacing-xl) 0;
