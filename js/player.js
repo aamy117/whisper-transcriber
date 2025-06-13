@@ -157,9 +157,9 @@ export class AudioPlayer {
     
     // 更新 UI
     this.elements.audioName.textContent = file.name;
-    this.elements.uploadArea.style.display = 'none';
-    this.elements.playerControls.style.display = 'block';
-    this.elements.transcriptionSection.style.display = 'block';
+    this.elements.uploadArea.classList.add('hidden');
+    this.elements.playerControls.classList.add('show');
+    this.elements.transcriptionSection.classList.add('show');
     
     // 儲存到 localStorage
     this.saveCurrentProject();
@@ -223,12 +223,12 @@ export class AudioPlayer {
     const pauseIcon = this.elements.playBtn.querySelector('.icon-pause');
     
     if (this.isPlaying) {
-        if (playIcon) playIcon.style.display = 'none';
-        if (pauseIcon) pauseIcon.style.display = 'block';
+        if (playIcon) playIcon.classList.add('hidden');
+        if (pauseIcon) pauseIcon.classList.remove('hidden');
         this.elements.playBtn.title = '暫停 (空白鍵)';
     } else {
-        if (playIcon) playIcon.style.display = 'block';
-        if (pauseIcon) pauseIcon.style.display = 'none';
+        if (playIcon) playIcon.classList.remove('hidden');
+        if (pauseIcon) pauseIcon.classList.add('hidden');
         this.elements.playBtn.title = '播放 (空白鍵)';
     }
   }

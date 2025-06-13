@@ -119,12 +119,12 @@ class WhisperApp {
   
   // Modal 控制
   showModal(modal) {
-    modal.style.display = 'flex';
+    modal.classList.add('show');
     document.body.style.overflow = 'hidden';
   }
   
   hideModal(modal) {
-    modal.style.display = 'none';
+    modal.classList.remove('show');
     document.body.style.overflow = '';
   }
   

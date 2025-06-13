@@ -173,33 +173,34 @@ body {
 
 /* 基本控制按鈕樣式 */
 .control-btn {
-  width: 56px; /* 增大按鈕尺寸 */
-  height: 56px;
+  width: 48px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--bg-secondary);
-  border: 2px solid var(--border-color);
-  border-radius: var(--radius-full);
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 50%;
   cursor: pointer;
   transition: all 0.2s ease;
   position: relative;
   overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 /* 主要播放按鈕（更大） */
 .control-btn-primary {
-  width: 64px;
-  height: 64px;
-  background-color: var(--primary-color);
-  border-color: var(--primary-color);
+  width: 56px;
+  height: 56px;
+  background-color: #2563eb;
+  border-color: #2563eb;
   color: white;
 }
 
 /* 按鈕懸停效果 */
 .control-btn:hover {
-  background-color: var(--bg-tertiary);
-  border-color: var(--primary-color);
+  background-color: #f9fafb;
+  border-color: #d1d5db;
   transform: scale(1.05);
 }
 
@@ -216,14 +217,14 @@ body {
 
 /* SVG 圖示樣式 */
 .control-btn .icon {
-  width: 24px;
-  height: 24px;
-  color: var(--text-primary);
+  width: 20px;
+  height: 20px;
+  color: #374151;
 }
 
 .control-btn-primary .icon {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   color: white;
 }
 
@@ -287,6 +288,110 @@ body {
 .control-btn.bookmark-set:hover {
   background-color: var(--primary-hover);
   border-color: var(--primary-hover);
+}
+
+/* 標註點控制區域 */
+.bookmark-controls {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-md);
+  background-color: #f9fafb;
+  border-radius: var(--radius-lg);
+  border: 1px solid #e5e7eb;
+}
+
+.bookmark-btn {
+  width: 36px;
+  height: 36px;
+  background-color: white;
+}
+
+.bookmark-btn .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.bookmark-btn .icon-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.bookmark-btn:disabled .icon-text {
+  color: #9ca3af;
+}
+
+/* 標記點已設定時的樣式 */
+.bookmark-btn.bookmark-set {
+  background-color: #ef4444;
+  border-color: #ef4444;
+}
+
+.bookmark-btn.bookmark-set .icon {
+  color: white;
+}
+
+.bookmark-btn.bookmark-set:hover {
+  background-color: #dc2626;
+  border-color: #dc2626;
+}
+
+/* 隱藏元素的類別 */
+.hidden {
+  display: none !important;
+}
+
+/* 初始隱藏的元素 */
+.player-controls,
+.transcription-section,
+.transcription-status,
+.editor-section,
+.search-bar,
+.modal {
+  display: none;
+}
+
+/* 顯示時的樣式 */
+.player-controls.show,
+.transcription-section.show,
+.transcription-status.show,
+.editor-section.show,
+.search-bar.show {
+  display: block;
+}
+
+.modal.show {
+  display: flex;
+}
+
+/* 暫停圖示預設隱藏 */
+.icon-pause {
+  display: none;
+}
+
+/* 圖示顯示控制 */
+.icon-play.hidden,
+.icon-pause.hidden {
+  display: none !important;
+}
+
+.icon-pause:not(.hidden) {
+  display: block;
+}
+
+/* 視覺隱藏類別 - 用於螢幕閱讀器 */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* Main Content */

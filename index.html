@@ -56,7 +56,7 @@
                         </div>
                     </div>
                     
-                    <div class="player-controls" id="playerControls" style="display: none;">
+                    <div class="player-controls" id="playerControls">
                         <audio id="audioPlayer"></audio>
                         <div class="audio-info">
                             <span class="audio-name" id="audioName"></span>
@@ -73,7 +73,7 @@
                                 <svg class="icon icon-play" viewBox="0 0 24 24" fill="currentColor">
                                     <path d="M8 5v14l11-7z"/>
                                 </svg>
-                                <svg class="icon icon-pause" viewBox="0 0 24 24" fill="currentColor" style="display: none;">
+                                <svg class="icon icon-pause" viewBox="0 0 24 24" fill="currentColor">
                                     <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
                                 </svg>
                             </button>
@@ -82,58 +82,68 @@
                                     <path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/>
                                 </svg>
                             </button>
-                            <button class="control-btn" id="bookmark1Btn" title="設定標記點 1">
-                                <span class="icon">📍</span>
-                            </button>
-                            <button class="control-btn" id="bookmark2Btn" title="設定標記點 2">
-                                <span class="icon">📍</span>
-                            </button>
-                            <button class="control-btn" id="gotoBookmark1Btn" title="跳轉到標記點 1" disabled>
-                                <span class="icon">1️⃣</span>
-                            </button>
-                            <button class="control-btn" id="gotoBookmark2Btn" title="跳轉到標記點 2" disabled>
-                                <span class="icon">2️⃣</span>
-                            </button>
                         </div>
                         
                         <div class="progress-container">
-                            <input type="range" id="progressBar" class="progress-bar" value="0" min="0" max="100">
+                            <label for="progressBar" class="visually-hidden">進度條</label>
+                            <input type="range" id="progressBar" class="progress-bar" value="0" min="0" max="100" aria-label="播放進度">
                             <div class="time-display">
                                 <span id="currentTime">00:00</span> / <span id="totalTime">00:00</span>
                             </div>
                         </div>
                         
+                        <div class="bookmark-controls">
+                            <button class="control-btn bookmark-btn" id="bookmark1Btn" title="設定標記點 1">
+                                <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                            </button>
+                            <button class="control-btn bookmark-btn" id="bookmark2Btn" title="設定標記點 2">
+                                <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                            </button>
+                            <button class="control-btn bookmark-btn" id="gotoBookmark1Btn" title="跳轉到標記點 1" disabled>
+                                <span class="icon-text">1</span>
+                            </button>
+                            <button class="control-btn bookmark-btn" id="gotoBookmark2Btn" title="跳轉到標記點 2" disabled>
+                                <span class="icon-text">2</span>
+                            </button>
+                        </div>
+                        
                         <div class="player-options">
                             <div class="speed-control">
-                                <label>速度：</label>
+                                <label for="speedSlider">速度：</label>
                                 <input type="range" id="speedSlider" 
-                                       min="0.75" max="3" value="1" step="0.05">
+                                       min="0.75" max="3" value="1" step="0.05"
+                                       aria-label="播放速度控制" aria-valuemin="0.75" aria-valuemax="3" aria-valuenow="1">
                                 <span id="speedValue">1.0x</span>
                             </div>
                             
                             <div class="volume-control">
-                                <label>音量：</label>
-                                <input type="range" id="volumeSlider" min="0" max="100" value="100">
+                                <label for="volumeSlider">音量：</label>
+                                <input type="range" id="volumeSlider" min="0" max="100" value="100"
+                                       aria-label="音量控制" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
                             </div>
                         </div>
                     </div>
                 </section>
 
                 <!-- Transcription Section -->
-                <section class="transcription-section" id="transcriptionSection" style="display: none;">
+                <section class="transcription-section" id="transcriptionSection">
                     <div class="section-header">
                         <h2>轉譯控制</h2>
                         <button class="btn btn-primary" id="transcribeBtn">開始轉譯</button>
                     </div>
                     
-                    <div class="transcription-status" id="transcriptionStatus" style="display: none;">
+                    <div class="transcription-status" id="transcriptionStatus">
                         <div class="status-message" id="statusMessage"></div>
                         <div class="progress-indicator" id="progressIndicator"></div>
                     </div>
                 </section>
 
                 <!-- Editor Section -->
-                <section class="editor-section" id="editorSection" style="display: none;">
+                <section class="editor-section" id="editorSection">
                     <div class="section-header">
                         <h2>編輯器</h2>
                         <div class="editor-toolbar">
@@ -149,7 +159,7 @@
                         </div>
                     </div>
                     
-                    <div class="search-bar" id="searchBar" style="display: none;">
+                    <div class="search-bar" id="searchBar">
                         <input type="text" id="searchInput" placeholder="搜尋文字...">
                         <button class="search-btn" id="searchCloseBtn">✕</button>
                     </div>
@@ -162,7 +172,7 @@
         </main>
 
         <!-- Settings Modal -->
-        <div class="modal" id="settingsModal" style="display: none;">
+        <div class="modal" id="settingsModal">
             <div class="modal-content">
                 <div class="modal-header">
                     <h2>設定</h2>
@@ -198,7 +208,7 @@
         </div>
 
         <!-- Help Modal -->
-        <div class="modal" id="helpModal" style="display: none;">
+        <div class="modal" id="helpModal">
             <div class="modal-content">
                 <div class="modal-header">
                     <h2>使用說明</h2>
@@ -232,7 +242,7 @@
         </div>
 
         <!-- Export Modal -->
-        <div class="modal" id="exportModal" style="display: none;">
+        <div class="modal" id="exportModal">
             <div class="modal-content">
                 <div class="modal-header">
                     <h2>匯出選項</h2>
