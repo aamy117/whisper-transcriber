@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>視訊測試</title>
+</head>
+<body>
+    <h1>視訊播放器測試</h1>
+    <input type="file" id="fileInput" accept="video/*">
+    <br><br>
+    <video id="testVideo" controls width="600"></video>
+    
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const video = document.getElementById('testVideo');
+        
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file && file.type.startsWith('video/')) {
+                const url = URL.createObjectURL(file);
+                video.src = url;
+                console.log('載入視訊:', file.name);
+            } else {
+                alert('請選擇視訊檔案');
+            }
+        });
+    </script>
+</body>
+</html>
