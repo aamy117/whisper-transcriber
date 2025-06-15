@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>模組載入測試</title>
+</head>
+<body>
+    <h1>模組載入測試</h1>
+    <div id="status">檢查中...</div>
+    
+    <script type="module">
+        const status = document.getElementById('status');
+        
+        try {
+            // 測試是否支援 ES6 模組
+            status.innerHTML += '<br>✓ 瀏覽器支援 ES6 模組';
+            
+            // 測試載入 video-config.js
+            const { default: VideoConfig } = await import('./js/video/video-config.js');
+            status.innerHTML += '<br>✓ video-config.js 載入成功';
+            
+            // 測試載入 video-player.js
+            const { VideoPlayer } = await import('./js/video/video-player.js');
+            status.innerHTML += '<br>✓ video-player.js 載入成功';
+            
+            // 測試載入 video-ui.js
+            const { VideoUI } = await import('./js/video/video-ui.js');
+            status.innerHTML += '<br>✓ video-ui.js 載入成功';
+            
+            // 測試載入 video-main.js
+            const mainModule = await import('./js/video/video-main.js');
+            status.innerHTML += '<br>✓ video-main.js 載入成功';
+            
+            status.innerHTML += '<br><br><strong>所有模組載入成功！</strong>';
+            
+        } catch (error) {
+            status.innerHTML += `<br><span style="color: red;">✗ 錯誤: ${error.message}</span>`;
+            console.error('模組載入錯誤:', error);
+        }
+    </script>
+    
+    <script nomodule>
+        document.getElementById('status').innerHTML = '<span style="color: red;">您的瀏覽器不支援 ES6 模組！請使用較新的瀏覽器。</span>';
+    </script>
+</body>
+</html>

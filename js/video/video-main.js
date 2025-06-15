@@ -23,17 +23,25 @@ class VideoApp {
   }
   
   async setup() {
+    console.log('開始 setup...');
+    
     try {
       // 初始化播放器
       const videoElement = document.getElementById('videoPlayer');
+      console.log('視訊元素:', !!videoElement);
+      
       if (!videoElement) {
         throw new Error('找不到視訊元素');
       }
       
+      console.log('建立 VideoPlayer...');
       this.player = new VideoPlayer(videoElement);
+      
+      console.log('建立 VideoUI...');
       this.ui = new VideoUI(this.player);
       
       // 綁定事件
+      console.log('綁定事件...');
       this.bindEvents();
       
       // 設定主題
@@ -47,18 +55,41 @@ class VideoApp {
       
     } catch (error) {
       console.error('視訊播放器初始化失敗:', error);
-      this.showError('播放器初始化失敗');
+      console.error('錯誤堆疊:', error.stack);
+      // 暫時註解掉 showError 以避免額外錯誤
+      // this.showError('播放器初始化失敗');
+      alert(`初始化失敗: ${error.message}`);
     }
   }
   
   bindEvents() {
+    console.log('開始綁定事件...');
+    
     // 檔案選擇
     const fileInput = document.getElementById('videoInput');
     const selectBtn = document.getElementById('selectVideoBtn');
     const uploadArea = document.getElementById('videoUploadArea');
     
-    selectBtn.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', (e) => this.handleFileSelect(e.target.files));
+    console.log('元素檢查:', {
+      fileInput: !!fileInput,
+      selectBtn: !!selectBtn,
+      uploadArea: !!uploadArea
+    });
+    
+    if (!fileInput || !selectBtn || !uploadArea) {
+      console.error('找不到必要的 DOM 元素');
+      return;
+    }
+    
+    selectBtn.addEventListener('click', () => {
+      console.log('選擇按鈕被點擊');
+      fileInput.click();
+    });
+    
+    fileInput.addEventListener('change', (e) => {
+      console.log('檔案選擇變更:', e.target.files);
+      this.handleFileSelect(e.target.files);
+    });
     
     // 拖放處理
     uploadArea.addEventListener('dragover', (e) => {
