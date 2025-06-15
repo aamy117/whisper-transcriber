@@ -451,10 +451,36 @@ export class VideoPlayer {
   handleLoadedMetadata() {
     this.state.duration = this.video.duration;
     console.log('視訊元數據載入完成');
+    console.log(`視訊尺寸: ${this.video.videoWidth}x${this.video.videoHeight}`);
+    console.log(`視訊時長: ${this.video.duration}秒`);
+    
+    // 確保視訊元素可見
+    if (this.video.videoWidth === 0 || this.video.videoHeight === 0) {
+      console.warn('視訊尺寸為 0，可能載入有問題');
+    }
   }
   
   handleLoadedData() {
     console.log('視訊數據載入完成');
+    console.log(`ReadyState: ${this.video.readyState}`);
+    console.log(`NetworkState: ${this.video.networkState}`);
+    
+    // 檢查視訊是否正確載入
+    if (this.video.readyState >= 2) {
+      console.log('✅ 視訊已準備好播放');
+      
+      // 確保視訊元素正確渲染
+      this.video.style.display = 'block';
+      this.video.style.visibility = 'visible';
+      
+      // 嘗試獲取第一幀
+      if (this.video.paused && this.video.currentTime === 0) {
+        this.video.currentTime = 0.1;
+        setTimeout(() => {
+          this.video.currentTime = 0;
+        }, 100);
+      }
+    }
   }
   
   handleCanPlay() {

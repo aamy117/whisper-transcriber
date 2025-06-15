@@ -588,7 +588,62 @@ class VideoApp {
       checkSupport: () => {
         return VideoPlayer.checkBrowserSupport();
       },
-        // 測試檔案
+        // 診斷視訊狀態
+      diagnose: () => {
+        if (!this.player || !this.player.video) {
+          console.error('播放器未初始化');
+          return;
+        }
+        
+        const video = this.player.video;
+        console.log('=== 視訊診斷資訊 ===');
+        console.log('視訊元素:', video);
+        console.log('視訊源:', video.src);
+        console.log('當前時間:', video.currentTime);
+        console.log('總時長:', video.duration);
+        console.log('視訊寬度:', video.videoWidth);
+        console.log('視訊高度:', video.videoHeight);
+        console.log('客戶端寬度:', video.clientWidth);
+        console.log('客戶端高度:', video.clientHeight);
+        console.log('就緒狀態:', video.readyState);
+        console.log('網路狀態:', video.networkState);
+        console.log('是否暫停:', video.paused);
+        console.log('音量:', video.volume);
+        console.log('是否靜音:', video.muted);
+        console.log('播放速率:', video.playbackRate);
+        console.log('錯誤:', video.error);
+        
+        // 檢查緩衝區
+        if (video.buffered.length > 0) {
+          console.log('緩衝區:');
+          for (let i = 0; i < video.buffered.length; i++) {
+            console.log(`  區段 ${i}: ${video.buffered.start(i).toFixed(2)}s - ${video.buffered.end(i).toFixed(2)}s`);
+          }
+        }
+        
+        // 檢查計算樣式
+        const computedStyle = window.getComputedStyle(video);
+        console.log('顯示樣式:', computedStyle.display);
+        console.log('可見性:', computedStyle.visibility);
+        console.log('透明度:', computedStyle.opacity);
+        console.log('位置:', computedStyle.position);
+        
+        // 檢查父元素
+        const wrapper = video.parentElement;
+        if (wrapper) {
+          const wrapperStyle = window.getComputedStyle(wrapper);
+          console.log('容器尺寸:', wrapper.clientWidth + 'x' + wrapper.clientHeight);
+          console.log('容器顯示:', wrapperStyle.display);
+        }
+        
+        return {
+          ready: video.readyState >= 2,
+          hasVideo: video.videoWidth > 0 && video.videoHeight > 0,
+          visible: computedStyle.display !== 'none' && computedStyle.visibility !== 'hidden'
+        };
+      },
+      
+      // 測試檔案
       testFile: (file) => {
         console.log('=== 檔案測試 ===');
         console.log('檔案名稱:', file.name);

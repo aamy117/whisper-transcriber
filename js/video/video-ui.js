@@ -269,6 +269,7 @@ export class VideoUI {
   // 控制列顯示/隱藏
   showControls() {
     this.elements.controls?.classList.remove('hidden');
+    this.elements.controls?.style.setProperty('opacity', '1', 'important');
     this.state.controlsVisible = true;
     
     // 重置自動隱藏計時器
@@ -276,8 +277,9 @@ export class VideoUI {
   }
   
   hideControls() {
+    // 只有在播放中且不在拖動時才隱藏控制欄
     if (this.player.isPlaying && !this.state.isDragging) {
-      this.elements.controls?.classList.add('hidden');
+      this.elements.controls?.style.setProperty('opacity', '0');
       this.state.controlsVisible = false;
     }
   }
