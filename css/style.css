@@ -1022,3 +1022,27 @@ kbd {
   line-height: 1.6;
   color: var(--text-primary);
 }
+
+/* 音質優化狀態指示器 */
+.optimization-status {
+  display: inline-block;
+  margin-left: var(--spacing-sm);
+  font-size: 1rem;
+  vertical-align: middle;
+  transition: all 0.3s ease;
+}
+
+.optimization-status:empty {
+  display: none;
+}
+
+/* 速度控制區域調整 */
+.speed-control {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.speed-control label {
+  white-space: nowrap;
+}

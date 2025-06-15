@@ -174,6 +174,14 @@ export class AudioPlayer {
     this.elements.speedSlider.value = 1.0;
     this.updateSpeedDisplay(1.0);
     
+    // 初始化 Web Audio API（如果支援）
+    if (this.webAudioSupported && !this.isWebAudioConnected) {
+      // 等待音訊元素準備好
+      this.audioElement.addEventListener('loadedmetadata', () => {
+        this.initWebAudio();
+      }, { once: true });
+    }
+    
     // 更新 UI
     this.elements.audioName.textContent = file.name;
     this.elements.uploadArea.classList.add('hidden');
@@ -283,13 +291,24 @@ export class AudioPlayer {
     const speed = parseFloat(e.target.value);
     this.setPlaybackRate(speed);
     this.updateSpeedDisplay(speed);
+    
+    // 更新音質優化狀態顯示
+    this.updateOptimizationStatus(speed);
   }
   
   setPlaybackRate(speed) {
     // 設定播放速度
     this.audioElement.playbackRate = speed;
     
-    // 如果 Web Audio 已連接，根據速度決定是否使用濾波器
+    // 決定是否需要 Web Audio 優化
+    const shouldUseWebAudio = this.shouldUseWebAudio(speed);
+    
+    if (shouldUseWebAudio && !this.isWebAudioConnected) {
+      // 需要但尚未初始化，嘗試初始化
+      this.initWebAudio();
+    }
+    
+    // 如果 Web Audio 已連接，更新音訊路由
     if (this.isWebAudioConnected) {
       this.updateAudioRouting(speed);
       this.updateFilterSettings(speed);
@@ -600,10 +619,24 @@ export class AudioPlayer {
     try {
       // 建立音頻上下文
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-      this.audioContext = new AudioContextClass({
-        latencyHint: 'interactive',
-        sampleRate: 44100
-      });
+      
+      // 某些瀏覽器可能需要不同的選項
+      const contextOptions = {};
+      try {
+        contextOptions.latencyHint = 'interactive';
+        contextOptions.sampleRate = 44100;
+      } catch (e) {
+        // 忽略不支援的選項
+      }
+      
+      this.audioContext = new AudioContextClass(contextOptions);
+      
+      // 處理 Safari 的自動播放限制
+      if (this.audioContext.state === 'suspended') {
+        document.addEventListener('click', () => {
+          this.audioContext.resume();
+        }, { once: true });
+      }
       
       // 建立音頻節點
       this.sourceNode = this.audioContext.createMediaElementSource(this.audioElement);
@@ -686,27 +719,59 @@ export class AudioPlayer {
   updateFilterSettings(playbackRate) {
     if (!this.filterNode || !this.isWebAudioConnected) return;
     
-    // 根據播放速度動態調整濾波器頻率
-    let frequency;
+    // 根據播放速度動態調整濾波器參數
+    let frequency, qValue;
+    
     if (playbackRate < 1.5) {
-      frequency = null; // 不應該在這個速度使用 Web Audio
+      // 不應該在這個速度使用濾波器
+      return;
     } else if (playbackRate <= 2.0) {
       frequency = 3500; // 1.5x-2.0x: 3.5kHz
+      qValue = 0.7;     // 較低的 Q 值，更自然的聲音
     } else if (playbackRate <= 2.5) {
       frequency = 3200; // 2.0x-2.5x: 3.2kHz  
+      qValue = 0.8;     // 稍微提高 Q 值
+    } else if (playbackRate <= 3.0) {
+      frequency = 3000; // 2.5x-3.0x: 3.0kHz
+      qValue = 0.9;     // 更高的 Q 值，補償高頻損失
     } else {
-      frequency = 3000; // >2.5x: 3.0kHz
+      frequency = 2800; // >3.0x: 2.8kHz
+      qValue = 1.0;     // 最高 Q 值
     }
     
-    if (frequency) {
-      this.filterNode.frequency.setValueAtTime(frequency, this.audioContext.currentTime);
-    }
+    // 使用平滑的參數變化避免爆音
+    const currentTime = this.audioContext.currentTime;
+    this.filterNode.frequency.linearRampToValueAtTime(frequency, currentTime + 0.1);
+    this.filterNode.Q.linearRampToValueAtTime(qValue, currentTime + 0.1);
+    
+    console.log(`Filter updated: ${frequency}Hz, Q=${qValue} for ${playbackRate}x speed`);
   }
   
   fallbackToNative() {
     console.log('Falling back to native audio playback');
     this.disconnectWebAudio();
     this.webAudioSupported = false; // 標記為不支援，避免重複嘗試
+  }
+  
+  // 更新音質優化狀態顯示
+  updateOptimizationStatus(speed = null) {
+    if (!this.elements.audioOptimizationStatus) return;
+    
+    const currentSpeed = speed || this.audioElement.playbackRate;
+    const isOptimized = this.isWebAudioConnected && currentSpeed >= 1.5;
+    
+    if (isOptimized) {
+      this.elements.audioOptimizationStatus.textContent = '🎵';
+      this.elements.audioOptimizationStatus.title = '音質優化已啟用';
+      this.elements.audioOptimizationStatus.style.color = 'var(--success-color)';
+    } else if (this.webAudioSupported && currentSpeed >= 1.5) {
+      this.elements.audioOptimizationStatus.textContent = '⚠️';
+      this.elements.audioOptimizationStatus.title = '音質優化未啟用';
+      this.elements.audioOptimizationStatus.style.color = 'var(--warning-color)';
+    } else {
+      this.elements.audioOptimizationStatus.textContent = '';
+      this.elements.audioOptimizationStatus.title = '';
+    }
   }
   
   // 取得當前載入的檔案
