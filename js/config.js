@@ -7,7 +7,12 @@ const Config = {
   api: {
     endpoint: 'https://api.openai.com/v1/audio/transcriptions',
     model: 'whisper-1',
-    maxFileSize: 50 * 1024 * 1024, // 50MB
+    maxFileSize: 25 * 1024 * 1024, // 25MB - OpenAI API 實際限制
+  },
+  
+  // 檔案限制
+  file: {
+    maxPlaybackSize: 2 * 1024 * 1024 * 1024, // 2GB - 本地播放限制
   },
   
   // 儲存設定

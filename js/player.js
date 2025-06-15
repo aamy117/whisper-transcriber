@@ -152,10 +152,10 @@ export class AudioPlayer {
       return false;
     }
     
-    // 檢查檔案大小
-    if (file.size > Config.api.maxFileSize) {
-      const maxSizeMB = Config.api.maxFileSize / (1024 * 1024);
-      this.showError(`檔案大小超過限制。最大允許：${maxSizeMB}MB`);
+    // 檢查檔案大小（播放限制）
+    if (file.size > Config.file.maxPlaybackSize) {
+      const maxSizeGB = Config.file.maxPlaybackSize / (1024 * 1024 * 1024);
+      this.showError(`檔案大小超過限制。最大允許：${maxSizeGB}GB`);
       return false;
     }
     

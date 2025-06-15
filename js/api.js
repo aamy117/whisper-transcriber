@@ -37,10 +37,10 @@ class WhisperAPI {
       throw new Error('請選擇檔案');
     }
     
-    // 檢查檔案大小
+    // 檢查檔案大小（API 限制）
     if (file.size > Config.api.maxFileSize) {
       const maxSizeMB = Config.api.maxFileSize / 1024 / 1024;
-      throw new Error(`檔案大小超過限制（最大 ${maxSizeMB}MB）`);
+      throw new Error(`檔案大小超過 OpenAI API 限制（最大 ${maxSizeMB}MB）。請使用較小的檔案進行轉譯。`);
     }
     
     // 檢查檔案格式
