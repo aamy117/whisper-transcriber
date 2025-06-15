@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Whisper 視訊工具 - 支援字幕搜尋與影片勘誤的專業工具">
+    <title>Whisper 視訊工具</title>
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/shared.css">
+    <link rel="stylesheet" href="css/style.css">
+    
+    <style>
+        .coming-soon {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 60vh;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+        
+        .coming-soon-icon {
+            font-size: 4rem;
+            margin-bottom: var(--spacing-lg);
+        }
+        
+        .coming-soon h2 {
+            font-size: 2rem;
+            color: var(--text-primary);
+            margin-bottom: var(--spacing-md);
+        }
+        
+        .coming-soon p {
+            max-width: 500px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <!-- 導航列 -->
+    <nav class="app-navigation">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <h1 class="nav-title">Whisper 工具</h1>
+            </div>
+            <div class="nav-links">
+                <a href="index.html" class="nav-link">
+                    <span class="nav-icon">🎵</span>
+                    <span>音訊工具</span>
+                </a>
+                <a href="video.html" class="nav-link active">
+                    <span class="nav-icon">🎬</span>
+                    <span>視訊工具</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+    
+    <div id="app">
+        <main class="app-main">
+            <div class="container">
+                <div class="coming-soon">
+                    <div class="coming-soon-icon">🎬</div>
+                    <h2>視訊工具開發中</h2>
+                    <p>
+                        我們正在開發強大的視訊處理功能，包括 MP4 字幕搜尋定位、
+                        時間標記與筆記、以及影片勘誤功能。敬請期待！
+                    </p>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script>
+        // 主題設定同步
+        const savedTheme = localStorage.getItem('whisper_theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+    </script>
+</body>
+</html>

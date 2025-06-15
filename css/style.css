@@ -80,8 +80,8 @@ body {
   background-color: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
   padding: var(--spacing-md) 0;
-  position: sticky;
-  top: 0;
+  position: relative;
+  top: auto;
   z-index: 100;
 }
 
@@ -451,7 +451,7 @@ body {
 
 /* Main Content */
 .app-main {
-  padding: var(--spacing-xl) 0;
+  padding: var(--spacing-md) 0 var(--spacing-xl) 0;
 }
 
 /* Upload Area */
