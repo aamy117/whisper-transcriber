@@ -53,9 +53,20 @@ const VideoConfig = {
   
   // 檔案設定
   file: {
-    maxSize: 2 * 1024 * 1024 * 1024, // 2GB
+    maxSize: 2 * 1024 * 1024 * 1024, // 2GB (將被移除)
     chunkSize: 1024 * 1024, // 1MB chunks for processing
     allowedTypes: ['video/mp4', 'video/webm', 'video/ogg', 'video/avi', 'video/mov']
+  },
+  
+  // 串流設定
+  streaming: {
+    enabled: true,
+    chunkSize: 2 * 1024 * 1024, // 2MB per chunk
+    bufferSize: 20 * 1024 * 1024, // 20MB buffer
+    threshold: 100 * 1024 * 1024, // 100MB 以上使用串流
+    preloadSize: 5 * 1024 * 1024, // 預載 5MB
+    bufferTime: 10, // 保持 10 秒緩衝
+    debug: true // 顯示串流除錯資訊
   },
   
   // 快捷鍵設定

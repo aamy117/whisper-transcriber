@@ -1,5 +1,6 @@
 // 視訊播放器核心模組
 import VideoConfig from './video-config.js';
+import { StreamingLoader, isMSESupported, getMSESupport } from './video-streaming.js';
 
 export class VideoPlayer {
   constructor(videoElement) {
@@ -9,6 +10,10 @@ export class VideoPlayer {
     this.isPlaying = false;
     this.isLoading = false;
     
+    // 串流載入器
+    this.streamingLoader = null;
+    this.useStreaming = false;
+    
     // 狀態管理
     this.state = {
       currentTime: 0,
@@ -17,7 +22,8 @@ export class VideoPlayer {
       volume: 1,
       playbackRate: 1,
       isFullscreen: false,
-      isMuted: false
+      isMuted: false,
+      isStreaming: false
     };
     
     // 效能優化
@@ -83,30 +89,69 @@ export class VideoPlayer {
       throw new Error(`不支援的檔案格式: ${file.type}`);
     }
     
-    // 檢查檔案大小
-    if (file.size > VideoConfig.file.maxSize) {
-      throw new Error(`檔案過大: ${(file.size / 1024 / 1024 / 1024).toFixed(2)}GB，最大支援 2GB`);
+    // 清理先前的資源
+    if (this.streamingLoader) {
+      this.streamingLoader.destroy();
+      this.streamingLoader = null;
     }
     
     try {
       this.isLoading = true;
       this.currentFile = file;
       
-      // 建立檔案 URL
-      const fileURL = URL.createObjectURL(file);
+      // 決定載入策略
+      const shouldUseStreaming = VideoConfig.streaming.enabled && 
+                                 file.size >= VideoConfig.streaming.threshold &&
+                                 isMSESupported() &&
+                                 this.isMSESupportedFormat(file.type);
       
-      // 載入視訊
-      await this.loadVideoSource(fileURL);
-      
-      // 取得視訊資訊
-      const info = await this.getVideoInfo();
-      
-      this.isLoading = false;
-      
-      // 發送載入完成事件
-      this.dispatchCustomEvent('video:loadeddata', { file, info });
-      
-      return info;
+      if (shouldUseStreaming) {
+        console.log(`使用串流載入 (檔案大小: ${this.formatFileSize(file.size)})`);
+        this.useStreaming = true;
+        this.state.isStreaming = true;
+        
+        // 使用串流載入
+        this.streamingLoader = new StreamingLoader(this.video);
+        
+        // 監聽串流進度
+        this.video.addEventListener('streaming:progress', this.handleStreamingProgress.bind(this));
+        
+        const info = await this.streamingLoader.loadFile(file);
+        
+        // 等待視訊 metadata 載入
+        await this.waitForMetadata();
+        
+        // 取得視訊資訊
+        const videoInfo = await this.getVideoInfo();
+        
+        this.isLoading = false;
+        
+        // 發送載入完成事件
+        this.dispatchCustomEvent('video:loadeddata', { file, info: videoInfo });
+        
+        return videoInfo;
+        
+      } else {
+        console.log(`使用直接載入 (檔案大小: ${this.formatFileSize(file.size)})`);
+        this.useStreaming = false;
+        this.state.isStreaming = false;
+        
+        // 建立檔案 URL
+        const fileURL = URL.createObjectURL(file);
+        
+        // 載入視訊
+        await this.loadVideoSource(fileURL);
+        
+        // 取得視訊資訊
+        const info = await this.getVideoInfo();
+        
+        this.isLoading = false;
+        
+        // 發送載入完成事件
+        this.dispatchCustomEvent('video:loadeddata', { file, info });
+        
+        return info;
+      }
       
     } catch (error) {
       this.isLoading = false;
@@ -387,12 +432,64 @@ export class VideoPlayer {
     this.video.dispatchEvent(event);
   }
   
+  // MSE 支援檢查
+  isMSESupportedFormat(mimeType) {
+    const baseType = mimeType.split(';')[0];
+    return baseType === 'video/mp4' || baseType === 'video/webm';
+  }
+  
+  // 等待 metadata 載入
+  waitForMetadata() {
+    return new Promise((resolve) => {
+      if (this.video.readyState >= 1) {
+        resolve();
+      } else {
+        this.video.addEventListener('loadedmetadata', resolve, { once: true });
+      }
+    });
+  }
+  
+  // 處理串流進度
+  handleStreamingProgress(event) {
+    const { loaded, total, percentage } = event.detail;
+    if (VideoConfig.streaming.debug) {
+      console.log(`串流進度: ${loaded}/${total} (${percentage.toFixed(1)}%)`);
+    }
+    
+    this.dispatchCustomEvent('video:streamingprogress', {
+      loaded,
+      total,
+      percentage
+    });
+  }
+  
+  // 格式化檔案大小
+  formatFileSize(bytes) {
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    if (bytes === 0) return '0 B';
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + sizes[i];
+  }
+  
   // 清理資源
   destroy() {
-    if (this.currentFile) {
+    // 清理串流載入器
+    if (this.streamingLoader) {
+      this.streamingLoader.destroy();
+      this.streamingLoader = null;
+    }
+    
+    // 清理視訊資源
+    if (this.currentFile && !this.useStreaming) {
       URL.revokeObjectURL(this.video.src);
     }
+    
     this.video.src = '';
     this.video.load();
+    
+    // 重置狀態
+    this.currentFile = null;
+    this.useStreaming = false;
+    this.state.isStreaming = false;
   }
 }
