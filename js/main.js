@@ -49,16 +49,22 @@ class WhisperApp {
     // 初始化編輯器
     const editorContainer = document.getElementById('editorContent');
     if (editorContainer) {
-      this.editor = new TranscriptionEditor(editorContainer);
-      
-      // 監聽編輯器事件
-      this.editor.on('save', (data) => {
-        this.handleEditorSave(data);
-      });
-      
-      this.editor.on('segmentClick', (data) => {
-        this.player.seekTo(data.time);
-      });
+      try {
+        this.editor = new TranscriptionEditor(editorContainer);
+        
+        // 監聽編輯器事件
+        this.editor.on('save', (data) => {
+          this.handleEditorSave(data);
+        });
+        
+        this.editor.on('segmentClick', (data) => {
+          if (this.player) {
+            this.player.seekTo(data.time);
+          }
+        });
+      } catch (error) {
+        console.error('編輯器初始化失敗:', error);
+      }
     }
     
     // 綁定 UI 事件
