@@ -236,17 +236,23 @@ export class VideoPlayer {
         } catch (streamError) {
           console.warn('串流載入失敗，嘗試傳統載入:', streamError);
           
-          // 串流失敗時嘗試傳統載入（如果檔案不是太大）
-          if (file.size <= 1024 * 1024 * 1024) { // 1GB 以下嘗試傳統載入
-            this.useStreaming = false;
-            this.state.isStreaming = false;
-            
-            // 清理串流載入器
-            if (this.streamingLoader) {
-              this.streamingLoader.destroy();
-              this.streamingLoader = null;
-            }
-            
+          // 清理串流載入器
+          if (this.streamingLoader) {
+            this.streamingLoader.destroy();
+            this.streamingLoader = null;
+          }
+          
+          this.useStreaming = false;
+          this.state.isStreaming = false;
+          
+          // 重置視訊元素
+          this.video.src = '';
+          this.video.load();
+          
+          // 根據檔案大小決定是否嘗試傳統載入
+          const maxTraditionalSize = 2 * 1024 * 1024 * 1024; // 2GB
+          
+          if (file.size <= maxTraditionalSize) {
             // 嘗試傳統載入
             console.log('🔄 回退到傳統載入模式');
             
@@ -258,9 +264,17 @@ export class VideoPlayer {
             this.isLoading = false;
             this.dispatchCustomEvent('video:loadeddata', { file, info });
             
+            // 顯示警告訊息
+            this.dispatchCustomEvent('video:warning', { 
+              message: '串流載入失敗，已切換為傳統載入模式。大檔案可能需要較長載入時間。' 
+            });
+            
             return info;
           } else {
-            throw new Error(`串流載入失敗且檔案過大 (${this.formatFileSize(file.size)}) 無法使用傳統載入: ${streamError.message}`);
+            // 檔案太大，建議使用其他方式
+            const errorMsg = `檔案過大 (${this.formatFileSize(file.size)})，串流載入失敗。\n\n可能的原因：\n1. 視訊檔案編碼格式不適合串流播放\n2. 檔案的 moov atom 不在檔案開頭\n\n建議：\n1. 使用較小的視訊檔案\n2. 使用 FFmpeg 重新編碼視訊：\n   ffmpeg -i input.mp4 -movflags faststart -c copy output.mp4`;
+            
+            throw new Error(errorMsg);
           }
         }
         
@@ -627,7 +641,15 @@ export class VideoPlayer {
   // 處理串流進度
   handleStreamingProgress(event) {
     const { loaded, total, percentage } = event.detail;
-    console.log(`串流進度: ${percentage.toFixed(1)}% (${this.formatFileSize(loaded)}/${this.formatFileSize(total)})`);
+    // loaded 和 total 是分塊數量，不是位元組
+    console.log(`串流進度: ${percentage.toFixed(1)}% (${loaded}/${total} 分塊)`);
+    
+    // 如果需要顯示位元組進度
+    if (this.streamingLoader && this.currentFile) {
+      const bytesLoaded = loaded * this.streamingLoader.chunkSize;
+      const bytesTotal = this.currentFile.size;
+      console.log(`已載入: ${this.formatFileSize(Math.min(bytesLoaded, bytesTotal))}/${this.formatFileSize(bytesTotal)}`);
+    }
     
     // 事件已經是 video:streaming:progress，不需要再次發送
   }

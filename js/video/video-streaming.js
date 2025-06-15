@@ -95,7 +95,21 @@ export class StreamingLoader {
     }
     
     // 開始載入第一個分塊
-    await this.loadNextChunk();
+    try {
+      await this.loadNextChunk();
+      
+      // 等待一段時間確認載入是否成功
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // 檢查是否有載入進度
+      if (this.currentChunk <= 1 && this.video.buffered.length === 0) {
+        throw new Error('串流載入無進展，可能是檔案格式不相容');
+      }
+      
+    } catch (error) {
+      console.error('串流載入初始化失敗:', error);
+      throw error;
+    }
     
     return {
       duration: this.video.duration,
@@ -267,15 +281,18 @@ export class StreamingLoader {
   appendBuffer(buffer) {
     return new Promise((resolve, reject) => {
       if (!this.sourceBuffer || this.sourceBuffer.updating) {
+        console.log('SourceBuffer 正在更新，加入待處理隊列');
         // 如果 SourceBuffer 正在更新，將資料加入待處理隊列
         this.pendingSegments.push({ buffer, resolve, reject });
         return;
       }
       
       try {
+        console.log(`準備附加緩衝區，大小: ${this.formatSize(buffer.byteLength)}`);
         this.sourceBuffer.appendBuffer(buffer);
         
         const onUpdateEnd = () => {
+          console.log('緩衝區附加成功');
           this.sourceBuffer.removeEventListener('updateend', onUpdateEnd);
           this.sourceBuffer.removeEventListener('error', onError);
           resolve();
@@ -285,6 +302,7 @@ export class StreamingLoader {
         };
         
         const onError = (e) => {
+          console.error('SourceBuffer 錯誤:', e);
           this.sourceBuffer.removeEventListener('updateend', onUpdateEnd);
           this.sourceBuffer.removeEventListener('error', onError);
           reject(new Error('附加緩衝區失敗'));
@@ -294,6 +312,7 @@ export class StreamingLoader {
         this.sourceBuffer.addEventListener('error', onError);
         
       } catch (error) {
+        console.error('appendBuffer 異常:', error);
         reject(error);
       }
     });
@@ -315,12 +334,25 @@ export class StreamingLoader {
    * 檢查緩衝區並載入更多資料
    */
   checkBufferAndLoad() {
-    if (!this.video.duration || this.currentChunk >= this.totalChunks) {
+    console.log(`檢查緩衝區 - 當前分塊: ${this.currentChunk}/${this.totalChunks}, 正在載入: ${this.isLoading}`);
+    
+    if (this.currentChunk >= this.totalChunks) {
+      console.log('所有分塊已載入完成');
+      return;
+    }
+    
+    // 如果視訊還沒有 duration，可能是第一個分塊還沒處理完
+    if (!this.video.duration || isNaN(this.video.duration)) {
+      console.log('視訊 duration 尚未就緒，稍後重試');
+      // 稍後重試
+      setTimeout(() => this.checkBufferAndLoad(), 1000);
       return;
     }
     
     const currentTime = this.video.currentTime;
     const buffered = this.video.buffered;
+    
+    console.log(`當前播放時間: ${currentTime.toFixed(2)}s, 緩衝區段數: ${buffered.length}`);
     
     // 計算已緩衝的時間
     let bufferedEnd = currentTime;
@@ -335,7 +367,10 @@ export class StreamingLoader {
     const bufferedTime = bufferedEnd - currentTime;
     const needMoreBuffer = bufferedTime < 10; // 保持 10 秒緩衝
     
+    console.log(`緩衝時間: ${bufferedTime.toFixed(2)}s, 需要更多緩衝: ${needMoreBuffer}`);
+    
     if (needMoreBuffer && !this.isLoading) {
+      console.log('開始載入下一個分塊');
       this.loadNextChunk();
     }
   }

@@ -73,7 +73,7 @@ const VideoConfig = {
     enabled: true,
     chunkSize: 5 * 1024 * 1024, // 5MB per chunk (增加以處理大檔案)
     bufferSize: 50 * 1024 * 1024, // 50MB buffer (增加緩衝)
-    threshold: 500 * 1024 * 1024, // 500MB 以上使用串流 (降低閾值)
+    threshold: 1024 * 1024 * 1024, // 1GB 以上才使用串流 (提高閾值，避免不必要的複雜性)
     preloadSize: 10 * 1024 * 1024, // 預載 10MB
     bufferTime: 15, // 保持 15 秒緩衝
     maxBufferTime: 60, // 最大緩衝 60 秒
