@@ -50,22 +50,22 @@ const VideoConfig = {
     prefix: 'whisper_video_',
     maxProjects: 10
   },
-  
-  // 檔案設定
+    // 檔案設定
   file: {
-    maxSize: 2 * 1024 * 1024 * 1024, // 2GB (將被移除)
+    maxSize: Infinity, // 移除檔案大小限制
+    warnSize: 2 * 1024 * 1024 * 1024, // 2GB 時顯示警告
     chunkSize: 1024 * 1024, // 1MB chunks for processing
-    allowedTypes: ['video/mp4', 'video/webm', 'video/ogg', 'video/ogv']
+    allowedTypes: ['video/mp4', 'video/webm', 'video/ogg', 'video/ogv', 'video/mov', 'video/avi', 'video/mkv']
   },
-  
-  // 串流設定
+    // 串流設定
   streaming: {
     enabled: true,
-    chunkSize: 2 * 1024 * 1024, // 2MB per chunk
-    bufferSize: 20 * 1024 * 1024, // 20MB buffer
-    threshold: 100 * 1024 * 1024, // 100MB 以上使用串流
-    preloadSize: 5 * 1024 * 1024, // 預載 5MB
-    bufferTime: 10, // 保持 10 秒緩衝
+    chunkSize: 5 * 1024 * 1024, // 5MB per chunk (增加以處理大檔案)
+    bufferSize: 50 * 1024 * 1024, // 50MB buffer (增加緩衝)
+    threshold: 500 * 1024 * 1024, // 500MB 以上使用串流 (降低閾值)
+    preloadSize: 10 * 1024 * 1024, // 預載 10MB
+    bufferTime: 15, // 保持 15 秒緩衝
+    maxBufferTime: 60, // 最大緩衝 60 秒
     debug: true // 顯示串流除錯資訊
   },
   

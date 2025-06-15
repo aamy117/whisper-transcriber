@@ -580,24 +580,52 @@ class VideoApp {
       checkSupport: () => {
         return VideoPlayer.checkBrowserSupport();
       },
-      
-      // 測試檔案
+        // 測試檔案
       testFile: (file) => {
         console.log('=== 檔案測試 ===');
         console.log('檔案名稱:', file.name);
         console.log('檔案大小:', this.formatFileSize(file.size));
         console.log('MIME 類型:', file.type);
         
+        // 檢查檔案大小分類
+        const sizeCategory = 
+          file.size > 5 * 1024 * 1024 * 1024 ? '超大檔案 (>5GB)' :
+          file.size > 2 * 1024 * 1024 * 1024 ? '大檔案 (>2GB)' :
+          file.size > 500 * 1024 * 1024 ? '中型檔案 (>500MB)' :
+          '小檔案 (<500MB)';
+        
+        console.log('檔案分類:', sizeCategory);
+        
+        // 檢查是否會使用串流
+        const willUseStreaming = VideoConfig.streaming.enabled && (
+          file.size >= VideoConfig.streaming.threshold ||
+          file.size > VideoConfig.file.warnSize
+        );
+        
+        console.log('載入策略:', willUseStreaming ? '串流模式' : '傳統模式');
+        
         // 檢查支援
         const video = document.createElement('video');
         const support = video.canPlayType(file.type);
         console.log('瀏覽器支援:', support || '不支援');
         
+        // 記憶體估算
+        const estimatedMemory = file.size / (1024 * 1024); // MB
+        const memoryWarning = estimatedMemory > 1024 ? 
+          `⚠️ 可能使用超過 ${Math.round(estimatedMemory)}MB 記憶體` : 
+          `✅ 預估記憶體使用: ${Math.round(estimatedMemory)}MB`;
+        
+        console.log('記憶體評估:', memoryWarning);
+        
         return {
           name: file.name,
           size: file.size,
+          sizeFormatted: this.formatFileSize(file.size),
           type: file.type,
-          support: support
+          category: sizeCategory,
+          support: support,
+          willUseStreaming: willUseStreaming,
+          estimatedMemoryMB: Math.round(estimatedMemory)
         };
       },
       

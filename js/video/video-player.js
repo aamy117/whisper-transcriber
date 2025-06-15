@@ -148,6 +148,30 @@ export class VideoPlayer {
     
     console.log(`✅ 檔案類型檢查通過: ${detectedType}`);
     
+    // 檢查檔案大小並顯示警告（但不阻止載入）
+    if (file.size > VideoConfig.file.warnSize) {
+      const fileSizeGB = (file.size / 1024 / 1024 / 1024).toFixed(2);
+      const warnSizeGB = (VideoConfig.file.warnSize / 1024 / 1024 / 1024).toFixed(0);
+      
+      console.warn(`⚠️ 大檔案警告: ${fileSizeGB}GB > ${warnSizeGB}GB`);
+      
+      const shouldContinue = confirm(
+        `檔案大小為 ${fileSizeGB}GB，超過建議的 ${warnSizeGB}GB。\n\n` +
+        `大檔案可能會：\n` +
+        `• 載入時間較長\n` +
+        `• 使用較多記憶體\n` +
+        `• 影響播放效能\n\n` +
+        `系統將自動使用串流模式來優化播放。\n\n` +
+        `是否繼續載入？`
+      );
+      
+      if (!shouldContinue) {
+        throw new Error('使用者取消載入大檔案');
+      }
+      
+      console.log('✅ 使用者確認載入大檔案');
+    }
+    
     // 清理先前的資源
     if (this.streamingLoader) {
       this.streamingLoader.destroy();
@@ -156,15 +180,22 @@ export class VideoPlayer {
     
     try {
       this.isLoading = true;
-      this.currentFile = file;
-        // 決定載入策略
-      const shouldUseStreaming = VideoConfig.streaming.enabled && 
-                                 file.size >= VideoConfig.streaming.threshold &&
-                                 isMSESupported() &&
-                                 this.isMSESupportedFormat(detectedType);
+      this.currentFile = file;      // 決定載入策略 - 大檔案強制使用串流
+      const shouldUseStreaming = VideoConfig.streaming.enabled && (
+        file.size >= VideoConfig.streaming.threshold ||
+        file.size > VideoConfig.file.warnSize // 超過警告大小的檔案強制串流
+      ) && isMSESupported() && this.isMSESupportedFormat(detectedType);
       
-      if (shouldUseStreaming) {
-        console.log(`使用串流載入 (檔案大小: ${this.formatFileSize(file.size)})`);
+      console.log(`載入策略決定:`, {
+        fileSize: this.formatFileSize(file.size),
+        threshold: this.formatFileSize(VideoConfig.streaming.threshold),
+        warnSize: this.formatFileSize(VideoConfig.file.warnSize),
+        mseSupported: isMSESupported(),
+        formatSupported: this.isMSESupportedFormat(detectedType),
+        willUseStreaming: shouldUseStreaming
+      });
+        if (shouldUseStreaming) {
+        console.log(`🎬 使用串流載入 (檔案大小: ${this.formatFileSize(file.size)})`);
         this.useStreaming = true;
         this.state.isStreaming = true;
         
@@ -174,20 +205,60 @@ export class VideoPlayer {
         // 監聽串流進度
         this.video.addEventListener('streaming:progress', this.handleStreamingProgress.bind(this));
         
-        const info = await this.streamingLoader.loadFile(file);
+        // 監聽串流錯誤
+        this.video.addEventListener('streaming:error', (e) => {
+          console.error('串流載入錯誤:', e.detail);
+          this.handleStreamingError(e.detail);
+        });
         
-        // 等待視訊 metadata 載入
-        await this.waitForMetadata();
-        
-        // 取得視訊資訊
-        const videoInfo = await this.getVideoInfo();
-        
-        this.isLoading = false;
-        
-        // 發送載入完成事件
-        this.dispatchCustomEvent('video:loadeddata', { file, info: videoInfo });
-        
-        return videoInfo;
+        try {
+          const info = await this.streamingLoader.loadFile(file);
+          
+          // 等待視訊 metadata 載入
+          await this.waitForMetadata();
+          
+          // 取得視訊資訊
+          const videoInfo = await this.getVideoInfo();
+          
+          this.isLoading = false;
+          
+          console.log('✅ 串流載入成功:', videoInfo);
+          
+          // 發送載入完成事件
+          this.dispatchCustomEvent('video:loadeddata', { file, info: videoInfo });
+          
+          return videoInfo;
+          
+        } catch (streamError) {
+          console.warn('串流載入失敗，嘗試傳統載入:', streamError);
+          
+          // 串流失敗時嘗試傳統載入（如果檔案不是太大）
+          if (file.size <= 1024 * 1024 * 1024) { // 1GB 以下嘗試傳統載入
+            this.useStreaming = false;
+            this.state.isStreaming = false;
+            
+            // 清理串流載入器
+            if (this.streamingLoader) {
+              this.streamingLoader.destroy();
+              this.streamingLoader = null;
+            }
+            
+            // 嘗試傳統載入
+            console.log('🔄 回退到傳統載入模式');
+            
+            const fileURL = URL.createObjectURL(file);
+            await this.loadVideoSource(fileURL);
+            await this.waitForMetadata();
+            const info = await this.getVideoInfo();
+            
+            this.isLoading = false;
+            this.dispatchCustomEvent('video:loadeddata', { file, info });
+            
+            return info;
+          } else {
+            throw new Error(`串流載入失敗且檔案過大 (${this.formatFileSize(file.size)}) 無法使用傳統載入: ${streamError.message}`);
+          }
+        }
         
       } else {
         // 使用傳統載入方式
@@ -559,6 +630,28 @@ export class VideoPlayer {
       total,
       percentage
     });
+  }
+
+  // 處理串流錯誤
+  handleStreamingError(error) {
+    console.error('串流錯誤:', error);
+    
+    // 根據錯誤類型提供不同的處理
+    let errorMessage = '串流播放錯誤';
+    
+    if (error.message) {
+      if (error.message.includes('MediaSource')) {
+        errorMessage = '瀏覽器不支援此視訊格式的串流播放';
+      } else if (error.message.includes('memory') || error.message.includes('Memory')) {
+        errorMessage = '記憶體不足，請嘗試使用較小的檔案';
+      } else if (error.message.includes('format') || error.message.includes('codec')) {
+        errorMessage = '視訊編碼格式不支援串流播放';
+      } else {
+        errorMessage = `串流錯誤: ${error.message}`;
+      }
+    }
+    
+    this.dispatchCustomEvent('video:error', { error: errorMessage });
   }
   
   // 格式化檔案大小
