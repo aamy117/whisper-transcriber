@@ -2,6 +2,7 @@ import Config from './config.js';
 import { AudioPlayer } from './player.js';
 import { WhisperAPI } from './api.js';
 import { TranscriptionEditor } from './editor.js';
+import { exportManager } from './export.js';
 
 // 主應用程式類別
 class WhisperApp {
@@ -470,12 +471,42 @@ class WhisperApp {
   handleExport() {
     const format = document.querySelector('input[name="exportFormat"]:checked')?.value;
     if (!format) {
-      alert('請選擇匯出格式');
+      this.showNotification('請選擇匯出格式', 'error');
       return;
     }
     
-    // TODO: 實作匯出功能
-    this.showNotification(`匯出功能 (${format}) 將在後續階段實作`, 'info');
+    // 檢查是否有轉譯內容
+    if (!this.editor || !this.currentProject?.transcription) {
+      this.showNotification('沒有可匯出的內容', 'error');
+      return;
+    }
+    
+    try {
+      // 取得編輯後的段落
+      const editedContent = this.editor.getEditedContent();
+      const segments = editedContent.segments;
+      
+      // 產生檔案名稱（使用原始音訊檔名或專案 ID）
+      const baseFilename = this.currentProject.fileName ? 
+        this.currentProject.fileName.replace(/\.[^/.]+$/, '') : // 移除副檔名
+        `轉譯_${new Date().toISOString().slice(0, 10)}`;
+      
+      // 執行匯出
+      exportManager.export(segments, format, baseFilename);
+      
+      // 顯示成功訊息
+      this.showNotification('檔案匯出成功！', 'success');
+      
+      // 關閉匯出對話框
+      const exportModal = document.getElementById('exportModal');
+      if (exportModal) {
+        this.hideModal(exportModal);
+      }
+      
+    } catch (error) {
+      console.error('匯出失敗:', error);
+      this.showNotification(`匯出失敗：${error.message}`, 'error');
+    }
   }
   
   // 通知功能
