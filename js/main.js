@@ -733,11 +733,11 @@ class WhisperApp {
     const projects = this.getRecentProjects();
     
     if (projects.length === 0) {
-      listContainer.style.display = 'none';
-      noProjectsMsg.style.display = 'block';
+      listContainer.classList.add('hidden');
+      noProjectsMsg.classList.remove('hidden');
     } else {
-      listContainer.style.display = 'block';
-      noProjectsMsg.style.display = 'none';
+      listContainer.classList.remove('hidden');
+      noProjectsMsg.classList.add('hidden');
       
       // 建立專案列表
       listContainer.innerHTML = projects.map(project => `
