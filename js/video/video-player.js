@@ -1,6 +1,60 @@
 // 視訊播放器核心模組
 import VideoConfig from './video-config.js';
-import { StreamingLoader, isMSESupported, getMSESupport } from './video-streaming.js';
+import { StreamingLoader } from './video-streaming.js';
+
+// 檢查 MSE (Media Source Extensions) 支援
+function isMSESupported() {
+  return 'MediaSource' in window && typeof MediaSource.isTypeSupported === 'function';
+}
+
+// 檢查瀏覽器對特定格式的支援
+function checkVideoSupport(format) {
+  const video = document.createElement('video');
+  return video.canPlayType(format);
+}
+
+// 改善的檔案類型檢測
+function improvedFileTypeDetection(file) {
+  console.log('=== 檔案類型檢測 ===');
+  console.log(`檔案名稱: ${file.name}`);
+  console.log(`原始 MIME 類型: ${file.type || '未知'}`);
+  
+  // 1. 檢查原始 MIME 類型
+  if (file.type && VideoConfig.file.allowedTypes.includes(file.type)) {
+    console.log(`✅ 使用原始 MIME 類型: ${file.type}`);
+    return file.type;
+  }
+  
+  // 2. 根據副檔名推斷
+  const extension = file.name.split('.').pop().toLowerCase();
+  console.log(`檔案副檔名: .${extension}`);
+  
+  const extensionMap = {
+    'mp4': 'video/mp4',
+    'm4v': 'video/mp4',
+    'mov': 'video/mp4',
+    'webm': 'video/webm',
+    'ogg': 'video/ogg',
+    'ogv': 'video/ogg',
+    'avi': 'video/x-msvideo',
+    'mkv': 'video/x-matroska'
+  };
+  
+  const inferredType = extensionMap[extension];
+  if (inferredType) {
+    console.log(`✅ 根據副檔名推斷類型: ${inferredType}`);
+    
+    // 檢查瀏覽器是否支援
+    const support = checkVideoSupport(inferredType);
+    console.log(`瀏覽器支援程度: ${support || '不支援'}`);
+    
+    return inferredType;
+  }
+  
+  // 3. 預設為 MP4（最通用的格式）
+  console.log(`⚠️ 無法確定類型，預設為 video/mp4`);
+  return 'video/mp4';
+}
 
 export class VideoPlayer {
   constructor(videoElement) {
@@ -77,37 +131,22 @@ export class VideoPlayer {
     this.video.volume = this.state.volume;
     this.video.playbackRate = this.state.playbackRate;
   }
-  
-  // 檔案載入
+    // 檔案載入
   async loadFile(file) {
     if (!file) {
       throw new Error('沒有選擇檔案');
     }
     
-    // 檢查檔案類型
-    console.log('檔案資訊:', {
-      name: file.name,
-      type: file.type,
-      size: this.formatFileSize(file.size)
-    });
+    // 使用改善的檔案類型檢測
+    const detectedType = improvedFileTypeDetection(file);
     
-    // 如果 file.type 為空，嘗試從檔案名稱推斷
-    let fileType = file.type;
-    if (!fileType) {
-      const extension = file.name.split('.').pop().toLowerCase();
-      const typeMap = {
-        'mp4': 'video/mp4',
-        'webm': 'video/webm',
-        'ogg': 'video/ogg',
-        'ogv': 'video/ogg'
-      };
-      fileType = typeMap[extension] || '';
+    // 檢查檔案類型是否在允許清單中
+    if (!VideoConfig.file.allowedTypes.includes(detectedType)) {
+      const supportedFormats = VideoConfig.file.allowedTypes.join(', ');
+      throw new Error(`不支援的檔案格式。\n檔案: ${file.name}\n檢測到的類型: ${detectedType}\n支援的格式: ${supportedFormats}`);
     }
     
-    if (!fileType || !VideoConfig.file.allowedTypes.includes(fileType)) {
-      const supportedFormats = 'MP4, WebM, OGG/OGV';
-      throw new Error(`不支援的檔案格式。\n目前檔案: ${file.name}\n檔案類型: ${fileType || '未知'}\n支援的格式: ${supportedFormats}`);
-    }
+    console.log(`✅ 檔案類型檢查通過: ${detectedType}`);
     
     // 清理先前的資源
     if (this.streamingLoader) {
@@ -118,12 +157,11 @@ export class VideoPlayer {
     try {
       this.isLoading = true;
       this.currentFile = file;
-      
-      // 決定載入策略
+        // 決定載入策略
       const shouldUseStreaming = VideoConfig.streaming.enabled && 
                                  file.size >= VideoConfig.streaming.threshold &&
                                  isMSESupported() &&
-                                 this.isMSESupportedFormat(file.type);
+                                 this.isMSESupportedFormat(detectedType);
       
       if (shouldUseStreaming) {
         console.log(`使用串流載入 (檔案大小: ${this.formatFileSize(file.size)})`);
@@ -152,7 +190,8 @@ export class VideoPlayer {
         return videoInfo;
         
       } else {
-        console.log(`使用直接載入 (檔案大小: ${this.formatFileSize(file.size)})`);
+        // 使用傳統載入方式
+        console.log(`使用傳統載入 (檔案大小: ${this.formatFileSize(file.size)})`);
         this.useStreaming = false;
         this.state.isStreaming = false;
         
@@ -161,6 +200,9 @@ export class VideoPlayer {
         
         // 載入視訊
         await this.loadVideoSource(fileURL);
+        
+        // 等待視訊 metadata 載入
+        await this.waitForMetadata();
         
         // 取得視訊資訊
         const info = await this.getVideoInfo();
@@ -451,32 +493,68 @@ export class VideoPlayer {
     const event = new CustomEvent(type, { detail });
     this.video.dispatchEvent(event);
   }
-  
-  // MSE 支援檢查
+
+  // 檢查 MSE 支援的格式
   isMSESupportedFormat(mimeType) {
+    if (!('MediaSource' in window)) {
+      return false;
+    }
+    
+    // 常見的 MSE 支援格式
+    const supportedFormats = [
+      'video/mp4; codecs="avc1.42E01E"',
+      'video/mp4; codecs="avc1.64001E"', 
+      'video/webm; codecs="vp8"',
+      'video/webm; codecs="vp9"'
+    ];
+    
+    // 檢查基本格式
+    if (MediaSource.isTypeSupported(mimeType)) {
+      return true;
+    }
+    
+    // 檢查帶編碼的格式
     const baseType = mimeType.split(';')[0];
-    return baseType === 'video/mp4' || baseType === 'video/webm';
-  }
-  
-  // 等待 metadata 載入
-  waitForMetadata() {
-    return new Promise((resolve) => {
-      if (this.video.readyState >= 1) {
-        resolve();
-      } else {
-        this.video.addEventListener('loadedmetadata', resolve, { once: true });
+    return supportedFormats.some(format => {
+      if (format.startsWith(baseType)) {
+        return MediaSource.isTypeSupported(format);
       }
+      return false;
     });
   }
-  
+
+  // 等待視訊元數據載入
+  waitForMetadata() {
+    return new Promise((resolve, reject) => {
+      if (this.video.readyState >= 1) {
+        // 元數據已載入
+        resolve();
+        return;
+      }
+      
+      const handleMetadata = () => {
+        this.video.removeEventListener('loadedmetadata', handleMetadata);
+        this.video.removeEventListener('error', handleError);
+        resolve();
+      };
+      
+      const handleError = (e) => {
+        this.video.removeEventListener('loadedmetadata', handleMetadata);
+        this.video.removeEventListener('error', handleError);
+        reject(new Error('載入視訊元數據失敗'));
+      };
+      
+      this.video.addEventListener('loadedmetadata', handleMetadata);
+      this.video.addEventListener('error', handleError);
+    });
+  }
+
   // 處理串流進度
   handleStreamingProgress(event) {
     const { loaded, total, percentage } = event.detail;
-    if (VideoConfig.streaming.debug) {
-      console.log(`串流進度: ${loaded}/${total} (${percentage.toFixed(1)}%)`);
-    }
+    console.log(`串流進度: ${percentage.toFixed(1)}% (${this.formatFileSize(loaded)}/${this.formatFileSize(total)})`);
     
-    this.dispatchCustomEvent('video:streamingprogress', {
+    this.dispatchCustomEvent('video:streaming:progress', {
       loaded,
       total,
       percentage
@@ -529,5 +607,48 @@ export class VideoPlayer {
     this.currentFile = null;
     this.useStreaming = false;
     this.state.isStreaming = false;
+  }
+  
+  // 除錯模式
+  enableDebugMode() {
+    window.videoDebug = {
+      app: this,
+      player: this.player,
+      ui: this.ui,
+      config: VideoConfig,
+      
+      // 測試方法
+      loadTestVideo: async () => {
+        // 建立測試檔案
+        const response = await fetch('data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAAIZnJlZQAA...');
+        const blob = await response.blob();
+        const file = new File([blob], 'test.mp4', { type: 'video/mp4' });
+        await this.handleFileSelect([file]);
+      },
+      
+      // 檢查瀏覽器支援
+      checkSupport: () => {
+        return VideoPlayer.checkBrowserSupport();
+      },
+      
+      // 測試檔案
+      testFile: (file) => {
+        return improvedFileTypeDetection(file);
+      },
+      
+      getState: () => {
+        return {
+          app: this.currentProject,
+          player: this.player?.getState(),
+          ui: this.ui?.state
+        };
+      }
+    };
+    
+    console.log('除錯模式已啟用。使用 window.videoDebug 存取除錯功能。');
+    console.log('可用方法:');
+    console.log('- videoDebug.checkSupport() - 檢查瀏覽器支援');
+    console.log('- videoDebug.testFile(file) - 測試檔案類型檢測');
+    console.log('- videoDebug.getState() - 獲取當前狀態');
   }
 }
