@@ -32,12 +32,16 @@ function improvedFileTypeDetection(file) {
   const extensionMap = {
     'mp4': 'video/mp4',
     'm4v': 'video/mp4',
-    'mov': 'video/mp4',
+    'mov': 'video/quicktime',
     'webm': 'video/webm',
     'ogg': 'video/ogg',
     'ogv': 'video/ogg',
     'avi': 'video/x-msvideo',
-    'mkv': 'video/x-matroska'
+    'mkv': 'video/x-matroska',
+    '3gp': 'video/3gpp',
+    '3g2': 'video/3gpp2',
+    'wmv': 'video/x-ms-wmv',
+    'flv': 'video/x-flv'
   };
   
   const inferredType = extensionMap[extension];
@@ -203,10 +207,10 @@ export class VideoPlayer {
         this.streamingLoader = new StreamingLoader(this.video);
         
         // 監聽串流進度
-        this.video.addEventListener('streaming:progress', this.handleStreamingProgress.bind(this));
+        this.video.addEventListener('video:streaming:progress', this.handleStreamingProgress.bind(this));
         
         // 監聽串流錯誤
-        this.video.addEventListener('streaming:error', (e) => {
+        this.video.addEventListener('video:streaming:error', (e) => {
           console.error('串流載入錯誤:', e.detail);
           this.handleStreamingError(e.detail);
         });
@@ -625,11 +629,7 @@ export class VideoPlayer {
     const { loaded, total, percentage } = event.detail;
     console.log(`串流進度: ${percentage.toFixed(1)}% (${this.formatFileSize(loaded)}/${this.formatFileSize(total)})`);
     
-    this.dispatchCustomEvent('video:streaming:progress', {
-      loaded,
-      total,
-      percentage
-    });
+    // 事件已經是 video:streaming:progress，不需要再次發送
   }
 
   // 處理串流錯誤

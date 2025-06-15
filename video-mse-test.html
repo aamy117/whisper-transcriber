@@ -356,8 +356,7 @@
                 const video = this.player.video;
                 video.addEventListener('video:loadeddata', (e) => this.handleVideoLoaded(e.detail));
                 video.addEventListener('video:error', (e) => this.handleVideoError(e.detail));
-                video.addEventListener('video:streamingprogress', (e) => this.handleStreamingProgress(e.detail));
-                video.addEventListener('streaming:progress', (e) => this.handleStreamingProgress(e.detail));
+                video.addEventListener('video:streaming:progress', (e) => this.handleStreamingProgress(e.detail));
                 
                 // 標籤切換
                 document.querySelectorAll('.tab-btn').forEach(btn => {

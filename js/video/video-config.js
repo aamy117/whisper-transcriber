@@ -55,7 +55,18 @@ const VideoConfig = {
     maxSize: Infinity, // 移除檔案大小限制
     warnSize: 2 * 1024 * 1024 * 1024, // 2GB 時顯示警告
     chunkSize: 1024 * 1024, // 1MB chunks for processing
-    allowedTypes: ['video/mp4', 'video/webm', 'video/ogg', 'video/ogv', 'video/mov', 'video/avi', 'video/mkv']
+    allowedTypes: [
+      'video/mp4', 
+      'video/webm', 
+      'video/ogg', 
+      'video/quicktime',
+      'video/x-msvideo',
+      'video/x-matroska',
+      'video/3gpp',
+      'video/3gpp2',
+      'video/x-ms-wmv',
+      'video/x-flv'
+    ]
   },
     // 串流設定
   streaming: {

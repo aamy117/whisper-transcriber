@@ -82,6 +82,15 @@ export class StreamingLoader {
       this.setupSourceBufferHandlers();
     } catch (error) {
       console.error('建立 SourceBuffer 失敗:', error);
+      
+      // 觸發錯誤事件
+      this.video.dispatchEvent(new CustomEvent('video:streaming:error', {
+        detail: {
+          error: `無法建立 SourceBuffer: ${error.message}`,
+          mimeType: mimeType
+        }
+      }));
+      
       throw new Error(`無法建立 SourceBuffer: ${error.message}`);
     }
     
@@ -208,7 +217,7 @@ export class StreamingLoader {
       this.isLoading = false;
       
       // 觸發進度事件
-      this.video.dispatchEvent(new CustomEvent('streaming:progress', {
+      this.video.dispatchEvent(new CustomEvent('video:streaming:progress', {
         detail: {
           loaded: this.currentChunk,
           total: this.totalChunks,
@@ -222,6 +231,16 @@ export class StreamingLoader {
     } catch (error) {
       this.isLoading = false;
       console.error('載入分塊失敗:', error);
+      
+      // 觸發錯誤事件
+      this.video.dispatchEvent(new CustomEvent('video:streaming:error', {
+        detail: {
+          error: error.message || '串流載入失敗',
+          chunk: this.currentChunk,
+          total: this.totalChunks
+        }
+      }));
+      
       throw error;
     }
   }

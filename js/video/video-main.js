@@ -477,7 +477,7 @@ class VideoApp {
         console.log('載入上次的專案:', this.currentProject);
         
         // 更新 UI 顯示專案資訊
-        this.updateProjectInfo();
+        // this.updateProjectInfo(); // TODO: 實作此函數或移除
         
         // 顯示提示訊息
         const notification = this.createNotification(
@@ -551,6 +551,14 @@ class VideoApp {
       }, 300);
     }, 3000);
   }
+  // 格式化檔案大小
+  formatFileSize(bytes) {
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    if (bytes === 0) return '0 B';
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + sizes[i];
+  }
+
     // 除錯模式
   enableDebugMode() {
     window.videoDebug = {
@@ -584,7 +592,7 @@ class VideoApp {
       testFile: (file) => {
         console.log('=== 檔案測試 ===');
         console.log('檔案名稱:', file.name);
-        console.log('檔案大小:', this.formatFileSize(file.size));
+        console.log('檔案大小:', app.formatFileSize(file.size));
         console.log('MIME 類型:', file.type);
         
         // 檢查檔案大小分類
@@ -620,7 +628,7 @@ class VideoApp {
         return {
           name: file.name,
           size: file.size,
-          sizeFormatted: this.formatFileSize(file.size),
+          sizeFormatted: app.formatFileSize(file.size),
           type: file.type,
           category: sizeCategory,
           support: support,
