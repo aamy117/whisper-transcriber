@@ -489,6 +489,51 @@ export class VideoPlayer {
   
   handleCanPlayThrough() {
     console.log('視訊可以流暢播放');
+    
+    // 如果視訊尺寸仍然為 0，嘗試強制刷新
+    if (this.video.videoWidth === 0 || this.video.videoHeight === 0) {
+      console.warn('視訊尺寸仍為 0，嘗試修復...');
+      
+      // 方法1：暫停並重新播放
+      const wasPlaying = !this.video.paused;
+      this.video.pause();
+      
+      // 方法2：觸發大小變更
+      this.video.style.width = '99%';
+      setTimeout(() => {
+        this.video.style.width = '100%';
+        if (wasPlaying) {
+          this.video.play().catch(e => console.error('重新播放失敗:', e));
+        }
+      }, 100);
+      
+      // 方法3：重新載入視訊源
+      if (this.retryCount === undefined) {
+        this.retryCount = 0;
+      }
+      
+      if (this.retryCount < 3 && !this.useStreaming) {
+        this.retryCount++;
+        console.log(`嘗試重新載入視訊 (第 ${this.retryCount} 次)`);
+        const currentSrc = this.video.src;
+        const currentTime = this.video.currentTime;
+        
+        setTimeout(() => {
+          if (this.video.videoWidth === 0) {
+            this.video.src = '';
+            this.video.load();
+            setTimeout(() => {
+              this.video.src = currentSrc;
+              this.video.currentTime = currentTime;
+            }, 100);
+          }
+        }, 500);
+      }
+    } else {
+      // 重置重試計數
+      this.retryCount = 0;
+      console.log(`✅ 視訊尺寸正常: ${this.video.videoWidth}x${this.video.videoHeight}`);
+    }
   }
   
   handlePlay() {

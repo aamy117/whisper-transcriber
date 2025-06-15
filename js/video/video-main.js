@@ -643,6 +643,71 @@ class VideoApp {
         };
       },
       
+      // 嘗試修復視訊顯示問題
+      fixVideo: async () => {
+        console.log('嘗試修復視訊顯示...');
+        
+        const video = this.player.video;
+        const wrapper = video.parentElement;
+        
+        // 1. 修復容器大小
+        if (wrapper) {
+          wrapper.style.minHeight = '400px';
+          wrapper.style.height = '100%';
+          console.log('✅ 容器大小已更新');
+        }
+        
+        // 2. 重新設置視訊樣式
+        video.style.width = '100%';
+        video.style.height = '100%';
+        video.style.maxWidth = '100%';
+        video.style.maxHeight = '100%';
+        video.style.objectFit = 'contain';
+        console.log('✅ 視訊樣式已更新');
+        
+        // 3. 如果是音訊檔案偽裝成視訊
+        if (video.videoWidth === 0 && video.duration > 0) {
+          console.warn('⚠️ 這可能是一個純音訊檔案');
+          
+          // 創建視覺化提示
+          const audioIndicator = document.createElement('div');
+          audioIndicator.style.cssText = `
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 48px;
+            text-align: center;
+            pointer-events: none;
+            z-index: 5;
+          `;
+          audioIndicator.innerHTML = '🎵<br><span style="font-size: 24px">音訊播放中</span>';
+          wrapper.appendChild(audioIndicator);
+          
+          return '已添加音訊指示器';
+        }
+        
+        // 4. 嘗試重新載入
+        if (video.videoWidth === 0) {
+          console.log('嘗試重新載入視訊...');
+          const currentTime = video.currentTime;
+          const src = video.src;
+          
+          video.src = '';
+          await new Promise(r => setTimeout(r, 100));
+          video.src = src;
+          video.currentTime = currentTime;
+          
+          // 等待載入
+          await new Promise(r => setTimeout(r, 1000));
+          
+          return videoDebug.diagnose();
+        }
+        
+        return '修復完成';
+      },
+      
       // 測試檔案
       testFile: (file) => {
         console.log('=== 檔案測試 ===');
