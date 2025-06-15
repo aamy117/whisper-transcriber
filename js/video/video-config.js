@@ -55,7 +55,7 @@ const VideoConfig = {
   file: {
     maxSize: 2 * 1024 * 1024 * 1024, // 2GB (將被移除)
     chunkSize: 1024 * 1024, // 1MB chunks for processing
-    allowedTypes: ['video/mp4', 'video/webm', 'video/ogg', 'video/avi', 'video/mov']
+    allowedTypes: ['video/mp4', 'video/webm', 'video/ogg', 'video/ogv']
   },
   
   // 串流設定

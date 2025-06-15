@@ -158,7 +158,10 @@ class VideoApp {
     const file = files[0];
     
     // 檢查是否為視訊檔案
-    if (!file.type.startsWith('video/')) {
+    const extension = file.name.split('.').pop().toLowerCase();
+    const videoExtensions = ['mp4', 'webm', 'ogg', 'ogv', 'mov', 'avi', 'mkv', 'm4v'];
+    
+    if (!file.type.startsWith('video/') && !videoExtensions.includes(extension)) {
       this.showError('請選擇視訊檔案');
       return;
     }
@@ -283,6 +286,15 @@ class VideoApp {
   
   // 顯示使用說明
   showHelp() {
+    // 檢查瀏覽器支援
+    const browserSupport = VideoPlayer.checkBrowserSupport ? VideoPlayer.checkBrowserSupport() : {};
+    let supportInfo = '<ul style="margin-left: 20px;">';
+    for (const [format, support] of Object.entries(browserSupport)) {
+      const icon = support === 'probably' ? '✅' : support === 'maybe' ? '⚠️' : '❌';
+      supportInfo += `<li>${icon} ${format}: ${support}</li>`;
+    }
+    supportInfo += '</ul>';
+    
     const modal = this.createModal('使用說明', `
       <div class="help-content" style="padding: 20px; max-height: 60vh; overflow-y: auto;">
         <h3 style="margin-bottom: 20px;">視訊播放器使用說明</h3>
@@ -291,10 +303,19 @@ class VideoApp {
           <h4 style="margin-bottom: 10px;">🎬 基本操作</h4>
           <ul style="margin-left: 20px; line-height: 1.8;">
             <li>拖放影片檔案或點擊選擇檔案按鈕上傳</li>
-            <li>支援 MP4、WebM、OGV 格式（最大 2GB）</li>
+            <li>支援 MP4、WebM、OGG/OGV 格式</li>
             <li>點擊播放按鈕或按空白鍵播放/暫停</li>
             <li>拖動進度條跳轉到指定時間</li>
           </ul>
+        </section>
+        
+        <section style="margin-bottom: 20px;">
+          <h4 style="margin-bottom: 10px;">📹 支援的視訊格式</h4>
+          <p style="margin-bottom: 10px;">您的瀏覽器支援以下格式：</p>
+          ${supportInfo}
+          <p style="margin-top: 10px; font-size: 14px; color: #666;">
+            <strong>建議：</strong>使用 MP4 (H.264) 格式以獲得最佳相容性
+          </p>
         </section>
         
         <section style="margin-bottom: 20px;">

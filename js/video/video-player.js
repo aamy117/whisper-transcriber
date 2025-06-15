@@ -85,8 +85,28 @@ export class VideoPlayer {
     }
     
     // 檢查檔案類型
-    if (!VideoConfig.file.allowedTypes.includes(file.type)) {
-      throw new Error(`不支援的檔案格式: ${file.type}`);
+    console.log('檔案資訊:', {
+      name: file.name,
+      type: file.type,
+      size: this.formatFileSize(file.size)
+    });
+    
+    // 如果 file.type 為空，嘗試從檔案名稱推斷
+    let fileType = file.type;
+    if (!fileType) {
+      const extension = file.name.split('.').pop().toLowerCase();
+      const typeMap = {
+        'mp4': 'video/mp4',
+        'webm': 'video/webm',
+        'ogg': 'video/ogg',
+        'ogv': 'video/ogg'
+      };
+      fileType = typeMap[extension] || '';
+    }
+    
+    if (!fileType || !VideoConfig.file.allowedTypes.includes(fileType)) {
+      const supportedFormats = 'MP4, WebM, OGG/OGV';
+      throw new Error(`不支援的檔案格式。\n目前檔案: ${file.name}\n檔案類型: ${fileType || '未知'}\n支援的格式: ${supportedFormats}`);
     }
     
     // 清理先前的資源
@@ -469,6 +489,24 @@ export class VideoPlayer {
     if (bytes === 0) return '0 B';
     const i = Math.floor(Math.log(bytes) / Math.log(1024));
     return (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + sizes[i];
+  }
+  
+  // 檢查瀏覽器支援的視訊格式
+  static checkBrowserSupport() {
+    const video = document.createElement('video');
+    const formats = {
+      'MP4 (H.264)': 'video/mp4; codecs="avc1.42E01E"',
+      'WebM (VP8)': 'video/webm; codecs="vp8"',
+      'WebM (VP9)': 'video/webm; codecs="vp9"',
+      'Ogg (Theora)': 'video/ogg; codecs="theora"'
+    };
+    
+    const support = {};
+    for (const [name, type] of Object.entries(formats)) {
+      support[name] = video.canPlayType(type) || 'no';
+    }
+    
+    return support;
   }
   
   // 清理資源
