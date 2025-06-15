@@ -1046,3 +1046,79 @@ kbd {
 .speed-control label {
   white-space: nowrap;
 }
+
+/* 編輯器容器 */
+.editor-container {
+  max-height: 600px;
+  overflow-y: auto;
+  padding: var(--spacing-md);
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.editor-empty {
+  text-align: center;
+  color: var(--text-tertiary);
+  padding: var(--spacing-xl);
+}
+
+/* 編輯器段落樣式 */
+.editor-container .segment {
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.segment-active {
+  background-color: var(--bg-tertiary);
+  border-left: 3px solid var(--primary-color);
+  margin-left: -3px;
+}
+
+.segment-edited .segment-text {
+  border-left: 3px solid var(--warning-color);
+  padding-left: calc(var(--spacing-sm) - 3px);
+}
+
+/* 段落操作按鈕 */
+.segment-actions {
+  position: absolute;
+  right: var(--spacing-sm);
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.segment:hover .segment-actions {
+  opacity: 1;
+}
+
+.segment-action-btn {
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-xs);
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+}
+
+.segment-action-btn:hover {
+  background-color: var(--bg-secondary);
+  border-color: var(--border-hover);
+}
+
+/* 搜尋高亮 */
+mark {
+  background-color: #ffeb3b;
+  color: #000;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+/* 深色模式搜尋高亮 */
+[data-theme="dark"] mark {
+  background-color: #ffc107;
+  color: #000;
+}

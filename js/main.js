@@ -1,6 +1,7 @@
 import Config from './config.js';
 import { AudioPlayer } from './player.js';
 import { WhisperAPI } from './api.js';
+import { TranscriptionEditor } from './editor.js';
 
 // 主應用程式類別
 class WhisperApp {
@@ -9,6 +10,7 @@ class WhisperApp {
     this.apiKey = null;
     this.currentProject = null;
     this.whisperAPI = null;
+    this.editor = null;
     this.isTranscribing = false;
     
     this.init();
@@ -42,6 +44,21 @@ class WhisperApp {
     // 初始化 API
     if (this.apiKey) {
       this.whisperAPI = new WhisperAPI();
+    }
+    
+    // 初始化編輯器
+    const editorContainer = document.getElementById('editorContent');
+    if (editorContainer) {
+      this.editor = new TranscriptionEditor(editorContainer);
+      
+      // 監聽編輯器事件
+      this.editor.on('save', (data) => {
+        this.handleEditorSave(data);
+      });
+      
+      this.editor.on('segmentClick', (data) => {
+        this.player.seekTo(data.time);
+      });
     }
     
     // 綁定 UI 事件
@@ -140,6 +157,70 @@ class WhisperApp {
         this.setTheme(e.target.value);
       });
     }
+    
+    // 搜尋功能
+    const searchBtn = document.getElementById('searchBtn');
+    const searchBar = document.getElementById('searchBar');
+    const searchInput = document.getElementById('searchInput');
+    const searchCloseBtn = document.getElementById('searchCloseBtn');
+    
+    if (searchBtn) {
+      searchBtn.addEventListener('click', () => {
+        this.toggleSearch();
+      });
+    }
+    
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        this.handleSearch(e.target.value);
+      });
+      
+      searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          this.closeSearch();
+        }
+      });
+    }
+    
+    if (searchCloseBtn) {
+      searchCloseBtn.addEventListener('click', () => {
+        this.closeSearch();
+      });
+    }
+    
+    // 儲存按鈕
+    const saveBtn = document.getElementById('saveBtn');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', () => {
+        this.saveProject();
+        this.showNotification('專案已儲存', 'success');
+      });
+    }
+    
+    // 全域快捷鍵
+    document.addEventListener('keydown', (e) => {
+      // Ctrl/Cmd + F: 搜尋
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        this.toggleSearch();
+      }
+      
+      // Ctrl/Cmd + S: 儲存
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        this.saveProject();
+        this.showNotification('專案已儲存', 'success');
+      }
+      
+      // Ctrl/Cmd + E: 匯出
+      if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+        e.preventDefault();
+        const exportModal = document.getElementById('exportModal');
+        if (exportModal) {
+          this.showModal(exportModal);
+        }
+      }
+    });
   }
   
   // Modal 控制
@@ -263,11 +344,22 @@ class WhisperApp {
   
   // 專案管理
   loadLastProject() {
-    const projectData = localStorage.getItem(Config.storage.prefix + 'currentProject');
+    const lastProjectId = localStorage.getItem(Config.storage.prefix + 'lastProjectId');
+    if (!lastProjectId) return;
+    
+    const projectKey = Config.storage.prefix + lastProjectId;
+    const projectData = localStorage.getItem(projectKey);
+    
     if (projectData) {
       try {
         this.currentProject = JSON.parse(projectData);
-        // TODO: 恢復上次的專案狀態
+        
+        // 如果有轉譯結果，顯示在編輯器中
+        if (this.currentProject.transcription) {
+          this.displayTranscription();
+        }
+        
+        this.showNotification('已載入上次的專案', 'info');
       } catch (e) {
         console.error('載入專案失敗:', e);
       }
@@ -446,7 +538,6 @@ class WhisperApp {
   // 顯示轉譯結果
   displayTranscription() {
     const editorSection = document.getElementById('editorSection');
-    const editorContent = document.getElementById('editorContent');
     
     if (!this.currentProject?.transcription) {
       return;
@@ -457,27 +548,9 @@ class WhisperApp {
       editorSection.style.display = 'block';
     }
     
-    // 暫時顯示簡單的文字結果（後續會整合編輯器模組）
-    if (editorContent) {
-      const segments = this.currentProject.transcription.segments;
-      editorContent.innerHTML = segments.map((seg, index) => `
-        <div class="segment" data-segment-id="${index}">
-          <div class="segment-time" data-time="${seg.start}">
-            ${this.formatTime(seg.start)}
-          </div>
-          <div class="segment-text">
-            ${seg.text}
-          </div>
-        </div>
-      `).join('');
-      
-      // 綁定點擊事件
-      editorContent.querySelectorAll('.segment-time').forEach(timeEl => {
-        timeEl.addEventListener('click', () => {
-          const time = parseFloat(timeEl.dataset.time);
-          this.player.seekTo(time);
-        });
-      });
+    // 使用編輯器模組顯示結果
+    if (this.editor) {
+      this.editor.loadTranscription(this.currentProject.transcription);
     }
   }
   
@@ -492,11 +565,84 @@ class WhisperApp {
   saveProject() {
     if (!this.currentProject) return;
     
+    // 如果有編輯器，取得編輯後的內容
+    if (this.editor && this.currentProject.transcription) {
+      const editedContent = this.editor.getEditedContent();
+      this.currentProject.transcription.segments = editedContent.segments;
+      this.currentProject.hasEdits = editedContent.hasEdits;
+    }
+    
+    // 更新最後修改時間
+    this.currentProject.lastModified = new Date().toISOString();
+    
     const key = `${Config.storage.prefix}${this.currentProject.id}`;
     localStorage.setItem(key, JSON.stringify(this.currentProject));
     
     // 更新最後專案 ID
     localStorage.setItem(`${Config.storage.prefix}lastProjectId`, this.currentProject.id);
+  }
+  
+  // 處理編輯器儲存事件
+  handleEditorSave(data) {
+    if (!this.currentProject) return;
+    
+    // 更新專案中的段落
+    if (this.currentProject.transcription) {
+      this.currentProject.transcription.segments = data.segments;
+    }
+    
+    // 儲存專案
+    this.saveProject();
+  }
+  
+  // 搜尋功能
+  toggleSearch() {
+    const searchBar = document.getElementById('searchBar');
+    const searchInput = document.getElementById('searchInput');
+    
+    if (!searchBar) return;
+    
+    const isVisible = searchBar.style.display === 'block';
+    
+    if (isVisible) {
+      this.closeSearch();
+    } else {
+      searchBar.style.display = 'block';
+      if (searchInput) {
+        searchInput.focus();
+        searchInput.select();
+      }
+    }
+  }
+  
+  closeSearch() {
+    const searchBar = document.getElementById('searchBar');
+    const searchInput = document.getElementById('searchInput');
+    
+    if (searchBar) {
+      searchBar.style.display = 'none';
+    }
+    
+    if (searchInput) {
+      searchInput.value = '';
+    }
+    
+    // 清除編輯器中的搜尋高亮
+    if (this.editor) {
+      this.editor.clearSearch();
+    }
+  }
+  
+  handleSearch(term) {
+    if (!this.editor) return;
+    
+    const results = this.editor.search(term);
+    
+    if (term && results.length === 0) {
+      this.showNotification('未找到匹配的內容', 'warning');
+    } else if (term && results.length > 0) {
+      this.showNotification(`找到 ${results.length} 個匹配項`, 'info');
+    }
   }
 }
 
