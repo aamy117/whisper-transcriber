@@ -46,12 +46,14 @@ class VideoApp {
       
       // 設定主題
       this.setupTheme();
-      
-      // 載入上次的專案（如果有）
+        // 載入上次的專案（如果有）
       this.loadLastProject();
       
+      // 啟用除錯模式（開發階段）
+      this.enableDebugMode();
+      
       this.isInitialized = true;
-      console.log('視訊播放器初始化完成');
+      console.log('✅ 視訊播放器初始化完成');
       
     } catch (error) {
       console.error('視訊播放器初始化失敗:', error);
@@ -462,8 +464,7 @@ class VideoApp {
     // 儲存為最後的專案
     localStorage.setItem(`${VideoConfig.storage.prefix}lastProjectId`, this.currentProject.id);
   }
-  
-  loadLastProject() {
+    loadLastProject() {
     const lastProjectId = localStorage.getItem(`${VideoConfig.storage.prefix}lastProjectId`);
     if (!lastProjectId) return;
     
@@ -474,9 +475,26 @@ class VideoApp {
       try {
         this.currentProject = JSON.parse(projectData);
         console.log('載入上次的專案:', this.currentProject);
-        // 這裡可以顯示專案資訊，但不自動載入檔案
+        
+        // 更新 UI 顯示專案資訊
+        this.updateProjectInfo();
+        
+        // 顯示提示訊息
+        const notification = this.createNotification(
+          `發現上次的專案：${this.currentProject.fileName}。請重新選擇檔案開始播放。`, 
+          'info'
+        );
+        
+        // 延遲顯示，確保 DOM 已載入
+        setTimeout(() => {
+          this.showNotification(notification);
+        }, 1000);
+        
       } catch (error) {
         console.error('載入專案失敗:', error);
+        // 清除無效的專案資料
+        localStorage.removeItem(key);
+        localStorage.removeItem(`${VideoConfig.storage.prefix}lastProjectId`);
       }
     }
   }
@@ -533,8 +551,7 @@ class VideoApp {
       }, 300);
     }, 3000);
   }
-  
-  // 除錯模式
+    // 除錯模式
   enableDebugMode() {
     window.videoDebug = {
       app: this,
@@ -544,11 +561,54 @@ class VideoApp {
       
       // 測試方法
       loadTestVideo: async () => {
-        // 建立測試檔案
-        const response = await fetch('data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAAIZnJlZQAA...');
-        const blob = await response.blob();
-        const file = new File([blob], 'test.mp4', { type: 'video/mp4' });
-        await this.handleFileSelect([file]);
+        // 使用線上測試視訊
+        const testVideoUrl = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+        console.log('載入測試視訊:', testVideoUrl);
+        
+        try {
+          // 建立測試檔案物件
+          const response = await fetch(testVideoUrl);
+          const blob = await response.blob();
+          const file = new File([blob], 'test-video.mp4', { type: 'video/mp4' });
+          await this.handleFileSelect([file]);
+        } catch (error) {
+          console.error('載入測試視訊失敗:', error);
+        }
+      },
+      
+      // 檢查瀏覽器支援
+      checkSupport: () => {
+        return VideoPlayer.checkBrowserSupport();
+      },
+      
+      // 測試檔案
+      testFile: (file) => {
+        console.log('=== 檔案測試 ===');
+        console.log('檔案名稱:', file.name);
+        console.log('檔案大小:', this.formatFileSize(file.size));
+        console.log('MIME 類型:', file.type);
+        
+        // 檢查支援
+        const video = document.createElement('video');
+        const support = video.canPlayType(file.type);
+        console.log('瀏覽器支援:', support || '不支援');
+        
+        return {
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          support: support
+        };
+      },
+      
+      // 清除專案
+      clearProjects: () => {
+        const keys = Object.keys(localStorage).filter(key => 
+          key.startsWith(VideoConfig.storage.prefix)
+        );
+        keys.forEach(key => localStorage.removeItem(key));
+        console.log(`清除了 ${keys.length} 個專案`);
+        window.location.reload();
       },
       
       getState: () => {
@@ -560,7 +620,13 @@ class VideoApp {
       }
     };
     
-    console.log('除錯模式已啟用。使用 window.videoDebug 存取除錯功能。');
+    console.log('🔧 除錯模式已啟用');
+    console.log('📝 可用方法:');
+    console.log('  videoDebug.checkSupport() - 檢查瀏覽器支援');
+    console.log('  videoDebug.testFile(file) - 測試檔案類型檢測');
+    console.log('  videoDebug.loadTestVideo() - 載入線上測試視訊');
+    console.log('  videoDebug.clearProjects() - 清除所有專案');
+    console.log('  videoDebug.getState() - 獲取當前狀態');
   }
 }
 
