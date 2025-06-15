@@ -345,12 +345,16 @@ body {
 
 /* 初始隱藏的元素 */
 .player-controls,
-.transcription-section,
 .transcription-status,
 .editor-section,
 .search-bar,
 .modal {
   display: none;
+}
+
+/* 轉譯區域預設顯示 */
+.transcription-section {
+  display: block;
 }
 
 /* 顯示時的樣式 */
