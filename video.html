@@ -3,40 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Whisper 視訊工具 - 支援字幕搜尋與影片勘誤的專業工具">
-    <title>Whisper 視訊工具</title>
+    <meta name="description" content="Whisper 視訊工具 - 專業的影片播放器，支援字幕搜尋與時間標記">
+    <title>視訊播放器 - Whisper 工具</title>
+    
+    <!-- Preconnect -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
     
     <!-- Styles -->
     <link rel="stylesheet" href="css/shared.css">
     <link rel="stylesheet" href="css/style.css">
-    
-    <style>
-        .coming-soon {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 60vh;
-            text-align: center;
-            color: var(--text-secondary);
-        }
-        
-        .coming-soon-icon {
-            font-size: 4rem;
-            margin-bottom: var(--spacing-lg);
-        }
-        
-        .coming-soon h2 {
-            font-size: 2rem;
-            color: var(--text-primary);
-            margin-bottom: var(--spacing-md);
-        }
-        
-        .coming-soon p {
-            max-width: 500px;
-            line-height: 1.6;
-        }
-    </style>
+    <link rel="stylesheet" href="css/video.css">
 </head>
 <body>
     <!-- 導航列 -->
@@ -57,26 +33,193 @@
             </div>
         </div>
     </nav>
-    
-    <div id="app">
-        <main class="app-main">
+
+    <!-- 主應用程式容器 -->
+    <div id="video-app">
+        <!-- 標題列 -->
+        <header class="app-header">
             <div class="container">
-                <div class="coming-soon">
-                    <div class="coming-soon-icon">🎬</div>
-                    <h2>視訊工具開發中</h2>
-                    <p>
-                        我們正在開發強大的視訊處理功能，包括 MP4 字幕搜尋定位、
-                        時間標記與筆記、以及影片勘誤功能。敬請期待！
-                    </p>
-                </div>
+                <h1 class="app-title">視訊播放器</h1>
+                <nav class="app-nav">
+                    <button class="nav-btn" id="themeToggleBtn" title="切換深色/淺色模式">
+                        <span class="icon icon-light">🌞</span>
+                        <span class="icon icon-dark">🌙</span>
+                    </button>
+                    <button class="nav-btn" id="settingsBtn" title="設定">
+                        <span class="icon">⚙️</span>
+                    </button>
+                    <button class="nav-btn" id="helpBtn" title="使用說明">
+                        <span class="icon">❓</span>
+                    </button>
+                </nav>
+            </div>
+        </header>
+
+        <!-- 主要內容區 -->
+        <main class="video-main">
+            <div class="video-layout">
+                <!-- 左側：視訊播放區 -->
+                <section class="video-section">
+                    <!-- 上傳區域 -->
+                    <div class="video-upload-area" id="videoUploadArea">
+                        <div class="upload-content">
+                            <span class="upload-icon">🎬</span>
+                            <h2>上傳影片檔案</h2>
+                            <p>拖放檔案到此處，或點擊選擇檔案</p>
+                            <p class="upload-hint">支援格式：MP4、WebM、OGV（最大 2GB）</p>
+                            <input type="file" id="videoInput" accept="video/*" hidden>
+                            <button class="btn btn-primary" id="selectVideoBtn">選擇檔案</button>
+                        </div>
+                    </div>
+
+                    <!-- 視訊播放器容器 -->
+                    <div class="video-player-container hidden" id="videoPlayerContainer">
+                        <div class="video-wrapper" id="videoWrapper">
+                            <!-- 視訊元素 -->
+                            <video id="videoPlayer" preload="metadata"></video>
+                            
+                            <!-- 載入指示器 -->
+                            <div class="video-loading hidden" id="videoLoading">
+                                <div class="loading-spinner"></div>
+                                <p class="loading-text">載入中...</p>
+                            </div>
+                            
+                            <!-- 自定義控制列 -->
+                            <div class="video-controls" id="videoControls">
+                                <!-- 進度條區域 -->
+                                <div class="controls-progress-area">
+                                    <div class="progress-container" id="progressContainer">
+                                        <div class="progress-buffered" id="progressBuffered"></div>
+                                        <div class="progress-played" id="progressPlayed"></div>
+                                        <div class="progress-thumb" id="progressThumb"></div>
+                                        <input type="range" id="progressSlider" class="progress-slider" value="0" min="0" max="100" step="0.1">
+                                    </div>
+                                    <div class="time-display">
+                                        <span id="currentTime">00:00</span>
+                                        <span class="time-separator">/</span>
+                                        <span id="totalTime">00:00</span>
+                                    </div>
+                                </div>
+                                
+                                <!-- 控制按鈕區域 -->
+                                <div class="controls-buttons">
+                                    <!-- 左側控制 -->
+                                    <div class="controls-left">
+                                        <button class="control-btn" id="playPauseBtn" title="播放/暫停 (空白鍵)">
+                                            <svg class="icon icon-play" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M8 5v14l11-7z"/>
+                                            </svg>
+                                            <svg class="icon icon-pause hidden" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                                            </svg>
+                                        </button>
+                                        
+                                        <button class="control-btn" id="skipBackBtn" title="快退 5 秒 (←)">
+                                            <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/>
+                                            </svg>
+                                        </button>
+                                        
+                                        <button class="control-btn" id="skipForwardBtn" title="快進 5 秒 (→)">
+                                            <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/>
+                                            </svg>
+                                        </button>
+                                        
+                                        <!-- 音量控制 -->
+                                        <div class="volume-control">
+                                            <button class="control-btn" id="muteBtn" title="靜音 (M)">
+                                                <svg class="icon icon-volume" viewBox="0 0 24 24" fill="currentColor">
+                                                    <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                                                </svg>
+                                                <svg class="icon icon-mute hidden" viewBox="0 0 24 24" fill="currentColor">
+                                                    <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+                                                </svg>
+                                            </button>
+                                            <input type="range" id="volumeSlider" class="volume-slider" value="100" min="0" max="100" title="音量">
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- 右側控制 -->
+                                    <div class="controls-right">
+                                        <!-- 播放速度 -->
+                                        <div class="speed-control">
+                                            <button class="control-btn" id="speedBtn" title="播放速度">
+                                                <span class="speed-text">1x</span>
+                                            </button>
+                                            <div class="speed-menu hidden" id="speedMenu">
+                                                <button class="speed-option" data-speed="0.5">0.5x</button>
+                                                <button class="speed-option" data-speed="0.75">0.75x</button>
+                                                <button class="speed-option active" data-speed="1">1x</button>
+                                                <button class="speed-option" data-speed="1.25">1.25x</button>
+                                                <button class="speed-option" data-speed="1.5">1.5x</button>
+                                                <button class="speed-option" data-speed="2">2x</button>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- 全螢幕 -->
+                                        <button class="control-btn" id="fullscreenBtn" title="全螢幕 (F)">
+                                            <svg class="icon icon-expand" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+                                            </svg>
+                                            <svg class="icon icon-compress hidden" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 右側：功能面板 -->
+                <aside class="side-panel">
+                    <!-- 標籤切換 -->
+                    <div class="panel-tabs">
+                        <button class="tab-btn active" data-tab="info">影片資訊</button>
+                        <button class="tab-btn" data-tab="subtitles">字幕搜尋</button>
+                        <button class="tab-btn" data-tab="bookmarks">時間標記</button>
+                    </div>
+
+                    <!-- 資訊面板 -->
+                    <div class="panel-content active" id="infoPanel">
+                        <div class="video-info">
+                            <h3>影片資訊</h3>
+                            <div class="info-item">
+                                <span class="info-label">檔案名稱：</span>
+                                <span class="info-value" id="videoFileName">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">檔案大小：</span>
+                                <span class="info-value" id="videoFileSize">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">影片長度：</span>
+                                <span class="info-value" id="videoDuration">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">解析度：</span>
+                                <span class="info-value" id="videoResolution">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 字幕面板 -->
+                    <div class="panel-content hidden" id="subtitlesPanel">
+                        <p class="panel-placeholder">字幕功能開發中...</p>
+                    </div>
+
+                    <!-- 標記面板 -->
+                    <div class="panel-content hidden" id="bookmarksPanel">
+                        <p class="panel-placeholder">標記功能開發中...</p>
+                    </div>
+                </aside>
             </div>
         </main>
     </div>
-    
-    <script>
-        // 主題設定同步
-        const savedTheme = localStorage.getItem('whisper_theme') || 'light';
-        document.documentElement.setAttribute('data-theme', savedTheme);
-    </script>
+
+    <!-- Scripts -->
+    <script type="module" src="js/video/video-main.js"></script>
 </body>
 </html>
