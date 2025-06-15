@@ -74,11 +74,36 @@ class WhisperApp {
     // 檢查 API Key（這會在需要時顯示設定視窗）
     this.checkApiKey();
     
-    // 載入上次的專案（如果有）
-    this.loadLastProject();
+    // 不再自動載入上次的專案
+    // this.loadLastProject();
   }
   
   bindUIEvents() {
+    // 最近專案按鈕
+    const recentProjectsBtn = document.getElementById('recentProjectsBtn');
+    const recentProjectsModal = document.getElementById('recentProjectsModal');
+    const recentProjectsCloseBtn = document.getElementById('recentProjectsCloseBtn');
+    
+    if (recentProjectsBtn) {
+      recentProjectsBtn.addEventListener('click', () => {
+        this.showRecentProjects();
+      });
+    }
+    
+    if (recentProjectsCloseBtn) {
+      recentProjectsCloseBtn.addEventListener('click', () => {
+        this.hideModal(recentProjectsModal);
+      });
+    }
+    
+    // 主題切換按鈕
+    const themeToggleBtn = document.getElementById('themeToggleBtn');
+    if (themeToggleBtn) {
+      themeToggleBtn.addEventListener('click', () => {
+        this.toggleTheme();
+      });
+    }
+    
     // 設定按鈕
     const settingsBtn = document.getElementById('settingsBtn');
     const settingsModal = document.getElementById('settingsModal');
@@ -328,6 +353,24 @@ class WhisperApp {
     document.documentElement.setAttribute('data-theme', theme);
   }
   
+  // 切換主題
+  toggleTheme() {
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+    const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+    
+    // 更新 DOM
+    document.documentElement.setAttribute('data-theme', newTheme);
+    
+    // 儲存到 localStorage
+    localStorage.setItem(Config.storage.prefix + 'theme', newTheme);
+    
+    // 更新設定頁面的選擇器（如果開啟的話）
+    const themeSelect = document.getElementById('themeSelect');
+    if (themeSelect) {
+      themeSelect.value = newTheme;
+    }
+  }
+  
   // API Key 檢查
   checkApiKey() {
     if (!this.apiKey) {
@@ -365,8 +408,6 @@ class WhisperApp {
         if (this.currentProject.transcription) {
           this.displayTranscription();
         }
-        
-        this.showNotification('已載入上次的專案', 'info');
       } catch (e) {
         console.error('載入專案失敗:', e);
       }
@@ -680,6 +721,167 @@ class WhisperApp {
     } else if (term && results.length > 0) {
       this.showNotification(`找到 ${results.length} 個匹配項`, 'info');
     }
+  }
+  
+  // 顯示最近專案
+  showRecentProjects() {
+    const modal = document.getElementById('recentProjectsModal');
+    const listContainer = document.getElementById('recentProjectsList');
+    const noProjectsMsg = document.getElementById('noRecentProjects');
+    
+    // 取得所有專案
+    const projects = this.getRecentProjects();
+    
+    if (projects.length === 0) {
+      listContainer.style.display = 'none';
+      noProjectsMsg.style.display = 'block';
+    } else {
+      listContainer.style.display = 'block';
+      noProjectsMsg.style.display = 'none';
+      
+      // 建立專案列表
+      listContainer.innerHTML = projects.map(project => `
+        <div class="project-item" data-project-id="${project.id}">
+          <div class="project-info">
+            <h3 class="project-name">${project.fileName || '未命名專案'}</h3>
+            <div class="project-meta">
+              <span class="project-date">${this.formatDate(project.lastModified)}</span>
+              <span class="project-size">${project.fileSize ? this.formatFileSize(project.fileSize) : ''}</span>
+            </div>
+          </div>
+          <div class="project-actions">
+            <button class="btn-load-project" data-project-id="${project.id}">載入</button>
+            <button class="btn-delete-project" data-project-id="${project.id}" title="刪除專案">🗑️</button>
+          </div>
+        </div>
+      `).join('');
+      
+      // 綁定事件
+      listContainer.querySelectorAll('.btn-load-project').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const projectId = e.target.dataset.projectId;
+          this.loadProject(projectId);
+          this.hideModal(modal);
+        });
+      });
+      
+      listContainer.querySelectorAll('.btn-delete-project').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const projectId = e.target.dataset.projectId;
+          if (confirm('確定要刪除此專案嗎？')) {
+            this.deleteProject(projectId);
+            this.showRecentProjects(); // 重新整理列表
+          }
+        });
+      });
+    }
+    
+    this.showModal(modal);
+  }
+  
+  // 取得最近專案列表
+  getRecentProjects() {
+    const projects = [];
+    const prefix = Config.storage.prefix;
+    
+    // 從 localStorage 取得所有專案
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key.startsWith(prefix + 'project_')) {
+        try {
+          const projectData = JSON.parse(localStorage.getItem(key));
+          projects.push(projectData);
+        } catch (e) {
+          console.error('無法載入專案:', key, e);
+        }
+      }
+    }
+    
+    // 按最後修改時間排序
+    projects.sort((a, b) => {
+      const dateA = new Date(a.lastModified || a.createdAt);
+      const dateB = new Date(b.lastModified || b.createdAt);
+      return dateB - dateA;
+    });
+    
+    return projects;
+  }
+  
+  // 載入專案
+  loadProject(projectId) {
+    const projectKey = Config.storage.prefix + projectId;
+    const projectData = localStorage.getItem(projectKey);
+    
+    if (projectData) {
+      try {
+        this.currentProject = JSON.parse(projectData);
+        
+        // 如果有轉譯結果，顯示在編輯器中
+        if (this.currentProject.transcription) {
+          this.displayTranscription();
+        }
+        
+        this.showNotification('專案載入成功', 'success');
+      } catch (e) {
+        console.error('載入專案失敗:', e);
+        this.showNotification('載入專案失敗', 'error');
+      }
+    }
+  }
+  
+  // 刪除專案
+  deleteProject(projectId) {
+    const projectKey = Config.storage.prefix + projectId;
+    localStorage.removeItem(projectKey);
+    
+    // 如果刪除的是當前專案，清空編輯器
+    if (this.currentProject && this.currentProject.id === projectId) {
+      this.currentProject = null;
+      if (this.editor) {
+        this.editor.clear();
+      }
+    }
+    
+    this.showNotification('專案已刪除', 'info');
+  }
+  
+  // 格式化日期
+  formatDate(dateString) {
+    if (!dateString) return '未知日期';
+    
+    const date = new Date(dateString);
+    const now = new Date();
+    const diff = now - date;
+    
+    // 小於 1 小時
+    if (diff < 3600000) {
+      const minutes = Math.floor(diff / 60000);
+      return minutes <= 1 ? '剛剛' : `${minutes} 分鐘前`;
+    }
+    
+    // 小於 24 小時
+    if (diff < 86400000) {
+      const hours = Math.floor(diff / 3600000);
+      return `${hours} 小時前`;
+    }
+    
+    // 小於 7 天
+    if (diff < 604800000) {
+      const days = Math.floor(diff / 86400000);
+      return days === 1 ? '昨天' : `${days} 天前`;
+    }
+    
+    // 顯示日期
+    return date.toLocaleDateString('zh-TW');
+  }
+  
+  // 格式化檔案大小
+  formatFileSize(bytes) {
+    if (!bytes) return '';
+    
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`;
   }
 }
 

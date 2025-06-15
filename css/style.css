@@ -1122,3 +1122,97 @@ mark {
   background-color: #ffc107;
   color: #000;
 }
+
+/* 主題切換按鈕圖示控制 */
+#themeToggleBtn .icon-dark {
+  display: none;
+}
+
+[data-theme="dark"] #themeToggleBtn .icon-light {
+  display: none;
+}
+
+[data-theme="dark"] #themeToggleBtn .icon-dark {
+  display: inline;
+}
+
+/* 最近專案列表 */
+.recent-projects-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.project-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--spacing-sm);
+  transition: all 0.2s;
+}
+
+.project-item:hover {
+  background-color: var(--bg-secondary);
+  border-color: var(--border-hover);
+}
+
+.project-info {
+  flex: 1;
+}
+
+.project-name {
+  font-size: 1rem;
+  font-weight: 500;
+  margin: 0 0 var(--spacing-xs) 0;
+  color: var(--text-primary);
+}
+
+.project-meta {
+  display: flex;
+  gap: var(--spacing-md);
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.project-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+}
+
+.btn-load-project {
+  padding: var(--spacing-xs) var(--spacing-md);
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+}
+
+.btn-load-project:hover {
+  background-color: var(--primary-hover);
+}
+
+.btn-delete-project {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.2rem;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+  padding: var(--spacing-xs);
+}
+
+.btn-delete-project:hover {
+  opacity: 1;
+}
+
+.no-projects {
+  text-align: center;
+  padding: var(--spacing-xl);
+  color: var(--text-tertiary);
+}

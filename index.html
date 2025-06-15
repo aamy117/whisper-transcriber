@@ -50,6 +50,13 @@
             <div class="container">
                 <h1 class="app-title">Whisper 聽打工具</h1>
                 <nav class="app-nav">
+                    <button class="nav-btn" id="recentProjectsBtn" title="最近專案">
+                        <span class="icon">📁</span>
+                    </button>
+                    <button class="nav-btn" id="themeToggleBtn" title="切換深色/淺色模式">
+                        <span class="icon icon-light">🌞</span>
+                        <span class="icon icon-dark">🌙</span>
+                    </button>
                     <button class="nav-btn" id="settingsBtn" title="設定">
                         <span class="icon">⚙️</span>
                     </button>
@@ -299,6 +306,24 @@
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-primary" id="confirmExportBtn">確認匯出</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Recent Projects Modal -->
+        <div class="modal" id="recentProjectsModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>最近專案</h2>
+                    <button class="modal-close" id="recentProjectsCloseBtn">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div id="recentProjectsList" class="recent-projects-list">
+                        <!-- 專案列表將動態載入 -->
+                    </div>
+                    <div id="noRecentProjects" class="no-projects" style="display: none;">
+                        <p>暫無最近的專案</p>
+                    </div>
                 </div>
             </div>
         </div>
