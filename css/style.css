@@ -957,3 +957,64 @@ kbd {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--border-hover);
 }
+
+/* 轉譯狀態樣式 */
+.transcription-status {
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  margin-top: var(--spacing-md);
+  text-align: center;
+}
+
+.status-message {
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  margin-bottom: var(--spacing-sm);
+}
+
+.progress-indicator {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto;
+  border: 3px solid var(--border-color);
+  border-top-color: var(--primary-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 編輯器段落樣式 */
+.segment {
+  display: flex;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  border-bottom: 1px solid var(--border-color);
+  transition: background-color 0.2s;
+}
+
+.segment:hover {
+  background-color: var(--bg-secondary);
+}
+
+.segment-time {
+  flex-shrink: 0;
+  color: var(--primary-color);
+  font-family: monospace;
+  cursor: pointer;
+  user-select: none;
+}
+
+.segment-time:hover {
+  text-decoration: underline;
+}
+
+.segment-text {
+  flex: 1;
+  line-height: 1.6;
+  color: var(--text-primary);
+}

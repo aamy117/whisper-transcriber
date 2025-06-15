@@ -1,5 +1,6 @@
 import Config from './config.js';
 import { AudioPlayer } from './player.js';
+import { WhisperAPI } from './api.js';
 
 // 主應用程式類別
 class WhisperApp {
@@ -7,6 +8,8 @@ class WhisperApp {
     this.player = null;
     this.apiKey = null;
     this.currentProject = null;
+    this.whisperAPI = null;
+    this.isTranscribing = false;
     
     this.init();
   }
@@ -35,6 +38,11 @@ class WhisperApp {
     
     // 載入設定
     this.loadSettings();
+    
+    // 初始化 API
+    if (this.apiKey) {
+      this.whisperAPI = new WhisperAPI();
+    }
     
     // 綁定 UI 事件
     this.bindUIEvents();
@@ -197,12 +205,20 @@ class WhisperApp {
     if (apiKeyInput && apiKeyInput.value) {
       this.apiKey = apiKeyInput.value;
       localStorage.setItem(Config.storage.prefix + 'apiKey', this.apiKey);
+      
+      // 更新或初始化 WhisperAPI
+      if (this.whisperAPI) {
+        this.whisperAPI.setApiKey(this.apiKey);
+      } else {
+        this.whisperAPI = new WhisperAPI();
+      }
     }
     
     // 儲存主題
     const themeSelect = document.getElementById('themeSelect');
     if (themeSelect) {
       localStorage.setItem(Config.storage.prefix + 'theme', themeSelect.value);
+      this.setTheme(themeSelect.value);
     }
     
     // 儲存自動儲存設定
@@ -272,8 +288,84 @@ class WhisperApp {
       return;
     }
     
-    // TODO: 實作轉譯功能
-    this.showNotification('轉譯功能將在下一階段實作', 'info');
+    // 檢查是否正在轉譯
+    if (this.isTranscribing) {
+      this.showNotification('正在轉譯中，請稍候', 'warning');
+      return;
+    }
+    
+    // 初始化 API（如果還沒有）
+    if (!this.whisperAPI) {
+      this.whisperAPI = new WhisperAPI();
+    }
+    
+    try {
+      this.isTranscribing = true;
+      
+      // 更新按鈕狀態
+      const transcribeBtn = document.getElementById('transcribeBtn');
+      if (transcribeBtn) {
+        transcribeBtn.disabled = true;
+        transcribeBtn.textContent = '轉譯中...';
+      }
+      
+      // 顯示進度
+      this.showTranscriptionStatus('準備轉譯...');
+      
+      // 估算時間
+      const estimate = this.whisperAPI.estimateTranscriptionTime(file.size);
+      this.showTranscriptionStatus(`正在轉譯... (預估 ${estimate.average} 秒)`);
+      
+      // 建立專案（如果還沒有）
+      if (!this.currentProject) {
+        this.currentProject = {
+          id: `project_${Date.now()}`,
+          fileName: file.name,
+          fileSize: file.size,
+          createdAt: new Date().toISOString(),
+          lastModified: new Date().toISOString()
+        };
+      }
+      
+      // 呼叫 API
+      const result = await this.whisperAPI.transcribe(file, {
+        language: 'zh', // 預設中文，後續可以讓使用者選擇
+        prompt: '以下是普通話的對話內容。' // 幫助提高中文識別準確度
+      });
+      
+      // 儲存結果
+      this.currentProject.transcription = {
+        text: result.text,
+        segments: result.segments,
+        language: result.language,
+        duration: result.duration,
+        createdAt: new Date().toISOString()
+      };
+      
+      // 顯示結果
+      this.displayTranscription();
+      
+      // 儲存專案
+      this.saveProject();
+      
+      this.showNotification('轉譯完成！', 'success');
+      
+    } catch (error) {
+      this.showNotification(`轉譯失敗：${error.message}`, 'error');
+      console.error('Transcription error:', error);
+    } finally {
+      this.isTranscribing = false;
+      
+      // 恢復按鈕狀態
+      const transcribeBtn = document.getElementById('transcribeBtn');
+      if (transcribeBtn) {
+        transcribeBtn.disabled = false;
+        transcribeBtn.textContent = '開始轉譯';
+      }
+      
+      // 隱藏狀態
+      this.hideTranscriptionStatus();
+    }
   }
   
   // 匯出功能
@@ -324,6 +416,87 @@ class WhisperApp {
         document.body.removeChild(notification);
       }, 300);
     }, 3000);
+  }
+  
+  // 顯示轉譯狀態
+  showTranscriptionStatus(message, showProgress = true) {
+    const statusSection = document.getElementById('transcriptionStatus');
+    const statusMessage = document.getElementById('statusMessage');
+    const progressIndicator = document.getElementById('progressIndicator');
+    
+    if (statusSection) {
+      statusSection.style.display = 'block';
+    }
+    if (statusMessage) {
+      statusMessage.textContent = message;
+    }
+    if (progressIndicator) {
+      progressIndicator.style.display = showProgress ? 'block' : 'none';
+    }
+  }
+  
+  // 隱藏轉譯狀態
+  hideTranscriptionStatus() {
+    const statusSection = document.getElementById('transcriptionStatus');
+    if (statusSection) {
+      statusSection.style.display = 'none';
+    }
+  }
+  
+  // 顯示轉譯結果
+  displayTranscription() {
+    const editorSection = document.getElementById('editorSection');
+    const editorContent = document.getElementById('editorContent');
+    
+    if (!this.currentProject?.transcription) {
+      return;
+    }
+    
+    // 顯示編輯器區域
+    if (editorSection) {
+      editorSection.style.display = 'block';
+    }
+    
+    // 暫時顯示簡單的文字結果（後續會整合編輯器模組）
+    if (editorContent) {
+      const segments = this.currentProject.transcription.segments;
+      editorContent.innerHTML = segments.map((seg, index) => `
+        <div class="segment" data-segment-id="${index}">
+          <div class="segment-time" data-time="${seg.start}">
+            ${this.formatTime(seg.start)}
+          </div>
+          <div class="segment-text">
+            ${seg.text}
+          </div>
+        </div>
+      `).join('');
+      
+      // 綁定點擊事件
+      editorContent.querySelectorAll('.segment-time').forEach(timeEl => {
+        timeEl.addEventListener('click', () => {
+          const time = parseFloat(timeEl.dataset.time);
+          this.player.seekTo(time);
+        });
+      });
+    }
+  }
+  
+  // 格式化時間
+  formatTime(seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+  
+  // 儲存專案
+  saveProject() {
+    if (!this.currentProject) return;
+    
+    const key = `${Config.storage.prefix}${this.currentProject.id}`;
+    localStorage.setItem(key, JSON.stringify(this.currentProject));
+    
+    // 更新最後專案 ID
+    localStorage.setItem(`${Config.storage.prefix}lastProjectId`, this.currentProject.id);
   }
 }
 

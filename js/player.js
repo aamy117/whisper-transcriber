@@ -708,4 +708,16 @@ export class AudioPlayer {
     this.disconnectWebAudio();
     this.webAudioSupported = false; // 標記為不支援，避免重複嘗試
   }
+  
+  // 取得當前載入的檔案
+  getCurrentFile() {
+    return this.currentFile;
+  }
+  
+  // 跳轉到指定時間
+  seekTo(seconds) {
+    if (this.audioElement && !isNaN(seconds)) {
+      this.audioElement.currentTime = Math.max(0, Math.min(seconds, this.duration));
+    }
+  }
 }
