@@ -65,6 +65,7 @@ export class VideoPlayer {
     this.video = videoElement;
     this.container = videoElement.parentElement;
     this.currentFile = null;
+    this.currentBlobUrl = null;  // 新增：保存 Blob URL
     this.isPlaying = false;
     this.isLoading = false;
     
@@ -139,6 +140,12 @@ export class VideoPlayer {
   async loadFile(file) {
     if (!file) {
       throw new Error('沒有選擇檔案');
+    }
+    
+    // 清理先前的資源（重要！）
+    if (this.currentFile && this.currentBlobUrl) {
+      URL.revokeObjectURL(this.currentBlobUrl);
+      this.currentBlobUrl = null;
     }
     
     // 使用改善的檔案類型檢測
@@ -257,6 +264,7 @@ export class VideoPlayer {
             console.log('🔄 回退到傳統載入模式');
             
             const fileURL = URL.createObjectURL(file);
+            this.currentBlobUrl = fileURL;  // 保存引用
             await this.loadVideoSource(fileURL);
             await this.waitForMetadata();
             const info = await this.getVideoInfo();
@@ -286,6 +294,7 @@ export class VideoPlayer {
         
         // 建立檔案 URL
         const fileURL = URL.createObjectURL(file);
+        this.currentBlobUrl = fileURL;  // 保存引用，避免被垃圾回收
         
         // 載入視訊
         await this.loadVideoSource(fileURL);
@@ -490,48 +499,18 @@ export class VideoPlayer {
   handleCanPlayThrough() {
     console.log('視訊可以流暢播放');
     
-    // 如果視訊尺寸仍然為 0，嘗試強制刷新
+    // 改為只記錄警告
     if (this.video.videoWidth === 0 || this.video.videoHeight === 0) {
-      console.warn('視訊尺寸仍為 0，嘗試修復...');
+      console.warn('視訊尺寸為 0，可能是：');
+      console.warn('1. 視訊檔案只包含音訊軌道');
+      console.warn('2. 視訊編碼不被完全支援');
+      console.warn('3. 視訊檔案的 metadata 有問題');
       
-      // 方法1：暫停並重新播放
-      const wasPlaying = !this.video.paused;
-      this.video.pause();
-      
-      // 方法2：觸發大小變更
-      this.video.style.width = '99%';
-      setTimeout(() => {
-        this.video.style.width = '100%';
-        if (wasPlaying) {
-          this.video.play().catch(e => console.error('重新播放失敗:', e));
-        }
-      }, 100);
-      
-      // 方法3：重新載入視訊源
-      if (this.retryCount === undefined) {
-        this.retryCount = 0;
-      }
-      
-      if (this.retryCount < 3 && !this.useStreaming) {
-        this.retryCount++;
-        console.log(`嘗試重新載入視訊 (第 ${this.retryCount} 次)`);
-        const currentSrc = this.video.src;
-        const currentTime = this.video.currentTime;
-        
-        setTimeout(() => {
-          if (this.video.videoWidth === 0) {
-            this.video.src = '';
-            this.video.load();
-            setTimeout(() => {
-              this.video.src = currentSrc;
-              this.video.currentTime = currentTime;
-            }, 100);
-          }
-        }, 500);
-      }
+      // 發送警告事件但不中斷播放
+      this.dispatchCustomEvent('video:warning', { 
+        message: '無法顯示視訊畫面，但音訊可能正常播放' 
+      });
     } else {
-      // 重置重試計數
-      this.retryCount = 0;
       console.log(`✅ 視訊尺寸正常: ${this.video.videoWidth}x${this.video.videoHeight}`);
     }
   }
@@ -782,8 +761,9 @@ export class VideoPlayer {
     }
     
     // 清理視訊資源
-    if (this.currentFile && !this.useStreaming) {
-      URL.revokeObjectURL(this.video.src);
+    if (this.currentBlobUrl) {  // 修改這裡
+      URL.revokeObjectURL(this.currentBlobUrl);
+      this.currentBlobUrl = null;
     }
     
     this.video.src = '';

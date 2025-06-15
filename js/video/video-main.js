@@ -688,21 +688,15 @@ class VideoApp {
           return '已添加音訊指示器';
         }
         
-        // 4. 嘗試重新載入
+        // 4. 不再嘗試重新載入，避免造成更多問題
         if (video.videoWidth === 0) {
-          console.log('嘗試重新載入視訊...');
-          const currentTime = video.currentTime;
-          const src = video.src;
+          console.log('視訊寬高仍為 0');
+          console.log('建議：');
+          console.log('1. 檢查是否為純音訊檔案');
+          console.log('2. 嘗試使用其他視訊檔案測試');
+          console.log('3. 確認視訊編碼是否被瀏覽器支援');
           
-          video.src = '';
-          await new Promise(r => setTimeout(r, 100));
-          video.src = src;
-          video.currentTime = currentTime;
-          
-          // 等待載入
-          await new Promise(r => setTimeout(r, 1000));
-          
-          return videoDebug.diagnose();
+          return '無法修復視訊顯示，但音訊可能正常播放';
         }
         
         return '修復完成';
