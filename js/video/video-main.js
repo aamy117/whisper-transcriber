@@ -127,6 +127,18 @@ class VideoApp {
       themeToggleBtn.addEventListener('click', () => this.toggleTheme());
     }
     
+    // 設定按鈕
+    const settingsBtn = document.getElementById('settingsBtn');
+    if (settingsBtn) {
+      settingsBtn.addEventListener('click', () => this.showSettings());
+    }
+    
+    // 使用說明按鈕
+    const helpBtn = document.getElementById('helpBtn');
+    if (helpBtn) {
+      helpBtn.addEventListener('click', () => this.showHelp());
+    }
+    
     // 視窗大小變化
     window.addEventListener('resize', () => this.handleResize());
     
@@ -219,6 +231,191 @@ class VideoApp {
     
     document.documentElement.setAttribute('data-theme', newTheme);
     localStorage.setItem('whisper_theme', newTheme);
+  }
+  
+  // 顯示設定對話框
+  showSettings() {
+    const modal = this.createModal('設定', `
+      <div class="settings-content" style="padding: 20px;">
+        <h3 style="margin-bottom: 20px;">播放器設定</h3>
+        
+        <div class="setting-item" style="margin-bottom: 15px;">
+          <label style="display: block; margin-bottom: 5px;">預設播放速度</label>
+          <select id="defaultSpeed" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+            <option value="0.5">0.5x</option>
+            <option value="0.75">0.75x</option>
+            <option value="1" selected>1x</option>
+            <option value="1.25">1.25x</option>
+            <option value="1.5">1.5x</option>
+            <option value="2">2x</option>
+          </select>
+        </div>
+        
+        <div class="setting-item" style="margin-bottom: 15px;">
+          <label style="display: block; margin-bottom: 5px;">自動播放</label>
+          <input type="checkbox" id="autoPlay" style="margin-right: 10px;">
+          <span>載入影片後自動播放</span>
+        </div>
+        
+        <div class="setting-item" style="margin-bottom: 15px;">
+          <label style="display: block; margin-bottom: 5px;">鍵盤快捷鍵</label>
+          <input type="checkbox" id="enableShortcuts" checked style="margin-right: 10px;">
+          <span>啟用鍵盤快捷鍵</span>
+        </div>
+        
+        <div class="button-group" style="margin-top: 20px; text-align: right;">
+          <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">取消</button>
+          <button class="btn btn-primary" style="margin-left: 10px;" onclick="window.videoApp.saveSettings()">儲存</button>
+        </div>
+      </div>
+    `);
+    
+    document.body.appendChild(modal);
+    
+    // 載入設定值
+    const settings = this.loadSettings();
+    if (settings) {
+      document.getElementById('defaultSpeed').value = settings.defaultSpeed || '1';
+      document.getElementById('autoPlay').checked = settings.autoPlay || false;
+      document.getElementById('enableShortcuts').checked = settings.enableShortcuts !== false;
+    }
+  }
+  
+  // 顯示使用說明
+  showHelp() {
+    const modal = this.createModal('使用說明', `
+      <div class="help-content" style="padding: 20px; max-height: 60vh; overflow-y: auto;">
+        <h3 style="margin-bottom: 20px;">視訊播放器使用說明</h3>
+        
+        <section style="margin-bottom: 20px;">
+          <h4 style="margin-bottom: 10px;">🎬 基本操作</h4>
+          <ul style="margin-left: 20px; line-height: 1.8;">
+            <li>拖放影片檔案或點擊選擇檔案按鈕上傳</li>
+            <li>支援 MP4、WebM、OGV 格式（最大 2GB）</li>
+            <li>點擊播放按鈕或按空白鍵播放/暫停</li>
+            <li>拖動進度條跳轉到指定時間</li>
+          </ul>
+        </section>
+        
+        <section style="margin-bottom: 20px;">
+          <h4 style="margin-bottom: 10px;">⌨️ 鍵盤快捷鍵</h4>
+          <ul style="margin-left: 20px; line-height: 1.8;">
+            <li><kbd>空白鍵</kbd> - 播放/暫停</li>
+            <li><kbd>←</kbd> / <kbd>→</kbd> - 快退/快進 5 秒</li>
+            <li><kbd>↑</kbd> / <kbd>↓</kbd> - 增加/減少音量</li>
+            <li><kbd>M</kbd> - 靜音/取消靜音</li>
+            <li><kbd>F</kbd> - 全螢幕/退出全螢幕</li>
+            <li><kbd>0-9</kbd> - 跳轉到相應百分比位置</li>
+          </ul>
+        </section>
+        
+        <section style="margin-bottom: 20px;">
+          <h4 style="margin-bottom: 10px;">🎛️ 進階功能</h4>
+          <ul style="margin-left: 20px; line-height: 1.8;">
+            <li><strong>播放速度調整</strong> - 點擊速度按鈕選擇 0.5x 到 2x</li>
+            <li><strong>音量控制</strong> - 拖動音量滑桿或使用鍵盤調整</li>
+            <li><strong>全螢幕模式</strong> - 雙擊影片或按 F 鍵進入全螢幕</li>
+            <li><strong>影片資訊</strong> - 右側面板顯示檔案資訊</li>
+          </ul>
+        </section>
+        
+        <section style="margin-bottom: 20px;">
+          <h4 style="margin-bottom: 10px;">💡 提示</h4>
+          <ul style="margin-left: 20px; line-height: 1.8;">
+            <li>瀏覽器會自動記住音量設定</li>
+            <li>支援拖放多個檔案，但只會載入第一個</li>
+            <li>在全螢幕模式下，移動滑鼠顯示控制列</li>
+          </ul>
+        </section>
+        
+        <div style="margin-top: 30px; text-align: center;">
+          <button class="btn btn-primary" onclick="this.closest('.modal-overlay').remove()">關閉</button>
+        </div>
+      </div>
+    `);
+    
+    document.body.appendChild(modal);
+  }
+  
+  // 建立 Modal
+  createModal(title, content) {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      animation: fadeIn 0.3s ease-out;
+    `;
+    
+    const modalContent = document.createElement('div');
+    modalContent.className = 'modal-content';
+    modalContent.style.cssText = `
+      background: var(--bg-primary, white);
+      color: var(--text-primary, #333);
+      border-radius: 12px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+      max-width: 600px;
+      width: 90%;
+      max-height: 90vh;
+      animation: slideUp 0.3s ease-out;
+    `;
+    
+    modalContent.innerHTML = `
+      <div class="modal-header" style="padding: 20px; border-bottom: 1px solid var(--border-color, #eee);">
+        <h2 style="margin: 0; font-size: 24px;">${title}</h2>
+        <button class="modal-close" style="position: absolute; top: 20px; right: 20px; background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-secondary, #666);" onclick="this.closest('.modal-overlay').remove()">×</button>
+      </div>
+      <div class="modal-body">
+        ${content}
+      </div>
+    `;
+    
+    modal.appendChild(modalContent);
+    
+    // 點擊背景關閉
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.remove();
+      }
+    });
+    
+    return modal;
+  }
+  
+  // 儲存設定
+  saveSettings() {
+    const settings = {
+      defaultSpeed: document.getElementById('defaultSpeed').value,
+      autoPlay: document.getElementById('autoPlay').checked,
+      enableShortcuts: document.getElementById('enableShortcuts').checked
+    };
+    
+    localStorage.setItem('video_player_settings', JSON.stringify(settings));
+    this.showNotification(this.createNotification('設定已儲存', 'info'));
+    
+    // 關閉 Modal
+    document.querySelector('.modal-overlay').remove();
+  }
+  
+  // 載入設定
+  loadSettings() {
+    const settingsStr = localStorage.getItem('video_player_settings');
+    if (settingsStr) {
+      try {
+        return JSON.parse(settingsStr);
+      } catch (error) {
+        console.error('載入設定失敗:', error);
+      }
+    }
+    return null;
   }
   
   // 響應式處理
@@ -369,6 +566,98 @@ style.textContent = `
       transform: translateX(100%);
       opacity: 0;
     }
+  }
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  
+  @keyframes slideUp {
+    from {
+      transform: translateY(20px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+  
+  /* Modal 按鈕樣式 */
+  .btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  
+  .btn-primary {
+    background: #3b82f6;
+    color: white;
+  }
+  
+  .btn-primary:hover {
+    background: #2563eb;
+  }
+  
+  .btn-secondary {
+    background: #e5e7eb;
+    color: #374151;
+  }
+  
+  .btn-secondary:hover {
+    background: #d1d5db;
+  }
+  
+  /* 深色模式下的 Modal 樣式 */
+  [data-theme="dark"] .modal-content {
+    background: #1f2937;
+    color: #f3f4f6;
+  }
+  
+  [data-theme="dark"] .modal-header {
+    border-color: #374151;
+  }
+  
+  [data-theme="dark"] .btn-secondary {
+    background: #374151;
+    color: #f3f4f6;
+  }
+  
+  [data-theme="dark"] .btn-secondary:hover {
+    background: #4b5563;
+  }
+  
+  [data-theme="dark"] select,
+  [data-theme="dark"] input[type="checkbox"] {
+    background: #374151;
+    color: #f3f4f6;
+    border-color: #4b5563;
+  }
+  
+  /* kbd 樣式 */
+  kbd {
+    display: inline-block;
+    padding: 2px 6px;
+    font-size: 12px;
+    font-family: monospace;
+    background: #f3f4f6;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.1);
+  }
+  
+  [data-theme="dark"] kbd {
+    background: #374151;
+    border-color: #4b5563;
+    color: #f3f4f6;
   }
   
   /* 移動端樣式調整 */
