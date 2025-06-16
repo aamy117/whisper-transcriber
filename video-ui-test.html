@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video UI Debug Test</title>
+    <link rel="stylesheet" href="css/shared.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/video.css">
+</head>
+<body>
+    <h1>Video UI Debug Test</h1>
+    
+    <!-- Include debug script -->
+    <script src="debug-video-ui.js"></script>
+    
+    <!-- Include main video script -->
+    <script type="module" src="js/video/video-main.js"></script>
+    
+    <div id="debug-output" style="margin: 20px; padding: 20px; background: #f0f0f0; border-radius: 8px;">
+        <h2>Debug Information</h2>
+        <pre id="debug-info">Loading...</pre>
+    </div>
+    
+    <script>
+        // Additional debug info
+        window.addEventListener('load', () => {
+            const debugInfo = document.getElementById('debug-info');
+            
+            setTimeout(() => {
+                let info = '';
+                
+                // Check if modules loaded
+                info += `VideoApp loaded: ${typeof window.videoApp !== 'undefined'}\n`;
+                
+                if (window.videoApp) {
+                    info += `VideoApp initialized: ${window.videoApp.isInitialized}\n`;
+                    info += `Player exists: ${!!window.videoApp.player}\n`;
+                    info += `UI exists: ${!!window.videoApp.ui}\n`;
+                }
+                
+                // Check for any errors
+                info += `\nConsole errors: Check browser console\n`;
+                
+                debugInfo.textContent = info;
+            }, 2000);
+        });
+    </script>
+</body>
+</html>

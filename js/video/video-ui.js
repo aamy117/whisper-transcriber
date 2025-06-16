@@ -3,6 +3,11 @@ import VideoConfig from './video-config.js';
 
 export class VideoUI {
   constructor(player) {
+    if (!player || !player.video) {
+      console.error('VideoUI: 需要有效的 VideoPlayer 實例');
+      throw new Error('VideoUI 初始化失敗：無效的 player 參數');
+    }
+    
     this.player = player;
     this.video = player.video;
     
@@ -27,7 +32,6 @@ export class VideoUI {
       progressSlider: document.getElementById('progressSlider'),
       progressPlayed: document.getElementById('progressPlayed'),
       progressBuffered: document.getElementById('progressBuffered'),
-      progressThumb: document.getElementById('progressThumb'),
       
       // 時間顯示
       currentTime: document.getElementById('currentTime'),
@@ -98,8 +102,8 @@ export class VideoUI {
   
   setupControls() {
     // 初始化音量滑桿
-    if (this.elements.volumeSlider) {
-      this.elements.volumeSlider.value = this.player.state.volume * 100;
+    if (this.elements.volumeSlider && this.player && this.player.state) {
+      this.elements.volumeSlider.value = (this.player.state.volume || 1) * 100;
     }
     
     // 初始化播放速度
@@ -160,6 +164,11 @@ export class VideoUI {
   
   bindPlayerEvents() {
     // 監聽播放器事件
+    if (!this.video) {
+      console.error('VideoUI: 無法綁定事件，video 元素不存在');
+      return;
+    }
+    
     this.video.addEventListener('video:play', () => this.updatePlayPauseButton(true));
     this.video.addEventListener('video:pause', () => this.updatePlayPauseButton(false));
     this.video.addEventListener('video:timeupdate', (e) => this.updateTimeDisplay(e.detail));
