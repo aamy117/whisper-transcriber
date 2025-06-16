@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>初始化診斷工具</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .diagnostic-section {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        h2 {
+            margin-top: 0;
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        
+        .check-item {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .check-pass {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .check-fail {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .check-warn {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .code-block {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+        
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        
+        button:hover {
+            background: #0056b3;
+        }
+        
+        .error-trace {
+            background: #f8d7da;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 視訊播放器初始化診斷工具</h1>
+    
+    <div class="diagnostic-section">
+        <h2>環境檢查</h2>
+        <div id="envChecks"></div>
+    </div>
+    
+    <div class="diagnostic-section">
+        <h2>模組載入檢查</h2>
+        <div id="moduleChecks"></div>
+    </div>
+    
+    <div class="diagnostic-section">
+        <h2>DOM 元素檢查</h2>
+        <div id="domChecks"></div>
+    </div>
+    
+    <div class="diagnostic-section">
+        <h2>初始化測試</h2>
+        <button onclick="runInitTest()">執行初始化測試</button>
+        <button onclick="runStepByStep()">逐步執行</button>
+        <button onclick="clearResults()">清除結果</button>
+        <div id="initResults"></div>
+    </div>
+    
+    <div class="diagnostic-section">
+        <h2>錯誤追蹤</h2>
+        <div id="errorTrace"></div>
+    </div>
+    
+    <!-- 測試用 DOM 元素 -->
+    <div style="display: none;" id="testContainer">
+        <div id="videoWrapper"></div>
+        <div id="videoPlayerContainer"></div>
+        <div id="videoUploadArea"></div>
+        <div id="videoControls"></div>
+        <video id="videoPlayer"></video>
+        <button id="playPauseBtn">
+            <span class="icon icon-play">▶</span>
+            <span class="icon icon-pause">⏸</span>
+        </button>
+        <button id="skipBackBtn"></button>
+        <button id="skipForwardBtn"></button>
+        <div id="progressContainer"></div>
+        <input id="progressSlider" type="range">
+        <div id="progressPlayed"></div>
+        <div id="progressBuffered"></div>
+        <span id="currentTime">00:00</span>
+        <span id="totalTime">00:00</span>
+        <button id="muteBtn">
+            <span class="icon icon-volume">🔊</span>
+            <span class="icon icon-mute">🔇</span>
+        </button>
+        <input id="volumeSlider" type="range">
+        <button id="speedBtn">
+            <span class="speed-text">1x</span>
+        </button>
+        <div id="speedMenu"></div>
+        <button id="fullscreenBtn">
+            <span class="icon icon-expand">⛶</span>
+            <span class="icon icon-compress">⛶</span>
+        </button>
+    </div>
+    
+    <script type="module">
+        // 全域錯誤捕獲
+        window.addEventListener('error', (e) => {
+            const errorTrace = document.getElementById('errorTrace');
+            errorTrace.innerHTML += `
+                <div class="error-trace">
+                    <strong>錯誤:</strong> ${e.message}<br>
+                    <strong>檔案:</strong> ${e.filename}<br>
+                    <strong>行號:</strong> ${e.lineno}:${e.colno}<br>
+                    <strong>堆疊:</strong><br>${e.error?.stack || '無堆疊資訊'}
+                </div>
+            `;
+        });
+        
+        window.addEventListener('unhandledrejection', (e) => {
+            const errorTrace = document.getElementById('errorTrace');
+            errorTrace.innerHTML += `
+                <div class="error-trace">
+                    <strong>未處理的 Promise 拒絕:</strong><br>
+                    ${e.reason}
+                </div>
+            `;
+        });
+        
+        // 環境檢查
+        function checkEnvironment() {
+            const checks = [
+                {
+                    name: '瀏覽器類型',
+                    check: () => navigator.userAgent,
+                    type: 'info'
+                },
+                {
+                    name: 'DOM 狀態',
+                    check: () => document.readyState,
+                    pass: (v) => v === 'complete'
+                },
+                {
+                    name: 'ES6 模組支援',
+                    check: () => 'noModule' in HTMLScriptElement.prototype,
+                    pass: (v) => v === true
+                },
+                {
+                    name: 'Video API',
+                    check: () => typeof HTMLVideoElement !== 'undefined',
+                    pass: (v) => v === true
+                },
+                {
+                    name: 'Promise 支援',
+                    check: () => typeof Promise !== 'undefined',
+                    pass: (v) => v === true
+                },
+                {
+                    name: 'URL 協議',
+                    check: () => window.location.protocol,
+                    pass: (v) => v.startsWith('http')
+                }
+            ];
+            
+            const container = document.getElementById('envChecks');
+            container.innerHTML = '';
+            
+            checks.forEach(check => {
+                const value = check.check();
+                const passed = check.pass ? check.pass(value) : null;
+                const className = 
+                    check.type === 'info' ? 'check-warn' :
+                    passed ? 'check-pass' : 'check-fail';
+                
+                container.innerHTML += `
+                    <div class="check-item ${className}">
+                        <span>${check.name}</span>
+                        <span>${value}</span>
+                    </div>
+                `;
+            });
+        }
+        
+        // 模組載入檢查
+        async function checkModules() {
+            const container = document.getElementById('moduleChecks');
+            container.innerHTML = '<div class="spinner"></div> 檢查中...';
+            
+            const modules = [
+                { name: 'dom-ready-manager.js', path: './js/video/dom-ready-manager.js' },
+                { name: 'video-config.js', path: './js/video/video-config.js' },
+                { name: 'video-player.js', path: './js/video/video-player.js' },
+                { name: 'video-ui.js', path: './js/video/video-ui.js' },
+                { name: 'video-main.js', path: './js/video/video-main.js' }
+            ];
+            
+            container.innerHTML = '';
+            
+            for (const module of modules) {
+                try {
+                    const mod = await import(module.path);
+                    const hasDefault = 'default' in mod;
+                    const exports = Object.keys(mod).filter(k => k !== 'default');
+                    
+                    container.innerHTML += `
+                        <div class="check-item check-pass">
+                            <span>${module.name}</span>
+                            <span>✅ ${hasDefault ? 'default' : ''} ${exports.join(', ')}</span>
+                        </div>
+                    `;
+                } catch (error) {
+                    container.innerHTML += `
+                        <div class="check-item check-fail">
+                            <span>${module.name}</span>
+                            <span>❌ ${error.message}</span>
+                        </div>
+                    `;
+                }
+            }
+        }
+        
+        // DOM 元素檢查
+        function checkDOMElements() {
+            const requiredElements = [
+                'videoWrapper',
+                'videoPlayerContainer',
+                'videoUploadArea',
+                'videoControls',
+                'videoPlayer',
+                'playPauseBtn',
+                'skipBackBtn',
+                'skipForwardBtn',
+                'progressContainer',
+                'progressSlider',
+                'progressPlayed',
+                'progressBuffered',
+                'currentTime',
+                'totalTime',
+                'muteBtn',
+                'volumeSlider',
+                'speedBtn',
+                'speedMenu',
+                'fullscreenBtn'
+            ];
+            
+            const container = document.getElementById('domChecks');
+            container.innerHTML = '';
+            
+            requiredElements.forEach(id => {
+                const element = document.getElementById(id);
+                const exists = !!element;
+                
+                container.innerHTML += `
+                    <div class="check-item ${exists ? 'check-pass' : 'check-fail'}">
+                        <span>#${id}</span>
+                        <span>${exists ? '✅ 存在' : '❌ 缺失'}</span>
+                    </div>
+                `;
+                
+                // 檢查子元素
+                if (exists && ['playPauseBtn', 'muteBtn', 'fullscreenBtn', 'speedBtn'].includes(id)) {
+                    const children = element.querySelectorAll('*');
+                    if (children.length === 0) {
+                        container.innerHTML += `
+                            <div class="check-item check-warn">
+                                <span>&nbsp;&nbsp;└─ 子元素</span>
+                                <span>⚠️ 無子元素</span>
+                            </div>
+                        `;
+                    }
+                }
+            });
+        }
+        
+        // 初始化測試
+        window.runInitTest = async function() {
+            const results = document.getElementById('initResults');
+            results.innerHTML = '<div class="spinner"></div> 執行中...';
+            
+            try {
+                // 動態匯入模組
+                const { default: domReadyManager } = await import('./js/video/dom-ready-manager.js');
+                const { VideoPlayer } = await import('./js/video/video-player.js');
+                const { VideoUI } = await import('./js/video/video-ui.js');
+                
+                results.innerHTML = '';
+                
+                // 步驟 1: DOM Ready
+                results.innerHTML += '<div class="check-item check-warn">檢查 DOM Ready...</div>';
+                await domReadyManager.waitForReady();
+                results.innerHTML += '<div class="check-item check-pass">✅ DOM Ready 完成</div>';
+                
+                // 步驟 2: 創建 Player
+                results.innerHTML += '<div class="check-item check-warn">創建 VideoPlayer...</div>';
+                const videoElement = document.getElementById('videoPlayer');
+                const player = new VideoPlayer(videoElement);
+                results.innerHTML += '<div class="check-item check-pass">✅ VideoPlayer 創建成功</div>';
+                
+                // 步驟 3: 創建 UI
+                results.innerHTML += '<div class="check-item check-warn">創建 VideoUI...</div>';
+                const ui = new VideoUI(player);
+                results.innerHTML += '<div class="check-item check-pass">✅ VideoUI 創建成功</div>';
+                
+                // 步驟 4: 初始化 UI
+                results.innerHTML += '<div class="check-item check-warn">初始化 VideoUI...</div>';
+                const result = await ui.initialize();
+                
+                if (result.success) {
+                    results.innerHTML += '<div class="check-item check-pass">✅ VideoUI 初始化成功</div>';
+                    results.innerHTML += `<div class="code-block">${JSON.stringify(ui.diagnose(), null, 2)}</div>`;
+                } else {
+                    results.innerHTML += `<div class="check-item check-fail">❌ VideoUI 初始化失敗: ${result.error}</div>`;
+                    if (result.details) {
+                        results.innerHTML += `<div class="code-block">${JSON.stringify(result.details, null, 2)}</div>`;
+                    }
+                }
+                
+            } catch (error) {
+                results.innerHTML += `
+                    <div class="error-trace">
+                        <strong>錯誤:</strong> ${error.message}<br>
+                        <strong>堆疊:</strong><br>${error.stack}
+                    </div>
+                `;
+            }
+        }
+        
+        // 逐步執行
+        window.runStepByStep = async function() {
+            const results = document.getElementById('initResults');
+            results.innerHTML = '';
+            
+            const steps = [
+                {
+                    name: '檢查全域物件',
+                    run: () => {
+                        return {
+                            window: typeof window,
+                            document: typeof document,
+                            HTMLVideoElement: typeof HTMLVideoElement
+                        };
+                    }
+                },
+                {
+                    name: '載入 domReadyManager',
+                    run: async () => {
+                        const mod = await import('./js/video/dom-ready-manager.js');
+                        return { loaded: true, hasDefault: 'default' in mod };
+                    }
+                },
+                {
+                    name: '載入 VideoPlayer',
+                    run: async () => {
+                        const mod = await import('./js/video/video-player.js');
+                        return { loaded: true, hasVideoPlayer: 'VideoPlayer' in mod };
+                    }
+                },
+                {
+                    name: '載入 VideoUI',
+                    run: async () => {
+                        const mod = await import('./js/video/video-ui.js');
+                        return { loaded: true, hasVideoUI: 'VideoUI' in mod };
+                    }
+                },
+                {
+                    name: '檢查 video 元素',
+                    run: () => {
+                        const video = document.getElementById('videoPlayer');
+                        return {
+                            exists: !!video,
+                            tagName: video?.tagName,
+                            isVideo: video instanceof HTMLVideoElement
+                        };
+                    }
+                }
+            ];
+            
+            for (const step of steps) {
+                try {
+                    results.innerHTML += `<div class="check-item check-warn">執行: ${step.name}...</div>`;
+                    const result = await step.run();
+                    results.innerHTML += `
+                        <div class="check-item check-pass">
+                            ✅ ${step.name}
+                        </div>
+                        <div class="code-block">${JSON.stringify(result, null, 2)}</div>
+                    `;
+                } catch (error) {
+                    results.innerHTML += `
+                        <div class="check-item check-fail">
+                            ❌ ${step.name}: ${error.message}
+                        </div>
+                    `;
+                    break;
+                }
+            }
+        }
+        
+        window.clearResults = function() {
+            document.getElementById('initResults').innerHTML = '';
+            document.getElementById('errorTrace').innerHTML = '';
+        }
+        
+        // 初始執行
+        checkEnvironment();
+        checkModules();
+        checkDOMElements();
+    </script>
+</body>
+</html>

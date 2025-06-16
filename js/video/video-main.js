@@ -1,7 +1,8 @@
-// 視訊播放器主程式
+// 改進的視訊播放器主程式
 import VideoConfig from './video-config.js';
 import { VideoPlayer } from './video-player.js';
 import { VideoUI } from './video-ui.js';
+import domReadyManager from './dom-ready-manager.js';
 
 class VideoApp {
   constructor() {
@@ -9,89 +10,277 @@ class VideoApp {
     this.ui = null;
     this.currentProject = null;
     this.isInitialized = false;
+    this.initPromise = null;
     
+    // 初始化階段追蹤
+    this.initStages = {
+      domReady: false,
+      playerCreated: false,
+      uiCreated: false,
+      uiInitialized: false,
+      eventsBinding: false,
+      completed: false
+    };
+    
+    // 開始初始化
     this.init();
   }
   
   async init() {
-    // 等待 DOM 載入完成
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => this.setup());
-    } else {
-      await this.setup();
+    // 確保只初始化一次
+    if (this.initPromise) {
+      return this.initPromise;
     }
+    
+    this.initPromise = this.performInit();
+    return this.initPromise;
   }
   
-  async setup() {
-    console.log('開始 setup...');
+  async performInit() {
+    console.log('🚀 開始 VideoApp 初始化流程...');
+    const startTime = Date.now();
     
     try {
-      // 初始化播放器
-      const videoElement = document.getElementById('videoPlayer');
-      console.log('視訊元素:', !!videoElement);
+      // 階段 1: 等待 DOM 載入
+      await this.waitForDOM();
       
-      if (!videoElement) {
-        throw new Error('找不到視訊元素');
-      }
+      // 階段 2: 創建播放器和 UI
+      await this.createComponents();
       
-      console.log('建立 VideoPlayer...');
-      this.player = new VideoPlayer(videoElement);
+      // 階段 3: 初始化 UI
+      await this.initializeUI();
       
-      console.log('建立 VideoUI...');
-      this.ui = new VideoUI(this.player);
+      // 階段 4: 綁定應用程式事件
+      await this.bindAppEvents();
       
-      // 綁定事件
-      console.log('綁定事件...');
-      this.bindEvents();
+      // 階段 5: 完成初始化
+      await this.completeInitialization();
       
-      // 設定主題
-      this.setupTheme();
-        // 載入上次的專案（如果有）
-      this.loadLastProject();
+      const totalTime = Date.now() - startTime;
+      console.log(`✅ VideoApp 初始化完成！總耗時: ${totalTime}ms`);
       
-      // 啟用除錯模式（開發階段）
-      this.enableDebugMode();
-      
-      this.isInitialized = true;
-      console.log('✅ 視訊播放器初始化完成');
+      return { success: true, time: totalTime };
       
     } catch (error) {
-      console.error('視訊播放器初始化失敗:', error);
-      console.error('錯誤堆疊:', error.stack);
-      // 暫時註解掉 showError 以避免額外錯誤
-      // this.showError('播放器初始化失敗');
-      alert(`初始化失敗: ${error.message}`);
+      console.error('❌ VideoApp 初始化失敗:', error);
+      this.handleInitError(error);
+      return { success: false, error };
     }
   }
   
-  bindEvents() {
-    console.log('開始綁定事件...');
+  /**
+   * 階段 1: 等待 DOM 載入
+   */
+  async waitForDOM() {
+    console.log('📄 階段 1: 等待 DOM 載入...');
     
-    // 檔案選擇
+    try {
+      await domReadyManager.waitForReady(10000);
+      this.initStages.domReady = true;
+      console.log('✅ DOM 載入完成');
+    } catch (error) {
+      throw new Error(`DOM 載入失敗: ${error.message}`);
+    }
+  }
+  
+  /**
+   * 階段 2: 創建核心組件
+   */
+  async createComponents() {
+    console.log('🔧 階段 2: 創建核心組件...');
+    
+    // 獲取視訊元素
+    const videoElement = document.getElementById('videoPlayer');
+    if (!videoElement) {
+      throw new Error('找不到視訊元素 #videoPlayer');
+    }
+    
+    try {
+      // 創建播放器
+      console.log('  創建 VideoPlayer...');
+      this.player = new VideoPlayer(videoElement);
+      this.initStages.playerCreated = true;
+      
+      // 創建 UI（但還不初始化）
+      console.log('  創建 VideoUI...');
+      this.ui = new VideoUI(this.player);
+      this.initStages.uiCreated = true;
+      
+      console.log('✅ 核心組件創建完成');
+    } catch (error) {
+      throw new Error(`組件創建失敗: ${error.message}`);
+    }
+  }
+  
+  /**
+   * 階段 3: 初始化 UI
+   */
+  async initializeUI() {
+    console.log('🎨 階段 3: 初始化 UI...');
+    
+    if (!this.ui) {
+      throw new Error('UI 組件未創建');
+    }
+    
+    const uiResult = await this.ui.initialize();
+    
+    if (!uiResult.success) {
+      // UI 初始化失敗，但可能可以重試
+      if (uiResult.canRetry) {
+        console.warn('⚠️ UI 初始化失敗，嘗試重試...');
+        const retryResult = await this.ui.retry();
+        if (!retryResult.success) {
+          throw new Error(`UI 初始化失敗: ${retryResult.error}`);
+        }
+      } else {
+        throw new Error(`UI 初始化失敗: ${uiResult.error}`);
+      }
+    }
+    
+    this.initStages.uiInitialized = true;
+    console.log('✅ UI 初始化完成');
+  }
+  
+  /**
+   * 階段 4: 綁定應用程式級事件
+   */
+  async bindAppEvents() {
+    console.log('🔗 階段 4: 綁定應用程式事件...');
+    
+    try {
+      // 檔案選擇
+      this.bindFileHandlers();
+      
+      // 標籤切換
+      this.bindTabHandlers();
+      
+      // 主題和設定
+      this.bindUIHandlers();
+      
+      // 視窗事件
+      this.bindWindowHandlers();
+      
+      // 播放器事件
+      this.bindPlayerHandlers();
+      
+      this.initStages.eventsBinding = true;
+      console.log('✅ 事件綁定完成');
+    } catch (error) {
+      throw new Error(`事件綁定失敗: ${error.message}`);
+    }
+  }
+  
+  /**
+   * 階段 5: 完成初始化
+   */
+  async completeInitialization() {
+    console.log('🏁 階段 5: 完成初始化...');
+    
+    // 設定主題
+    this.setupTheme();
+    
+    // 載入上次的專案
+    this.loadLastProject();
+    
+    // 啟用除錯模式
+    this.enableDebugMode();
+    
+    // 標記完成
+    this.isInitialized = true;
+    this.initStages.completed = true;
+    
+    // 發送初始化完成事件
+    window.dispatchEvent(new CustomEvent('videoapp:initialized', {
+      detail: { stages: this.initStages }
+    }));
+    
+    console.log('✅ 所有初始化階段完成');
+  }
+  
+  /**
+   * 處理初始化錯誤
+   */
+  handleInitError(error) {
+    console.error('初始化錯誤詳情:', {
+      message: error.message,
+      stack: error.stack,
+      stages: this.initStages
+    });
+    
+    // 顯示錯誤訊息給用戶
+    this.showInitError(error);
+    
+    // 提供診斷資訊
+    console.log('診斷資訊:');
+    console.log('- DOM 狀態:', domReadyManager.diagnose());
+    console.log('- 初始化階段:', this.initStages);
+    
+    if (this.ui) {
+      console.log('- UI 診斷:', this.ui.diagnose());
+    }
+  }
+  
+  /**
+   * 顯示初始化錯誤
+   */
+  showInitError(error) {
+    // 創建錯誤提示元素
+    const errorDiv = document.createElement('div');
+    errorDiv.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #fff;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+      max-width: 500px;
+      z-index: 10000;
+      text-align: center;
+    `;
+    
+    errorDiv.innerHTML = `
+      <h2 style="color: #e74c3c; margin-bottom: 20px;">初始化錯誤</h2>
+      <p style="margin-bottom: 20px;">${error.message}</p>
+      <details style="text-align: left; margin-bottom: 20px;">
+        <summary style="cursor: pointer; margin-bottom: 10px;">詳細資訊</summary>
+        <pre style="background: #f5f5f5; padding: 10px; border-radius: 5px; overflow-x: auto; font-size: 12px;">
+初始化階段:
+${JSON.stringify(this.initStages, null, 2)}
+
+錯誤堆疊:
+${error.stack}
+        </pre>
+      </details>
+      <button onclick="location.reload()" style="
+        background: #3b82f6;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+      ">重新載入</button>
+    `;
+    
+    document.body.appendChild(errorDiv);
+  }
+  
+  // ========== 事件綁定方法 ==========
+  
+  bindFileHandlers() {
     const fileInput = document.getElementById('videoInput');
     const selectBtn = document.getElementById('selectVideoBtn');
     const uploadArea = document.getElementById('videoUploadArea');
     
-    console.log('元素檢查:', {
-      fileInput: !!fileInput,
-      selectBtn: !!selectBtn,
-      uploadArea: !!uploadArea
-    });
-    
     if (!fileInput || !selectBtn || !uploadArea) {
-      console.error('找不到必要的 DOM 元素');
+      console.warn('部分檔案處理元素不存在');
       return;
     }
     
-    selectBtn.addEventListener('click', () => {
-      console.log('選擇按鈕被點擊');
-      fileInput.click();
-    });
-    
-    fileInput.addEventListener('change', (e) => {
-      console.log('檔案選擇變更:', e.target.files);
-      this.handleFileSelect(e.target.files);
-    });
+    selectBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => this.handleFileSelect(e.target.files));
     
     // 拖放處理
     uploadArea.addEventListener('dragover', (e) => {
@@ -112,47 +301,44 @@ class VideoApp {
       uploadArea.classList.remove('drag-over');
       this.handleFileSelect(e.dataTransfer.files);
     });
-    
-    // 防止視窗拖放
-    document.addEventListener('dragover', (e) => e.preventDefault());
-    document.addEventListener('drop', (e) => e.preventDefault());
-    
-    // 標籤切換
+  }
+  
+  bindTabHandlers() {
     const tabBtns = document.querySelectorAll('.tab-btn');
     tabBtns.forEach(btn => {
       btn.addEventListener('click', () => this.switchTab(btn.dataset.tab));
     });
-    
-    // 主題切換
+  }
+  
+  bindUIHandlers() {
     const themeToggleBtn = document.getElementById('themeToggleBtn');
-    if (themeToggleBtn) {
-      themeToggleBtn.addEventListener('click', () => this.toggleTheme());
-    }
-    
-    // 設定按鈕
     const settingsBtn = document.getElementById('settingsBtn');
-    if (settingsBtn) {
-      settingsBtn.addEventListener('click', () => this.showSettings());
-    }
-    
-    // 使用說明按鈕
     const helpBtn = document.getElementById('helpBtn');
-    if (helpBtn) {
-      helpBtn.addEventListener('click', () => this.showHelp());
-    }
     
-    // 視窗大小變化
+    themeToggleBtn?.addEventListener('click', () => this.toggleTheme());
+    settingsBtn?.addEventListener('click', () => this.showSettings());
+    helpBtn?.addEventListener('click', () => this.showHelp());
+  }
+  
+  bindWindowHandlers() {
     window.addEventListener('resize', () => this.handleResize());
-    
-    // 頁面關閉前儲存狀態
     window.addEventListener('beforeunload', () => this.saveState());
     
-    // 監聽播放器事件
+    // 防止視窗拖放
+    document.addEventListener('dragover', (e) => e.preventDefault());
+    document.addEventListener('drop', (e) => e.preventDefault());
+  }
+  
+  bindPlayerHandlers() {
+    if (!this.player || !this.player.video) return;
+    
     const video = this.player.video;
     video.addEventListener('video:loadeddata', () => this.handleVideoLoaded());
     video.addEventListener('video:error', (e) => this.handleVideoError(e.detail));
     video.addEventListener('video:warning', (e) => this.showWarning(e.detail.message));
   }
+  
+  // ========== 檔案處理 ==========
   
   async handleFileSelect(files) {
     if (!files || files.length === 0) return;
@@ -224,7 +410,8 @@ class VideoApp {
     }
   }
   
-  // 主題管理
+  // ========== 主題管理 ==========
+  
   setupTheme() {
     const savedTheme = localStorage.getItem('whisper_theme') || 'light';
     document.documentElement.setAttribute('data-theme', savedTheme);
@@ -238,7 +425,8 @@ class VideoApp {
     localStorage.setItem('whisper_theme', newTheme);
   }
   
-  // 顯示設定對話框
+  // ========== 設定和說明 ==========
+  
   showSettings() {
     const modal = this.createModal('設定', `
       <div class="settings-content" style="padding: 20px;">
@@ -286,10 +474,9 @@ class VideoApp {
     }
   }
   
-  // 顯示使用說明
   showHelp() {
     // 檢查瀏覽器支援
-    const browserSupport = VideoPlayer.checkBrowserSupport ? VideoPlayer.checkBrowserSupport() : {};
+    const browserSupport = this.player?.constructor.checkBrowserSupport ? this.player.constructor.checkBrowserSupport() : {};
     let supportInfo = '<ul style="margin-left: 20px;">';
     for (const [format, support] of Object.entries(browserSupport)) {
       const icon = support === 'probably' ? '✅' : support === 'maybe' ? '⚠️' : '❌';
@@ -312,15 +499,6 @@ class VideoApp {
         </section>
         
         <section style="margin-bottom: 20px;">
-          <h4 style="margin-bottom: 10px;">📹 支援的視訊格式</h4>
-          <p style="margin-bottom: 10px;">您的瀏覽器支援以下格式：</p>
-          ${supportInfo}
-          <p style="margin-top: 10px; font-size: 14px; color: #666;">
-            <strong>建議：</strong>使用 MP4 (H.264) 格式以獲得最佳相容性
-          </p>
-        </section>
-        
-        <section style="margin-bottom: 20px;">
           <h4 style="margin-bottom: 10px;">⌨️ 鍵盤快捷鍵</h4>
           <ul style="margin-left: 20px; line-height: 1.8;">
             <li><kbd>空白鍵</kbd> - 播放/暫停</li>
@@ -328,26 +506,6 @@ class VideoApp {
             <li><kbd>↑</kbd> / <kbd>↓</kbd> - 增加/減少音量</li>
             <li><kbd>M</kbd> - 靜音/取消靜音</li>
             <li><kbd>F</kbd> - 全螢幕/退出全螢幕</li>
-            <li><kbd>0-9</kbd> - 跳轉到相應百分比位置</li>
-          </ul>
-        </section>
-        
-        <section style="margin-bottom: 20px;">
-          <h4 style="margin-bottom: 10px;">🎛️ 進階功能</h4>
-          <ul style="margin-left: 20px; line-height: 1.8;">
-            <li><strong>播放速度調整</strong> - 點擊速度按鈕選擇 0.5x 到 2x</li>
-            <li><strong>音量控制</strong> - 拖動音量滑桿或使用鍵盤調整</li>
-            <li><strong>全螢幕模式</strong> - 雙擊影片或按 F 鍵進入全螢幕</li>
-            <li><strong>影片資訊</strong> - 右側面板顯示檔案資訊</li>
-          </ul>
-        </section>
-        
-        <section style="margin-bottom: 20px;">
-          <h4 style="margin-bottom: 10px;">💡 提示</h4>
-          <ul style="margin-left: 20px; line-height: 1.8;">
-            <li>瀏覽器會自動記住音量設定</li>
-            <li>支援拖放多個檔案，但只會載入第一個</li>
-            <li>在全螢幕模式下，移動滑鼠顯示控制列</li>
           </ul>
         </section>
         
@@ -360,7 +518,8 @@ class VideoApp {
     document.body.appendChild(modal);
   }
   
-  // 建立 Modal
+  // ========== Modal 相關 ==========
+  
   createModal(title, content) {
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
@@ -413,7 +572,8 @@ class VideoApp {
     return modal;
   }
   
-  // 儲存設定
+  // ========== 設定管理 ==========
+  
   saveSettings() {
     const settings = {
       defaultSpeed: document.getElementById('defaultSpeed').value,
@@ -428,7 +588,6 @@ class VideoApp {
     document.querySelector('.modal-overlay').remove();
   }
   
-  // 載入設定
   loadSettings() {
     const settingsStr = localStorage.getItem('video_player_settings');
     if (settingsStr) {
@@ -441,20 +600,22 @@ class VideoApp {
     return null;
   }
   
-  // 響應式處理
+  // ========== 響應式處理 ==========
+  
   handleResize() {
     // 可以在這裡處理視窗大小變化的邏輯
     const width = window.innerWidth;
     
     if (width < VideoConfig.ui.breakpoints.tablet) {
       // 移動端調整
-      document.querySelector('.video-layout').classList.add('mobile');
+      document.querySelector('.video-layout')?.classList.add('mobile');
     } else {
-      document.querySelector('.video-layout').classList.remove('mobile');
+      document.querySelector('.video-layout')?.classList.remove('mobile');
     }
   }
   
-  // 專案管理
+  // ========== 專案管理 ==========
+  
   saveProject() {
     if (!this.currentProject) return;
     
@@ -464,7 +625,8 @@ class VideoApp {
     // 儲存為最後的專案
     localStorage.setItem(`${VideoConfig.storage.prefix}lastProjectId`, this.currentProject.id);
   }
-    loadLastProject() {
+  
+  loadLastProject() {
     const lastProjectId = localStorage.getItem(`${VideoConfig.storage.prefix}lastProjectId`);
     if (!lastProjectId) return;
     
@@ -475,9 +637,6 @@ class VideoApp {
       try {
         this.currentProject = JSON.parse(projectData);
         console.log('載入上次的專案:', this.currentProject);
-        
-        // 更新 UI 顯示專案資訊
-        // this.updateProjectInfo(); // TODO: 實作此函數或移除
         
         // 顯示提示訊息
         const notification = this.createNotification(
@@ -508,10 +667,10 @@ class VideoApp {
     }
   }
   
-  // 錯誤和警告處理
+  // ========== 錯誤和通知處理 ==========
+  
   showError(message) {
     console.error(message);
-    // TODO: 實作更好的錯誤提示 UI
     const notification = this.createNotification(message, 'error');
     this.showNotification(notification);
   }
@@ -551,15 +710,9 @@ class VideoApp {
       }, 300);
     }, 3000);
   }
-  // 格式化檔案大小
-  formatFileSize(bytes) {
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    if (bytes === 0) return '0 B';
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + sizes[i];
-  }
-
-    // 除錯模式
+  
+  // ========== 除錯模式 ==========
+  
   enableDebugMode() {
     window.videoDebug = {
       app: this,
@@ -586,9 +739,10 @@ class VideoApp {
       
       // 檢查瀏覽器支援
       checkSupport: () => {
-        return VideoPlayer.checkBrowserSupport();
+        return this.player?.constructor.checkBrowserSupport ? this.player.constructor.checkBrowserSupport() : null;
       },
-        // 診斷視訊狀態
+      
+      // 診斷視訊狀態
       diagnose: () => {
         if (!this.player || !this.player.video) {
           console.error('播放器未初始化');
@@ -603,8 +757,6 @@ class VideoApp {
         console.log('總時長:', video.duration);
         console.log('視訊寬度:', video.videoWidth);
         console.log('視訊高度:', video.videoHeight);
-        console.log('客戶端寬度:', video.clientWidth);
-        console.log('客戶端高度:', video.clientHeight);
         console.log('就緒狀態:', video.readyState);
         console.log('網路狀態:', video.networkState);
         console.log('是否暫停:', video.paused);
@@ -612,160 +764,14 @@ class VideoApp {
         console.log('是否靜音:', video.muted);
         console.log('播放速率:', video.playbackRate);
         console.log('錯誤:', video.error);
-        
-        // 檢查緩衝區
-        if (video.buffered.length > 0) {
-          console.log('緩衝區:');
-          for (let i = 0; i < video.buffered.length; i++) {
-            console.log(`  區段 ${i}: ${video.buffered.start(i).toFixed(2)}s - ${video.buffered.end(i).toFixed(2)}s`);
-          }
-        }
-        
-        // 檢查計算樣式
-        const computedStyle = window.getComputedStyle(video);
-        console.log('顯示樣式:', computedStyle.display);
-        console.log('可見性:', computedStyle.visibility);
-        console.log('透明度:', computedStyle.opacity);
-        console.log('位置:', computedStyle.position);
-        
-        // 檢查父元素
-        const wrapper = video.parentElement;
-        if (wrapper) {
-          const wrapperStyle = window.getComputedStyle(wrapper);
-          console.log('容器尺寸:', wrapper.clientWidth + 'x' + wrapper.clientHeight);
-          console.log('容器顯示:', wrapperStyle.display);
-        }
-        
-        return {
-          ready: video.readyState >= 2,
-          hasVideo: video.videoWidth > 0 && video.videoHeight > 0,
-          visible: computedStyle.display !== 'none' && computedStyle.visibility !== 'hidden'
-        };
-      },
-      
-      // 嘗試修復視訊顯示問題
-      fixVideo: async () => {
-        console.log('嘗試修復視訊顯示...');
-        
-        const video = this.player.video;
-        const wrapper = video.parentElement;
-        
-        // 1. 修復容器大小
-        if (wrapper) {
-          wrapper.style.minHeight = '400px';
-          wrapper.style.height = '100%';
-          console.log('✅ 容器大小已更新');
-        }
-        
-        // 2. 重新設置視訊樣式
-        video.style.width = '100%';
-        video.style.height = '100%';
-        video.style.maxWidth = '100%';
-        video.style.maxHeight = '100%';
-        video.style.objectFit = 'contain';
-        console.log('✅ 視訊樣式已更新');
-        
-        // 3. 如果是音訊檔案偽裝成視訊
-        if (video.videoWidth === 0 && video.duration > 0) {
-          console.warn('⚠️ 這可能是一個純音訊檔案');
-          
-          // 創建視覺化提示
-          const audioIndicator = document.createElement('div');
-          audioIndicator.style.cssText = `
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            font-size: 48px;
-            text-align: center;
-            pointer-events: none;
-            z-index: 5;
-          `;
-          audioIndicator.innerHTML = '🎵<br><span style="font-size: 24px">音訊播放中</span>';
-          wrapper.appendChild(audioIndicator);
-          
-          return '已添加音訊指示器';
-        }
-        
-        // 4. 不再嘗試重新載入，避免造成更多問題
-        if (video.videoWidth === 0) {
-          console.log('視訊寬高仍為 0');
-          console.log('建議：');
-          console.log('1. 檢查是否為純音訊檔案');
-          console.log('2. 嘗試使用其他視訊檔案測試');
-          console.log('3. 確認視訊編碼是否被瀏覽器支援');
-          
-          return '無法修復視訊顯示，但音訊可能正常播放';
-        }
-        
-        return '修復完成';
-      },
-      
-      // 測試檔案
-      testFile: (file) => {
-        console.log('=== 檔案測試 ===');
-        console.log('檔案名稱:', file.name);
-        console.log('檔案大小:', app.formatFileSize(file.size));
-        console.log('MIME 類型:', file.type);
-        
-        // 檢查檔案大小分類
-        const sizeCategory = 
-          file.size > 5 * 1024 * 1024 * 1024 ? '超大檔案 (>5GB)' :
-          file.size > 2 * 1024 * 1024 * 1024 ? '大檔案 (>2GB)' :
-          file.size > 500 * 1024 * 1024 ? '中型檔案 (>500MB)' :
-          '小檔案 (<500MB)';
-        
-        console.log('檔案分類:', sizeCategory);
-        
-        // 檢查是否會使用串流
-        const willUseStreaming = VideoConfig.streaming.enabled && (
-          file.size >= VideoConfig.streaming.threshold ||
-          file.size > VideoConfig.file.warnSize
-        );
-        
-        console.log('載入策略:', willUseStreaming ? '串流模式' : '傳統模式');
-        
-        // 檢查支援
-        const video = document.createElement('video');
-        const support = video.canPlayType(file.type);
-        console.log('瀏覽器支援:', support || '不支援');
-        
-        // 記憶體估算
-        const estimatedMemory = file.size / (1024 * 1024); // MB
-        const memoryWarning = estimatedMemory > 1024 ? 
-          `⚠️ 可能使用超過 ${Math.round(estimatedMemory)}MB 記憶體` : 
-          `✅ 預估記憶體使用: ${Math.round(estimatedMemory)}MB`;
-        
-        console.log('記憶體評估:', memoryWarning);
-        
-        return {
-          name: file.name,
-          size: file.size,
-          sizeFormatted: app.formatFileSize(file.size),
-          type: file.type,
-          category: sizeCategory,
-          support: support,
-          willUseStreaming: willUseStreaming,
-          estimatedMemoryMB: Math.round(estimatedMemory)
-        };
-      },
-      
-      // 清除專案
-      clearProjects: () => {
-        const keys = Object.keys(localStorage).filter(key => 
-          key.startsWith(VideoConfig.storage.prefix)
-        );
-        keys.forEach(key => localStorage.removeItem(key));
-        console.log(`清除了 ${keys.length} 個專案`);
-        window.location.reload();
       },
       
       getState: () => {
         return {
           app: this.currentProject,
           player: this.player?.getState(),
-          ui: this.ui?.state
+          ui: this.ui?.state,
+          initStages: this.initStages
         };
       }
     };
@@ -773,145 +779,34 @@ class VideoApp {
     console.log('🔧 除錯模式已啟用');
     console.log('📝 可用方法:');
     console.log('  videoDebug.checkSupport() - 檢查瀏覽器支援');
-    console.log('  videoDebug.testFile(file) - 測試檔案類型檢測');
     console.log('  videoDebug.loadTestVideo() - 載入線上測試視訊');
-    console.log('  videoDebug.clearProjects() - 清除所有專案');
+    console.log('  videoDebug.diagnose() - 診斷視訊狀態');
     console.log('  videoDebug.getState() - 獲取當前狀態');
+  }
+  
+  /**
+   * 獲取初始化狀態
+   */
+  getInitStatus() {
+    return {
+      initialized: this.isInitialized,
+      stages: this.initStages,
+      diagnostics: {
+        dom: domReadyManager.diagnose(),
+        ui: this.ui?.diagnose(),
+        player: this.player ? 'ready' : 'not created'
+      }
+    };
   }
 }
 
-// 加入動畫樣式
-const style = document.createElement('style');
-style.textContent = `
-  @keyframes slideIn {
-    from {
-      transform: translateX(100%);
-      opacity: 0;
-    }
-    to {
-      transform: translateX(0);
-      opacity: 1;
-    }
-  }
-  
-  @keyframes slideOut {
-    from {
-      transform: translateX(0);
-      opacity: 1;
-    }
-    to {
-      transform: translateX(100%);
-      opacity: 0;
-    }
-  }
-  
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
-  }
-  
-  @keyframes slideUp {
-    from {
-      transform: translateY(20px);
-      opacity: 0;
-    }
-    to {
-      transform: translateY(0);
-      opacity: 1;
-    }
-  }
-  
-  /* Modal 按鈕樣式 */
-  .btn {
-    padding: 8px 16px;
-    border: none;
-    border-radius: 6px;
-    font-size: 14px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-  
-  .btn-primary {
-    background: #3b82f6;
-    color: white;
-  }
-  
-  .btn-primary:hover {
-    background: #2563eb;
-  }
-  
-  .btn-secondary {
-    background: #e5e7eb;
-    color: #374151;
-  }
-  
-  .btn-secondary:hover {
-    background: #d1d5db;
-  }
-  
-  /* 深色模式下的 Modal 樣式 */
-  [data-theme="dark"] .modal-content {
-    background: #1f2937;
-    color: #f3f4f6;
-  }
-  
-  [data-theme="dark"] .modal-header {
-    border-color: #374151;
-  }
-  
-  [data-theme="dark"] .btn-secondary {
-    background: #374151;
-    color: #f3f4f6;
-  }
-  
-  [data-theme="dark"] .btn-secondary:hover {
-    background: #4b5563;
-  }
-  
-  [data-theme="dark"] select,
-  [data-theme="dark"] input[type="checkbox"] {
-    background: #374151;
-    color: #f3f4f6;
-    border-color: #4b5563;
-  }
-  
-  /* kbd 樣式 */
-  kbd {
-    display: inline-block;
-    padding: 2px 6px;
-    font-size: 12px;
-    font-family: monospace;
-    background: #f3f4f6;
-    border: 1px solid #d1d5db;
-    border-radius: 4px;
-    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.1);
-  }
-  
-  [data-theme="dark"] kbd {
-    background: #374151;
-    border-color: #4b5563;
-    color: #f3f4f6;
-  }
-  
-  /* 移動端樣式調整 */
-  .video-layout.mobile {
-    grid-template-columns: 1fr;
-  }
-  
-  .video-layout.mobile .side-panel {
-    height: 300px;
-  }
-`;
-document.head.appendChild(style);
-
-// 初始化應用程式
+// 創建全域實例
 const app = new VideoApp();
 
 // 匯出給全域使用
 window.videoApp = app;
+window.videoAppStatus = () => app.getInitStatus();
 
+// 導出類和實例
+export { VideoApp };
 export default app;

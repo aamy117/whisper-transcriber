@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DOM Ready Manager 測試</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .status-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .status-card h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .status-item:last-child {
+            border-bottom: none;
+        }
+        
+        .status-value {
+            font-weight: bold;
+        }
+        
+        .status-ok {
+            color: #27ae60;
+        }
+        
+        .status-error {
+            color: #e74c3c;
+        }
+        
+        .status-warning {
+            color: #f39c12;
+        }
+        
+        .log-area {
+            background: #263238;
+            color: #aed581;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .test-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            background: #3b82f6;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        button:hover {
+            background: #2563eb;
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #4caf50;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>DOM Ready Manager 測試頁面</h1>
+    
+    <div class="test-controls">
+        <button id="testDOMReady">測試 DOM Ready</button>
+        <button id="testElements">測試元素檢查</button>
+        <button id="testWaitElement">測試等待元素</button>
+        <button id="testFullInit">測試完整初始化</button>
+        <button id="clearLogs">清除日誌</button>
+    </div>
+    
+    <div class="status-card">
+        <h2>DOM 狀態</h2>
+        <div id="domStatus"></div>
+    </div>
+    
+    <div class="status-card">
+        <h2>初始化進度</h2>
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill" style="width: 0%">0%</div>
+        </div>
+        <div id="initStages"></div>
+    </div>
+    
+    <div class="status-card">
+        <h2>元素檢查結果</h2>
+        <div id="elementStatus"></div>
+    </div>
+    
+    <div class="status-card">
+        <h2>測試日誌</h2>
+        <div class="log-area" id="logArea"></div>
+    </div>
+    
+    <!-- 測試用的 DOM 元素（模擬視訊播放器結構） -->
+    <div style="display: none;">
+        <div id="videoWrapper"></div>
+        <div id="videoPlayerContainer"></div>
+        <div id="videoUploadArea"></div>
+        <div id="videoControls"></div>
+        <video id="videoPlayer"></video>
+        <button id="playPauseBtn">
+            <span class="icon-play">▶</span>
+            <span class="icon-pause">⏸</span>
+        </button>
+        <button id="skipBackBtn"></button>
+        <button id="skipForwardBtn"></button>
+        <div id="progressContainer"></div>
+        <input id="progressSlider" type="range">
+        <div id="progressPlayed"></div>
+        <div id="progressBuffered"></div>
+        <span id="currentTime">00:00</span>
+        <span id="totalTime">00:00</span>
+        <button id="muteBtn">
+            <span class="icon-volume">🔊</span>
+            <span class="icon-mute">🔇</span>
+        </button>
+        <input id="volumeSlider" type="range">
+        <button id="speedBtn"></button>
+        <div id="speedMenu"></div>
+        <button id="fullscreenBtn">
+            <span class="icon-expand">⛶</span>
+            <span class="icon-compress">⛶</span>
+        </button>
+    </div>
+    
+    <script type="module">
+        import domReadyManager from './js/video/dom-ready-manager.js';
+        import VideoConfig from './js/video/video-config.js';
+        import { VideoPlayer } from './js/video/video-player.js';
+        import { VideoUI } from './js/video/video-ui.js';
+        
+        // 日誌函數
+        function log(message, type = 'info') {
+            const logArea = document.getElementById('logArea');
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? '#e74c3c' : type === 'success' ? '#27ae60' : '#aed581';
+            logArea.innerHTML += `<div style="color: ${color}">[${timestamp}] ${message}</div>`;
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+        
+        // 更新 DOM 狀態顯示
+        function updateDOMStatus() {
+            const status = domReadyManager.diagnose();
+            const statusDiv = document.getElementById('domStatus');
+            
+            statusDiv.innerHTML = `
+                <div class="status-item">
+                    <span>DOM Ready</span>
+                    <span class="status-value ${status.domReady ? 'status-ok' : 'status-warning'}">
+                        ${status.domReady ? '✅ 是' : '⏳ 否'}
+                    </span>
+                </div>
+                <div class="status-item">
+                    <span>Ready State</span>
+                    <span class="status-value">${status.readyState}</span>
+                </div>
+                <div class="status-item">
+                    <span>載入時間</span>
+                    <span class="status-value">${status.loadTime ? status.loadTime + 'ms' : '-'}</span>
+                </div>
+                <div class="status-item">
+                    <span>待處理回調</span>
+                    <span class="status-value">${status.callbacks.pending}</span>
+                </div>
+            `;
+        }
+        
+        // 更新進度
+        function updateProgress(percent, stage) {
+            const progressFill = document.getElementById('progressFill');
+            progressFill.style.width = percent + '%';
+            progressFill.textContent = percent + '%';
+            
+            if (stage) {
+                log(`進度更新: ${stage} (${percent}%)`, 'info');
+            }
+        }
+        
+        // 測試 DOM Ready
+        document.getElementById('testDOMReady').addEventListener('click', async () => {
+            log('開始測試 DOM Ready...');
+            updateProgress(0, 'DOM Ready 測試');
+            
+            try {
+                await domReadyManager.waitForReady(5000);
+                log('✅ DOM Ready 完成', 'success');
+                updateProgress(100, 'DOM Ready 完成');
+                updateDOMStatus();
+            } catch (error) {
+                log(`❌ 錯誤: ${error.message}`, 'error');
+            }
+        });
+        
+        // 測試元素檢查
+        document.getElementById('testElements').addEventListener('click', () => {
+            log('開始測試元素檢查...');
+            
+            // 註冊必要元素
+            const requiredElements = [
+                { id: 'videoWrapper' },
+                { id: 'videoPlayer' },
+                { id: 'playPauseBtn' },
+                { id: 'volumeSlider' },
+                { id: 'missingElement' }, // 故意加入不存在的元素
+                { id: 'optionalElement', optional: true }
+            ];
+            
+            domReadyManager.requireElements(requiredElements);
+            const result = domReadyManager.checkElements();
+            
+            const statusDiv = document.getElementById('elementStatus');
+            statusDiv.innerHTML = `
+                <div class="status-item">
+                    <span>所有必要元素</span>
+                    <span class="status-value ${result.allFound ? 'status-ok' : 'status-error'}">
+                        ${result.allFound ? '✅ 找到' : '❌ 缺失'}
+                    </span>
+                </div>
+                <div class="status-item">
+                    <span>找到的元素</span>
+                    <span class="status-value status-ok">${result.found.join(', ') || '無'}</span>
+                </div>
+                <div class="status-item">
+                    <span>缺失的元素</span>
+                    <span class="status-value status-error">${result.missing.join(', ') || '無'}</span>
+                </div>
+                <div class="status-item">
+                    <span>可選元素</span>
+                    <span class="status-value status-warning">${result.optional.join(', ') || '無'}</span>
+                </div>
+            `;
+            
+            log(`元素檢查完成: ${result.found.length} 找到, ${result.missing.length} 缺失`, 
+                result.allFound ? 'success' : 'error');
+        });
+        
+        // 測試等待元素
+        document.getElementById('testWaitElement').addEventListener('click', async () => {
+            log('開始測試等待元素...');
+            
+            // 創建一個延遲出現的元素
+            setTimeout(() => {
+                const elem = document.createElement('div');
+                elem.id = 'delayedElement';
+                elem.textContent = '我是延遲出現的元素';
+                document.body.appendChild(elem);
+                log('已創建延遲元素', 'info');
+            }, 2000);
+            
+            try {
+                log('等待 #delayedElement 出現 (2秒後出現)...');
+                const element = await domReadyManager.waitForElement('#delayedElement', 5000);
+                log('✅ 成功找到延遲元素', 'success');
+                element.remove(); // 清理
+            } catch (error) {
+                log(`❌ 等待元素失敗: ${error.message}`, 'error');
+            }
+        });
+        
+        // 測試完整初始化
+        document.getElementById('testFullInit').addEventListener('click', async () => {
+            log('開始測試完整初始化流程...');
+            updateProgress(0, '開始初始化');
+            
+            const stages = {
+                'DOM Ready': 20,
+                '創建 Player': 40,
+                '創建 UI': 60,
+                '初始化 UI': 80,
+                '完成': 100
+            };
+            
+            try {
+                // 1. DOM Ready
+                updateProgress(stages['DOM Ready'], 'DOM Ready');
+                await domReadyManager.waitForReady();
+                log('✅ DOM Ready', 'success');
+                
+                // 2. 創建 Player
+                updateProgress(stages['創建 Player'], '創建 Player');
+                const videoElement = document.getElementById('videoPlayer');
+                const player = new VideoPlayer(videoElement);
+                log('✅ VideoPlayer 創建成功', 'success');
+                
+                // 3. 創建 UI
+                updateProgress(stages['創建 UI'], '創建 UI');
+                const ui = new VideoUI(player);
+                log('✅ VideoUI 創建成功', 'success');
+                
+                // 4. 初始化 UI
+                updateProgress(stages['初始化 UI'], '初始化 UI');
+                const result = await ui.initialize();
+                
+                if (result.success) {
+                    log('✅ UI 初始化成功', 'success');
+                } else {
+                    log(`⚠️ UI 初始化失敗: ${result.error}`, 'error');
+                    log('診斷資訊: ' + JSON.stringify(result.details, null, 2), 'info');
+                }
+                
+                // 5. 完成
+                updateProgress(stages['完成'], '初始化完成');
+                log('🎉 完整初始化流程完成！', 'success');
+                
+                // 顯示初始化階段
+                const stagesDiv = document.getElementById('initStages');
+                stagesDiv.innerHTML = Object.entries(stages).map(([stage, percent]) => `
+                    <div class="status-item">
+                        <span>${stage}</span>
+                        <span class="status-value status-ok">✅ 完成</span>
+                    </div>
+                `).join('');
+                
+            } catch (error) {
+                log(`❌ 初始化失敗: ${error.message}`, 'error');
+                console.error(error);
+            }
+        });
+        
+        // 清除日誌
+        document.getElementById('clearLogs').addEventListener('click', () => {
+            document.getElementById('logArea').innerHTML = '';
+            log('日誌已清除');
+        });
+        
+        // 初始更新
+        updateDOMStatus();
+        setInterval(updateDOMStatus, 1000);
+        
+        log('測試頁面已載入，請點擊按鈕開始測試');
+    </script>
+</body>
+</html>

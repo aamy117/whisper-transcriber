@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>初始化順序測試</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        h2 {
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        
+        .test-case {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        
+        .test-case h3 {
+            margin-top: 0;
+        }
+        
+        .code-block {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        
+        .result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        
+        .result.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .result.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .result.warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        
+        button:hover {
+            background: #0056b3;
+        }
+        
+        .timeline {
+            margin: 20px 0;
+        }
+        
+        .timeline-item {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+        }
+        
+        .timeline-time {
+            width: 80px;
+            text-align: right;
+            margin-right: 20px;
+            font-family: monospace;
+            color: #666;
+        }
+        
+        .timeline-event {
+            flex: 1;
+            padding: 5px 10px;
+            background: #e9ecef;
+            border-radius: 5px;
+        }
+        
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        
+        .comparison-table th,
+        .comparison-table td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+        
+        .comparison-table th {
+            background: #f8f9fa;
+            font-weight: bold;
+        }
+        
+        .comparison-table tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 視訊播放器初始化順序測試</h1>
+    
+    <div class="test-section">
+        <h2>問題說明</h2>
+        <p>原始的 <code>video-ui.js</code> 在建構函式中立即嘗試獲取 DOM 元素，這可能導致：</p>
+        <ul>
+            <li>如果在 DOM 載入前初始化，元素會是 <code>null</code></li>
+            <li>後續操作可能因為 <code>null</code> 值而失敗</li>
+            <li>難以處理非同步載入的情況</li>
+        </ul>
+    </div>
+    
+    <div class="test-section">
+        <h2>測試案例</h2>
+        
+        <div class="test-case">
+            <h3>案例 1：在 DOM 載入前初始化（問題場景）</h3>
+            <div class="code-block">// 在 &lt;head&gt; 中執行
+const ui = new VideoUI(player);  // 可能失敗！</div>
+            <button onclick="testEarlyInit()">執行測試</button>
+            <div id="earlyInitResult"></div>
+        </div>
+        
+        <div class="test-case">
+            <h3>案例 2：使用 DOMContentLoaded（傳統解法）</h3>
+            <div class="code-block">document.addEventListener('DOMContentLoaded', () => {
+    const ui = new VideoUI(player);  // 應該成功
+});</div>
+            <button onclick="testDOMContentLoaded()">執行測試</button>
+            <div id="domContentLoadedResult"></div>
+        </div>
+        
+        <div class="test-case">
+            <h3>案例 3：使用改進的非同步初始化（推薦）</h3>
+            <div class="code-block">const ui = new VideoUI(player);
+await ui.initialize();  // 內部處理 DOM 就緒</div>
+            <button onclick="testAsyncInit()">執行測試</button>
+            <div id="asyncInitResult"></div>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h2>初始化時間軸</h2>
+        <div id="timeline" class="timeline"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>方案比較</h2>
+        <table class="comparison-table">
+            <thead>
+                <tr>
+                    <th>方案</th>
+                    <th>優點</th>
+                    <th>缺點</th>
+                    <th>適用場景</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>原始方式</strong><br>建構函式中獲取元素</td>
+                    <td>• 簡單直接<br>• 同步執行</td>
+                    <td>• DOM 時機問題<br>• 容易出錯<br>• 難以測試</td>
+                    <td>只適用於確保 DOM 已載入的情況</td>
+                </tr>
+                <tr>
+                    <td><strong>DOMContentLoaded</strong><br>事件監聽方式</td>
+                    <td>• 確保 DOM 就緒<br>• 相容性好</td>
+                    <td>• 需要額外包裝<br>• 程式碼分散</td>
+                    <td>傳統網頁應用</td>
+                </tr>
+                <tr>
+                    <td><strong>延遲初始化</strong><br>分離建構與初始化</td>
+                    <td>• 彈性高<br>• 易於測試<br>• 支援重試</td>
+                    <td>• 需要兩步驟<br>• API 較複雜</td>
+                    <td>現代化應用、SPA</td>
+                </tr>
+                <tr>
+                    <td><strong>非同步初始化</strong><br>使用 async/await</td>
+                    <td>• 最佳實踐<br>• 錯誤處理完善<br>• 支援 Promise</td>
+                    <td>• 需要理解非同步</td>
+                    <td>推薦用於所有新專案</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="test-section">
+        <h2>建議的初始化流程</h2>
+        <div class="code-block">// 1. 創建實例（不執行 DOM 操作）
+const player = new VideoPlayer(videoElement);
+const ui = new VideoUI(player);
+
+// 2. 非同步初始化（內部處理 DOM 就緒）
+try {
+    await ui.initialize();
+    console.log('UI 初始化成功');
+} catch (error) {
+    console.error('UI 初始化失敗:', error);
+    // 可以重試或顯示錯誤訊息
+}</div>
+    </div>
+    
+    <!-- 測試用元素 -->
+    <div style="display: none;">
+        <div id="videoWrapper"></div>
+        <div id="videoPlayerContainer"></div>
+        <div id="videoUploadArea"></div>
+        <div id="videoControls"></div>
+        <video id="videoPlayer"></video>
+        <button id="playPauseBtn"><span class="icon-play">▶</span></button>
+        <button id="skipBackBtn"></button>
+        <button id="skipForwardBtn"></button>
+        <div id="progressContainer"></div>
+        <input id="progressSlider" type="range">
+        <div id="progressPlayed"></div>
+        <div id="progressBuffered"></div>
+        <span id="currentTime">00:00</span>
+        <span id="totalTime">00:00</span>
+        <button id="muteBtn"></button>
+        <input id="volumeSlider" type="range">
+        <button id="speedBtn"><span class="speed-text">1x</span></button>
+        <div id="speedMenu"></div>
+        <button id="fullscreenBtn"></button>
+    </div>
+    
+    <script type="module">
+        import { VideoPlayer } from './js/video/video-player.js';
+        import { VideoUI as OriginalVideoUI } from './js/video/video-ui.js';
+        import { VideoUI as ImprovedVideoUI } from './js/video/video-ui.js';
+        
+        const timeline = [];
+        
+        function addTimelineEvent(event) {
+            const time = performance.now().toFixed(2);
+            timeline.push({ time, event });
+            updateTimeline();
+        }
+        
+        function updateTimeline() {
+            const container = document.getElementById('timeline');
+            container.innerHTML = timeline.map(item => `
+                <div class="timeline-item">
+                    <div class="timeline-time">${item.time}ms</div>
+                    <div class="timeline-event">${item.event}</div>
+                </div>
+            `).join('');
+        }
+        
+        function showResult(elementId, success, message, details = null) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `
+                <div class="result ${success ? 'success' : 'error'}">
+                    ${success ? '✅' : '❌'} ${message}
+                    ${details ? `<div class="code-block">${details}</div>` : ''}
+                </div>
+            `;
+        }
+        
+        // 測試 1：早期初始化
+        window.testEarlyInit = function() {
+            timeline.length = 0;
+            addTimelineEvent('開始測試：早期初始化');
+            
+            try {
+                // 模擬在 DOM 載入前的情況
+                const tempVideo = document.createElement('video');
+                const player = new VideoPlayer(tempVideo);
+                addTimelineEvent('VideoPlayer 創建成功');
+                
+                // 嘗試創建 UI（可能失敗）
+                const ui = new OriginalVideoUI(player);
+                addTimelineEvent('VideoUI 創建成功？');
+                
+                // 檢查元素
+                const nullElements = Object.entries(ui.elements)
+                    .filter(([key, value]) => value === null)
+                    .map(([key]) => key);
+                
+                if (nullElements.length > 0) {
+                    showResult('earlyInitResult', false, 
+                        `初始化完成但有 ${nullElements.length} 個元素為 null`,
+                        `Null 元素: ${nullElements.join(', ')}`);
+                } else {
+                    showResult('earlyInitResult', true, '初始化成功（意外）');
+                }
+                
+            } catch (error) {
+                addTimelineEvent(`錯誤: ${error.message}`);
+                showResult('earlyInitResult', false, `初始化失敗: ${error.message}`);
+            }
+        };
+        
+        // 測試 2：DOMContentLoaded
+        window.testDOMContentLoaded = function() {
+            timeline.length = 0;
+            addTimelineEvent('開始測試：DOMContentLoaded');
+            
+            // 檢查當前 DOM 狀態
+            addTimelineEvent(`當前 DOM 狀態: ${document.readyState}`);
+            
+            try {
+                const video = document.getElementById('videoPlayer');
+                const player = new VideoPlayer(video);
+                addTimelineEvent('VideoPlayer 創建成功');
+                
+                const ui = new OriginalVideoUI(player);
+                addTimelineEvent('VideoUI 創建成功');
+                
+                // 檢查元素
+                const nullElements = Object.entries(ui.elements)
+                    .filter(([key, value]) => value === null)
+                    .map(([key]) => key);
+                
+                if (nullElements.length === 0) {
+                    showResult('domContentLoadedResult', true, '所有元素成功獲取');
+                } else {
+                    showResult('domContentLoadedResult', false,
+                        `有 ${nullElements.length} 個元素為 null`,
+                        `Null 元素: ${nullElements.join(', ')}`);
+                }
+                
+            } catch (error) {
+                addTimelineEvent(`錯誤: ${error.message}`);
+                showResult('domContentLoadedResult', false, `初始化失敗: ${error.message}`);
+            }
+        };
+        
+        // 測試 3：非同步初始化
+        window.testAsyncInit = async function() {
+            timeline.length = 0;
+            addTimelineEvent('開始測試：非同步初始化');
+            
+            try {
+                const video = document.getElementById('videoPlayer');
+                const player = new VideoPlayer(video);
+                addTimelineEvent('VideoPlayer 創建成功');
+                
+                const ui = new ImprovedVideoUI(player);
+                addTimelineEvent('VideoUI 實例創建成功');
+                
+                // 非同步初始化
+                const result = await ui.initialize();
+                addTimelineEvent(`初始化結果: ${result.success ? '成功' : '失敗'}`);
+                
+                if (result.success) {
+                    const diagnosis = ui.diagnose();
+                    showResult('asyncInitResult', true, 
+                        '非同步初始化成功',
+                        JSON.stringify(diagnosis, null, 2));
+                } else {
+                    showResult('asyncInitResult', false,
+                        `初始化失敗: ${result.error}`);
+                }
+                
+            } catch (error) {
+                addTimelineEvent(`錯誤: ${error.message}`);
+                showResult('asyncInitResult', false, `錯誤: ${error.message}`);
+            }
+        };
+        
+        // 頁面載入時顯示當前狀態
+        addTimelineEvent(`頁面載入 - DOM 狀態: ${document.readyState}`);
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            addTimelineEvent('DOMContentLoaded 事件觸發');
+        });
+        
+        window.addEventListener('load', () => {
+            addTimelineEvent('window.load 事件觸發');
+        });
+    </script>
+</body>
+</html>

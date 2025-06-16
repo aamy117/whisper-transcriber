@@ -61,6 +61,17 @@ function improvedFileTypeDetection(file) {
 }
 
 export class VideoPlayer {
+  // 靜態方法：檢查瀏覽器支援
+  static checkBrowserSupport() {
+    const video = document.createElement('video');
+    return {
+      'MP4': video.canPlayType('video/mp4'),
+      'WebM': video.canPlayType('video/webm'),
+      'Ogg': video.canPlayType('video/ogg'),
+      'HLS': video.canPlayType('application/vnd.apple.mpegurl'),
+      'MSE': isMSESupported() ? 'supported' : 'not supported'
+    };
+  }
   constructor(videoElement) {
     this.video = videoElement;
     this.container = videoElement.parentElement;

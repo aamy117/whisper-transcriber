@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>視訊播放器初始化測試</title>
+    <link rel="stylesheet" href="css/shared.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/video.css">
+    <style>
+        .test-container {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        
+        .test-section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .test-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .test-status {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        
+        .status-pending { background: #f39c12; color: white; }
+        .status-running { background: #3498db; color: white; }
+        .status-success { background: #27ae60; color: white; }
+        .status-error { background: #e74c3c; color: white; }
+        
+        .test-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .test-card {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .test-card:hover {
+            border-color: #3498db;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .test-card.running {
+            border-color: #3498db;
+            background: #ebf5fb;
+        }
+        
+        .test-card.success {
+            border-color: #27ae60;
+            background: #e8f8f5;
+        }
+        
+        .test-card.error {
+            border-color: #e74c3c;
+            background: #fadbd8;
+        }
+        
+        .test-card h4 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+        }
+        
+        .test-card p {
+            margin: 0;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .test-results {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .test-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+        
+        .btn-success {
+            background: #27ae60;
+            color: white;
+        }
+        
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        .progress-tracker {
+            margin: 20px 0;
+        }
+        
+        .progress-item {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+        }
+        
+        .progress-icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            font-size: 16px;
+        }
+        
+        .progress-icon.pending {
+            background: #e0e0e0;
+            color: #999;
+        }
+        
+        .progress-icon.running {
+            background: #3498db;
+            color: white;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .progress-icon.success {
+            background: #27ae60;
+            color: white;
+        }
+        
+        .progress-icon.error {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        .metric-card {
+            background: #f8f9fa;
+            border-radius: 5px;
+            padding: 15px;
+            text-align: center;
+        }
+        
+        .metric-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .metric-label {
+            font-size: 14px;
+            color: #7f8c8d;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="test-section">
+            <div class="test-header">
+                <h1>視訊播放器初始化測試套件</h1>
+                <span class="test-status status-pending" id="overallStatus">準備就緒</span>
+            </div>
+            
+            <div class="test-controls">
+                <button class="btn btn-primary" id="runAllTests">執行所有測試</button>
+                <button class="btn btn-success" id="runSelectedTests">執行選定測試</button>
+                <button class="btn btn-danger" id="clearResults">清除結果</button>
+                <button class="btn" id="exportResults">匯出報告</button>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>測試項目</h2>
+            <div class="test-grid" id="testGrid">
+                <!-- 測試項目將動態生成 -->
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>初始化進度追蹤</h2>
+            <div class="progress-tracker" id="progressTracker">
+                <!-- 進度項目將動態生成 -->
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>效能指標</h2>
+            <div class="test-grid">
+                <div class="metric-card">
+                    <div class="metric-value" id="domLoadTime">-</div>
+                    <div class="metric-label">DOM 載入時間</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="initTime">-</div>
+                    <div class="metric-label">初始化總時間</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="memoryUsage">-</div>
+                    <div class="metric-label">記憶體使用</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="errorCount">0</div>
+                    <div class="metric-label">錯誤數量</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>測試結果</h2>
+            <div class="test-results" id="testResults"></div>
+        </div>
+    </div>
+    
+    <!-- 包含實際的視訊播放器元素（隱藏） -->
+    <div style="display: none;">
+        <div id="videoWrapper"></div>
+        <div id="videoPlayerContainer"></div>
+        <div id="videoUploadArea"></div>
+        <div id="videoControls"></div>
+        <video id="videoPlayer"></video>
+        <button id="playPauseBtn">
+            <span class="icon icon-play">▶</span>
+            <span class="icon icon-pause">⏸</span>
+        </button>
+        <button id="skipBackBtn"></button>
+        <button id="skipForwardBtn"></button>
+        <div id="progressContainer"></div>
+        <input id="progressSlider" type="range">
+        <div id="progressPlayed"></div>
+        <div id="progressBuffered"></div>
+        <span id="currentTime">00:00</span>
+        <span id="totalTime">00:00</span>
+        <button id="muteBtn">
+            <span class="icon icon-volume">🔊</span>
+            <span class="icon icon-mute">🔇</span>
+        </button>
+        <input id="volumeSlider" type="range">
+        <button id="speedBtn">
+            <span class="speed-text">1x</span>
+        </button>
+        <div id="speedMenu"></div>
+        <button id="fullscreenBtn">
+            <span class="icon icon-expand">⛶</span>
+            <span class="icon icon-compress">⛶</span>
+        </button>
+        <div id="videoFileName"></div>
+        <div id="videoFileSize"></div>
+        <div id="videoDuration"></div>
+        <div id="videoResolution"></div>
+    </div>
+    
+    <script type="module" src="js/test-suite.js"></script>
+</body>
+</html>
