@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小檔案視訊測試</title>
+    <link rel="stylesheet" href="css/shared.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        h2 {
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+        
+        .video-container {
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        
+        #videoPlayer {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        
+        .file-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-family: monospace;
+        }
+        
+        .status-message {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .status-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        
+        button:hover {
+            background: #0056b3;
+        }
+        
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        
+        #fileInput {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        
+        .test-results {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        
+        .test-results h3 {
+            margin-top: 0;
+        }
+        
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .result-item:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎬 小檔案視訊測試</h1>
+    
+    <div class="test-section">
+        <h2>測試說明</h2>
+        <p>這個頁面專門測試小檔案（< 10MB）的視訊播放，使用傳統載入方式而非串流載入。</p>
+        <ul>
+            <li>支援格式：MP4, WebM, Ogg</li>
+            <li>檔案大小：建議小於 10MB</li>
+            <li>載入方式：直接載入整個檔案到記憶體</li>
+        </ul>
+    </div>
+    
+    <div class="test-section">
+        <h2>選擇視訊檔案</h2>
+        <div class="controls">
+            <input type="file" id="fileInput" accept="video/*">
+            <button onclick="loadSampleVideo()">載入範例視訊</button>
+        </div>
+        <div id="status"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>視訊播放器</h2>
+        <div id="videoWrapper">
+            <div id="videoUploadArea">
+                <p style="text-align: center; color: #666;">請選擇視訊檔案</p>
+            </div>
+            <div id="videoPlayerContainer" style="display: none;">
+                <div class="video-container">
+                    <video id="videoPlayer" controls></video>
+                </div>
+                <div class="file-info" id="fileInfo"></div>
+                <div id="videoControls" style="display: flex; gap: 10px; justify-content: center;">
+                    <button id="playPauseBtn">播放/暫停</button>
+                    <button onclick="testSeek()">測試跳轉</button>
+                    <button onclick="testSpeed()">測試速度</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h2>測試結果</h2>
+        <div class="test-results" id="testResults">
+            <h3>載入資訊</h3>
+            <div id="loadInfo">等待載入視訊...</div>
+        </div>
+    </div>
+    
+    <!-- 隱藏的必要元素（為了相容 VideoUI） -->
+    <div style="display: none;">
+        <button id="skipBackBtn"></button>
+        <button id="skipForwardBtn"></button>
+        <div id="progressContainer"></div>
+        <input id="progressSlider" type="range">
+        <div id="progressPlayed"></div>
+        <div id="progressBuffered"></div>
+        <span id="currentTime">00:00</span>
+        <span id="totalTime">00:00</span>
+        <button id="muteBtn"></button>
+        <input id="volumeSlider" type="range">
+        <button id="speedBtn"><span class="speed-text">1x</span></button>
+        <div id="speedMenu"></div>
+        <button id="fullscreenBtn"></button>
+    </div>
+    
+    <script type="module">
+        import domReadyManager from './js/video/dom-ready-manager.js';
+        import { VideoPlayer } from './js/video/video-player.js';
+        import { VideoUI } from './js/video/video-ui.js';
+        
+        let player = null;
+        let ui = null;
+        let startTime = 0;
+        
+        function showStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.className = `status-message status-${type}`;
+            status.textContent = message;
+        }
+        
+        function updateLoadInfo(info) {
+            const loadInfo = document.getElementById('loadInfo');
+            const items = Object.entries(info).map(([key, value]) => 
+                `<div class="result-item">
+                    <span>${key}:</span>
+                    <span><strong>${value}</strong></span>
+                </div>`
+            ).join('');
+            loadInfo.innerHTML = items;
+        }
+        
+        async function loadVideo(file) {
+            startTime = performance.now();
+            
+            try {
+                showStatus(`正在載入 ${file.name}...`, 'info');
+                
+                const videoElement = document.getElementById('videoPlayer');
+                
+                if (!player) {
+                    // 等待 DOM 就緒
+                    await domReadyManager.waitForReady();
+                    
+                    player = new VideoPlayer(videoElement);
+                    ui = new VideoUI(player);
+                    
+                    // 初始化 UI
+                    await ui.initialize();
+                    
+                    // 監聽事件
+                    videoElement.addEventListener('video:loadeddata', (e) => {
+                        const loadTime = ((performance.now() - startTime) / 1000).toFixed(2);
+                        showStatus('視訊載入成功！', 'success');
+                        
+                        const info = e.detail.info;
+                        updateLoadInfo({
+                            '檔案名稱': info.fileName,
+                            '檔案大小': formatFileSize(info.fileSize),
+                            '檔案類型': info.fileType,
+                            '視訊尺寸': `${info.width} × ${info.height}`,
+                            '視訊長度': formatTime(info.duration),
+                            '載入時間': `${loadTime} 秒`,
+                            '載入方式': player.useStreaming ? '串流載入' : '傳統載入'
+                        });
+                        
+                        // 更新檔案資訊
+                        document.getElementById('fileInfo').innerHTML = `
+                            <strong>${info.fileName}</strong> | 
+                            ${formatFileSize(info.fileSize)} | 
+                            ${info.width}×${info.height} | 
+                            ${formatTime(info.duration)}
+                        `;
+                    });
+                    
+                    videoElement.addEventListener('video:error', (e) => {
+                        showStatus(`錯誤: ${e.detail.error}`, 'error');
+                    });
+                    
+                    videoElement.addEventListener('video:warning', (e) => {
+                        showStatus(`警告: ${e.detail.message}`, 'info');
+                    });
+                }
+                
+                await player.loadFile(file);
+                
+                document.getElementById('videoUploadArea').style.display = 'none';
+                document.getElementById('videoPlayerContainer').style.display = 'block';
+                
+            } catch (error) {
+                showStatus(`載入失敗: ${error.message}`, 'error');
+                console.error('載入錯誤:', error);
+            }
+        }
+        
+        // 檔案選擇
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                loadVideo(file);
+            }
+        });
+        
+        // 播放控制
+        document.getElementById('playPauseBtn').addEventListener('click', () => {
+            if (player) {
+                player.togglePlayPause();
+            }
+        });
+        
+        // 載入範例視訊
+        window.loadSampleVideo = async function() {
+            try {
+                showStatus('正在載入範例視訊...', 'info');
+                const response = await fetch('https://www.w3schools.com/html/mov_bbb.mp4');
+                const blob = await response.blob();
+                const file = new File([blob], 'big_buck_bunny.mp4', { type: 'video/mp4' });
+                loadVideo(file);
+            } catch (error) {
+                showStatus(`載入範例失敗: ${error.message}`, 'error');
+            }
+        };
+        
+        // 測試功能
+        window.testSeek = function() {
+            if (player && player.video.duration) {
+                const randomTime = Math.random() * player.video.duration;
+                player.seek(randomTime);
+                showStatus(`跳轉到 ${formatTime(randomTime)}`, 'info');
+            }
+        };
+        
+        window.testSpeed = function() {
+            if (player) {
+                const speeds = [0.5, 0.75, 1, 1.25, 1.5, 2];
+                const currentIndex = speeds.indexOf(player.video.playbackRate);
+                const nextIndex = (currentIndex + 1) % speeds.length;
+                player.setPlaybackRate(speeds[nextIndex]);
+                showStatus(`播放速度: ${speeds[nextIndex]}x`, 'info');
+            }
+        };
+        
+        function formatFileSize(bytes) {
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            if (bytes === 0) return '0 B';
+            const i = Math.floor(Math.log(bytes) / Math.log(1024));
+            return (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + sizes[i];
+        }
+        
+        function formatTime(seconds) {
+            if (!seconds || !isFinite(seconds)) return '00:00';
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+    </script>
+</body>
+</html>
