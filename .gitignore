@@ -9,6 +9,7 @@ Thumbs.db
 # Editor files
 .vscode/
 .idea/
+.mp4
 
 # Test files
 test-audio/
