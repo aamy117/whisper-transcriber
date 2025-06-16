@@ -79,7 +79,13 @@
                     <div class="video-player-container hidden" id="videoPlayerContainer">
                         <div class="video-wrapper" id="videoWrapper">
                             <!-- 視訊元素 -->
-                            <video id="videoPlayer" preload="metadata" playsinline></video>
+                            <video id="videoPlayer" 
+                                   preload="metadata" 
+                                   playsinline 
+                                   webkit-playsinline 
+                                   controls="false"
+                                   controlslist="nodownload nofullscreen noremoteplayback"
+                                   disablepictureinpicture></video>
                             
                             <!-- 載入指示器 -->
                             <div class="video-loading hidden" id="videoLoading">

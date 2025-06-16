@@ -93,9 +93,38 @@ export class VideoPlayer {
   }
   
   init() {
+    this.setupCrossBrowserCompatibility();
     this.bindVideoEvents();
     this.setupVideoProperties();
     console.log('VideoPlayer 初始化完成');
+  }
+  
+  setupCrossBrowserCompatibility() {
+    // 移除原生控制項，使用自定義控制項
+    this.video.controls = false;
+    
+    // 設定 playsinline 屬性（iOS）
+    this.video.setAttribute('playsinline', '');
+    this.video.setAttribute('webkit-playsinline', '');
+    
+    // 設定其他相容性屬性
+    this.video.setAttribute('x-webkit-airplay', 'allow');
+    
+    // 檢測瀏覽器類型
+    const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    
+    if (isFirefox) {
+      console.log('檢測到 Firefox，套用相容性設定');
+      // Firefox 特定設定
+    }
+    
+    if (isSafari || isIOS) {
+      console.log('檢測到 Safari/iOS，套用相容性設定');
+      // Safari/iOS 特定設定
+      this.video.setAttribute('playsInline', 'true');
+    }
   }
   
   bindVideoEvents() {
