@@ -97,6 +97,7 @@ export class VideoUI {
       console.log('🔗 綁定事件處理器...');
       this.bindEvents();
       this.bindPlayerEvents();
+      this.bindErrorHandlerEvents();
       
       // 步驟 5: 設置初始狀態
       console.log('⚙️ 設置初始狀態...');
@@ -315,7 +316,7 @@ export class VideoUI {
   }
   
   setupMouseControls() {
-    const wrapper = this.elements.wrapper;
+    const wrapper = this.elements.videoWrapper;
     if (!wrapper) return;
     
     // 滑鼠移動顯示控制列
@@ -347,18 +348,27 @@ export class VideoUI {
     this.video.addEventListener('video:volumechange', (e) => this.updateVolumeDisplay(e.detail));
     this.video.addEventListener('video:fullscreenchange', (e) => this.updateFullscreenButton(e.detail));
     this.video.addEventListener('video:loadeddata', (e) => this.updateVideoInfo(e.detail));
+    this.video.addEventListener('video:error', (e) => this.handleVideoError(e.detail));
+    this.video.addEventListener('video:warning', (e) => this.handleVideoWarning(e.detail));
+  }
+  
+  bindErrorHandlerEvents() {
+    // 監聽錯誤處理器事件
+    document.addEventListener('memory:warning', (e) => this.handleMemoryWarning(e.detail));
+    document.addEventListener('memory:critical', (e) => this.handleMemoryCritical(e.detail));
+    document.addEventListener('error:retry', (e) => this.handleErrorRetry(e.detail));
   }
   
   // ========== UI 顯示控制 ==========
   
   showPlayer() {
-    this.elements.container?.classList.remove('hidden');
-    this.elements.uploadArea?.classList.add('hidden');
+    this.elements.videoPlayerContainer?.classList.remove('hidden');
+    this.elements.videoUploadArea?.classList.add('hidden');
   }
   
   hidePlayer() {
-    this.elements.container?.classList.add('hidden');
-    this.elements.uploadArea?.classList.remove('hidden');
+    this.elements.videoPlayerContainer?.classList.add('hidden');
+    this.elements.videoUploadArea?.classList.remove('hidden');
   }
   
   // ========== 播放控制 ==========
@@ -455,8 +465,8 @@ export class VideoUI {
   // ========== 控制列顯示/隱藏 ==========
   
   showControls() {
-    this.elements.controls?.classList.remove('hidden');
-    this.elements.controls?.style.setProperty('opacity', '1', 'important');
+    this.elements.videoControls?.classList.remove('hidden');
+    this.elements.videoControls?.style.setProperty('opacity', '1', 'important');
     this.state.controlsVisible = true;
     
     // 重置自動隱藏計時器
@@ -466,7 +476,7 @@ export class VideoUI {
   hideControls() {
     // 只有在播放中且不在拖動時才隱藏控制欄
     if (this.player.isPlaying && !this.state.isDragging) {
-      this.elements.controls?.style.setProperty('opacity', '0');
+      this.elements.videoControls?.style.setProperty('opacity', '0');
       this.state.controlsVisible = false;
     }
   }
@@ -670,10 +680,148 @@ export class VideoUI {
   // ========== 載入指示器 ==========
   
   showLoading() {
-    this.elements.loading?.classList.remove('hidden');
+    this.elements.videoLoading?.classList.remove('hidden');
   }
   
   hideLoading() {
-    this.elements.loading?.classList.add('hidden');
+    this.elements.videoLoading?.classList.add('hidden');
+  }
+  
+  // ========== 錯誤處理方法 ==========
+  
+  handleVideoError(detail) {
+    console.error('視訊錯誤:', detail);
+    
+    const message = detail.error || '視訊載入錯誤';
+    this.showNotification(message, 'error');
+    
+    // 如果有詳細資訊，顯示在控制台
+    if (detail.details) {
+      console.error('錯誤詳情:', detail.details);
+    }
+  }
+  
+  handleVideoWarning(detail) {
+    console.warn('視訊警告:', detail);
+    this.showNotification(detail.message, 'warning');
+  }
+  
+  handleMemoryWarning(detail) {
+    console.warn('記憶體警告:', detail);
+    this.showNotification(
+      `⚠️ ${detail.message}\n${detail.suggestion}`,
+      'warning',
+      5000
+    );
+  }
+  
+  handleMemoryCritical(detail) {
+    console.error('記憶體危險:', detail);
+    this.showNotification(
+      `🚨 ${detail.message}\n${detail.suggestion}`,
+      'error',
+      0 // 不自動隱藏
+    );
+  }
+  
+  handleErrorRetry(detail) {
+    console.log('錯誤重試:', detail);
+    this.showNotification(
+      `🔄 正在重試 (${detail.attempt}/${detail.maxAttempts})...`,
+      'info',
+      3000
+    );
+  }
+  
+  // 顯示通知訊息
+  showNotification(message, type = 'info', duration = 4000) {
+    // 創建通知元素
+    const notification = document.createElement('div');
+    notification.className = `video-notification video-notification-${type}`;
+    notification.textContent = message;
+    
+    // 添加樣式
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 15px 20px;
+      border-radius: 5px;
+      font-size: 14px;
+      z-index: 10000;
+      max-width: 400px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      animation: slideIn 0.3s ease-out;
+    `;
+    
+    // 根據類型設置顏色
+    switch (type) {
+      case 'error':
+        notification.style.background = '#f8d7da';
+        notification.style.color = '#721c24';
+        notification.style.border = '1px solid #f5c6cb';
+        break;
+      case 'warning':
+        notification.style.background = '#fff3cd';
+        notification.style.color = '#856404';
+        notification.style.border = '1px solid #ffeeba';
+        break;
+      case 'success':
+        notification.style.background = '#d4edda';
+        notification.style.color = '#155724';
+        notification.style.border = '1px solid #c3e6cb';
+        break;
+      default:
+        notification.style.background = '#d1ecf1';
+        notification.style.color = '#0c5460';
+        notification.style.border = '1px solid #bee5eb';
+    }
+    
+    // 添加關閉按鈕
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '×';
+    closeBtn.style.cssText = `
+      position: absolute;
+      top: 5px;
+      right: 10px;
+      background: none;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      opacity: 0.7;
+    `;
+    closeBtn.onclick = () => notification.remove();
+    notification.appendChild(closeBtn);
+    
+    // 添加到頁面
+    document.body.appendChild(notification);
+    
+    // 自動移除
+    if (duration > 0) {
+      setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease-out';
+        setTimeout(() => notification.remove(), 300);
+      }, duration);
+    }
+  }
+  
+  // 診斷方法
+  diagnose() {
+    const diagnosis = {
+      initialized: this.state.initialized,
+      domReady: this.state.domReady,
+      elementsFound: Object.keys(this.elements).length,
+      missingElements: [],
+      playerState: this.player?.getState()
+    };
+    
+    // 檢查缺失的元素
+    for (const req of this.requiredElements) {
+      if (!req.optional && !this.elements[req.id]) {
+        diagnosis.missingElements.push(req.id);
+      }
+    }
+    
+    return diagnosis;
   }
 }

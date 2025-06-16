@@ -1,6 +1,7 @@
 // 視訊播放器核心模組
 import VideoConfig from './video-config.js';
 import { StreamingLoader } from './video-streaming.js';
+import videoErrorHandler from './video-error-handler.js';
 
 // 檢查 MSE (Media Source Extensions) 支援
 function isMSESupported() {
@@ -83,6 +84,9 @@ export class VideoPlayer {
     // 串流載入器
     this.streamingLoader = null;
     this.useStreaming = false;
+    
+    // 錯誤處理
+    this.errorHandler = videoErrorHandler;
     
     // 狀態管理
     this.state = {
@@ -231,11 +235,20 @@ export class VideoPlayer {
     
     try {
       this.isLoading = true;
-      this.currentFile = file;      // 決定載入策略 - 大檔案強制使用串流
-      const shouldUseStreaming = VideoConfig.streaming.enabled && (
-        file.size >= VideoConfig.streaming.threshold ||
-        file.size > VideoConfig.file.warnSize // 超過警告大小的檔案強制串流
-      ) && isMSESupported() && this.isMSESupportedFormat(detectedType);
+      this.currentFile = file;
+      
+      // 開始記憶體監控
+      this.errorHandler.startMemoryMonitoring();
+      
+      // 決定載入策略 - 大檔案強制使用串流
+      // 對於小檔案（<10MB）直接使用傳統載入，避免串流的複雜性
+      const minStreamingSize = 10 * 1024 * 1024; // 10MB
+      const shouldUseStreaming = VideoConfig.streaming.enabled && 
+        file.size >= minStreamingSize && // 檔案必須大於最小串流大小
+        (file.size >= VideoConfig.streaming.threshold ||
+         file.size > VideoConfig.file.warnSize) && 
+        isMSESupported() && 
+        this.isMSESupportedFormat(detectedType);
       
       console.log(`載入策略決定:`, {
         fileSize: this.formatFileSize(file.size),
@@ -281,7 +294,17 @@ export class VideoPlayer {
           return videoInfo;
           
         } catch (streamError) {
-          console.warn('串流載入失敗，嘗試傳統載入:', streamError);
+          console.warn('串流載入失敗:', streamError);
+          
+          // 使用錯誤處理器分析和處理錯誤
+          const errorResponse = await this.errorHandler.handleStreamingError(
+            streamError, 
+            file, 
+            {
+              chunkSize: this.streamingLoader?.chunkSize,
+              timeout: 30000
+            }
+          );
           
           // 清理串流載入器
           if (this.streamingLoader) {
@@ -296,33 +319,81 @@ export class VideoPlayer {
           this.video.src = '';
           this.video.load();
           
-          // 根據檔案大小決定是否嘗試傳統載入
-          const maxTraditionalSize = 2 * 1024 * 1024 * 1024; // 2GB
-          
-          if (file.size <= maxTraditionalSize) {
-            // 嘗試傳統載入
-            console.log('🔄 回退到傳統載入模式');
-            
-            const fileURL = URL.createObjectURL(file);
-            this.currentBlobUrl = fileURL;  // 保存引用
-            await this.loadVideoSource(fileURL);
-            await this.waitForMetadata();
-            const info = await this.getVideoInfo();
-            
-            this.isLoading = false;
-            this.dispatchCustomEvent('video:loadeddata', { file, info });
-            
-            // 顯示警告訊息
-            this.dispatchCustomEvent('video:warning', { 
-              message: '串流載入失敗，已切換為傳統載入模式。大檔案可能需要較長載入時間。' 
-            });
-            
-            return info;
-          } else {
-            // 檔案太大，建議使用其他方式
-            const errorMsg = `檔案過大 (${this.formatFileSize(file.size)})，串流載入失敗。\n\n可能的原因：\n1. 視訊檔案編碼格式不適合串流播放\n2. 檔案的 moov atom 不在檔案開頭\n\n建議：\n1. 使用較小的視訊檔案\n2. 使用 FFmpeg 重新編碼視訊：\n   ffmpeg -i input.mp4 -movflags faststart -c copy output.mp4`;
-            
-            throw new Error(errorMsg);
+          // 根據錯誤處理器的建議執行操作
+          switch (errorResponse.action) {
+            case 'retry':
+              // 重試串流載入
+              console.log('🔄 重試串流載入...');
+              this.streamingLoader = new StreamingLoader(this.video);
+              
+              // 應用優化選項
+              if (errorResponse.options.chunkSize) {
+                this.streamingLoader.chunkSize = errorResponse.options.chunkSize;
+              }
+              
+              try {
+                const info = await this.streamingLoader.loadFile(file);
+                await this.waitForMetadata();
+                const videoInfo = await this.getVideoInfo();
+                
+                this.isLoading = false;
+                this.errorHandler.clearRetryAttempts(file.name);
+                
+                console.log('✅ 重試成功:', videoInfo);
+                this.dispatchCustomEvent('video:loadeddata', { file, info: videoInfo });
+                
+                return videoInfo;
+              } catch (retryError) {
+                // 重試失敗，繼續處理
+                return this.handleStreamingFailure(file, retryError);
+              }
+              
+            case 'fallback':
+              // 執行回退策略
+              const strategy = errorResponse.recommendation;
+              
+              if (strategy.name === 'traditional') {
+                // 傳統載入
+                return await this.fallbackToTraditionalLoading(file);
+              } else if (strategy.name === 'reducedChunkSize') {
+                // 減少分塊大小並重試
+                console.log('📉 使用減少的分塊大小重試...');
+                this.streamingLoader = new StreamingLoader(this.video);
+                this.streamingLoader.chunkSize = strategy.options.chunkSize;
+                
+                try {
+                  const info = await this.streamingLoader.loadFile(file);
+                  await this.waitForMetadata();
+                  const videoInfo = await this.getVideoInfo();
+                  
+                  this.isLoading = false;
+                  this.dispatchCustomEvent('video:loadeddata', { file, info: videoInfo });
+                  
+                  return videoInfo;
+                } catch (fallbackError) {
+                  // 回退策略失敗
+                  return this.handleStreamingFailure(file, fallbackError);
+                }
+              }
+              break;
+              
+            case 'fatal':
+              // 致命錯誤，無法恢復
+              this.isLoading = false;
+              
+              // 顯示詳細錯誤資訊
+              const errorDetails = {
+                error: errorResponse.error,
+                suggestions: errorResponse.suggestions,
+                diagnostics: errorResponse.diagnostics
+              };
+              
+              this.dispatchCustomEvent('video:error', { 
+                error: '無法載入視訊',
+                details: errorDetails
+              });
+              
+              throw new Error(this.formatFatalError(errorDetails));
           }
         }
         
@@ -792,8 +863,100 @@ export class VideoPlayer {
     return support;
   }
   
+  // 回退到傳統載入
+  async fallbackToTraditionalLoading(file) {
+    const maxTraditionalSize = 2 * 1024 * 1024 * 1024; // 2GB
+    
+    if (file.size > maxTraditionalSize) {
+      throw new Error(`檔案過大 (${this.formatFileSize(file.size)})，無法使用傳統載入方式`);
+    }
+    
+    console.log('🔄 回退到傳統載入模式');
+    
+    try {
+      const fileURL = URL.createObjectURL(file);
+      this.currentBlobUrl = fileURL;
+      await this.loadVideoSource(fileURL);
+      await this.waitForMetadata();
+      const info = await this.getVideoInfo();
+      
+      this.isLoading = false;
+      this.dispatchCustomEvent('video:loadeddata', { file, info });
+      
+      // 顯示警告訊息
+      this.dispatchCustomEvent('video:warning', { 
+        message: '串流載入失敗，已切換為傳統載入模式。大檔案可能需要較長載入時間。' 
+      });
+      
+      return info;
+    } catch (error) {
+      throw new Error(`傳統載入失敗: ${error.message}`);
+    }
+  }
+  
+  // 處理串流失敗
+  async handleStreamingFailure(file, error) {
+    console.error('串流處理完全失敗:', error);
+    
+    // 嘗試最後的傳統載入
+    if (file.size <= 2 * 1024 * 1024 * 1024) {
+      try {
+        return await this.fallbackToTraditionalLoading(file);
+      } catch (fallbackError) {
+        // 完全失敗
+        const errorMsg = this.formatFatalError({
+          error: '視訊載入完全失敗',
+          suggestions: [
+            '檢查視訊檔案是否損壞',
+            '嘗試使用其他瀏覽器',
+            '將視訊轉換為其他格式'
+          ]
+        });
+        throw new Error(errorMsg);
+      }
+    } else {
+      // 檔案太大，無法使用傳統載入
+      const errorMsg = this.formatFatalError({
+        error: `檔案過大 (${this.formatFileSize(file.size)})`,
+        suggestions: [
+          '使用視訊編輯軟體分割檔案',
+          '降低視訊解析度或位元率',
+          '使用專業的視訊播放軟體'
+        ]
+      });
+      throw new Error(errorMsg);
+    }
+  }
+  
+  // 格式化致命錯誤訊息
+  formatFatalError(errorDetails) {
+    let message = errorDetails.error;
+    
+    if (errorDetails.suggestions && errorDetails.suggestions.length > 0) {
+      message += '\n\n建議：\n';
+      errorDetails.suggestions.forEach((suggestion, index) => {
+        message += `${index + 1}. ${suggestion}\n`;
+      });
+    }
+    
+    if (errorDetails.diagnostics) {
+      message += '\n診斷資訊：\n';
+      message += `瀏覽器: ${errorDetails.diagnostics.browser || '未知'}\n`;
+      if (errorDetails.diagnostics.memory && errorDetails.diagnostics.memory.available) {
+        message += `記憶體使用: ${errorDetails.diagnostics.memory.usagePercent}%\n`;
+      }
+    }
+    
+    return message;
+  }
+  
   // 清理資源
   destroy() {
+    // 停止記憶體監控
+    if (this.errorHandler) {
+      this.errorHandler.stopMemoryMonitoring();
+    }
+    
     // 清理串流載入器
     if (this.streamingLoader) {
       this.streamingLoader.destroy();
