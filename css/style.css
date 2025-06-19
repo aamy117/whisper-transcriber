@@ -880,6 +880,188 @@ body {
   margin-top: var(--spacing-xs);
 }
 
+/* 大檔案處理選項樣式 */
+.processing-options {
+  padding: 20px;
+}
+
+.processing-options .warning-message {
+  background: var(--warning-bg, #fff3cd);
+  color: var(--warning-color, #856404);
+  padding: 15px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+}
+
+.processing-options .option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin: 20px 0;
+}
+
+.processing-options .option-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+  padding: 15px;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.processing-options .option-item:hover {
+  border-color: var(--primary-color);
+  background: var(--hover-bg, #f8f9fa);
+}
+
+.processing-options .option-item.selected {
+  border-color: var(--primary-color);
+  background: var(--primary-light, #e3f2fd);
+}
+
+.processing-options .option-icon {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.processing-options .option-content h4 {
+  margin: 0 0 5px 0;
+  color: var(--text-primary);
+}
+
+.processing-options .option-content p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.processing-options .cost-estimate {
+  margin-top: 5px;
+  font-weight: 500;
+  color: var(--success-color, #28a745);
+}
+
+.processing-options .option-details {
+  margin-top: 20px;
+  padding: 15px;
+  background: var(--surface-color, #f8f9fa);
+  border-radius: 6px;
+  min-height: 100px;
+}
+
+.processing-options .option-details h4 {
+  margin-top: 0;
+  color: var(--primary-color);
+}
+
+.processing-options .option-details ul {
+  margin: 10px 0;
+  padding-left: 20px;
+}
+
+.processing-options .option-details .hint {
+  color: var(--text-secondary);
+  font-style: italic;
+  text-align: center;
+}
+
+/* 對話框覆蓋層樣式 */
+.dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9990;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s ease-out;
+}
+
+.dialog-overlay.show {
+  opacity: 1;
+}
+
+.dialog {
+  background: var(--bg-primary);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  max-width: 500px;
+  width: 90%;
+  max-height: 90vh;
+  overflow: hidden;
+  transform: scale(0.9);
+  transition: transform 0.3s ease-out;
+}
+
+.dialog-overlay.show .dialog {
+  transform: scale(1);
+}
+
+.dialog-header {
+  padding: 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.dialog-header h3 {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.dialog-content {
+  padding: 20px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.dialog-footer {
+  padding: 15px 20px;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* 進度條樣式 */
+.progress-container {
+  padding: 20px;
+}
+
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.progress-stage {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.progress-percentage {
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: var(--border-color);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--primary-color);
+  transition: width 0.3s ease;
+}
+
 /* Help */
 .hotkey-list {
   list-style: none;
