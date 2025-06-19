@@ -52,5 +52,37 @@ build/
 secrets.json
 *.key
 *.pem
+
+# Python files (如果使用 Python 開發)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment files
+.env.*
+*.env
+
+# Package lock files (選擇性)
+# package-lock.json
+# yarn.lock
+
+# Coverage reports
+coverage/
+*.lcov
+.nyc_output/
+
+# IDE directories (避免重複)
 .claude/
 .vscode/
+*.swp
+*.swo
+*~

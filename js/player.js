@@ -1,4 +1,5 @@
 import Config from './config.js';
+import { notify } from './notification.js';
 
 // 音訊播放器類別
 export class AudioPlayer {
@@ -484,8 +485,7 @@ export class AudioPlayer {
   }
   
   showError(message) {
-    // TODO: 實作更好的錯誤提示 UI
-    alert(message);
+    notify.error(message);
   }
   
   saveCurrentProject() {

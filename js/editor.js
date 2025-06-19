@@ -1,5 +1,7 @@
 // 轉譯編輯器模組
 import Config from './config.js';
+import { notify } from './notification.js';
+import { dialog } from './dialog.js';
 
 export class TranscriptionEditor {
   constructor(containerElement) {
@@ -111,20 +113,13 @@ export class TranscriptionEditor {
     const actionsEl = document.createElement('div');
     actionsEl.className = 'segment-actions';
     
-    // 復原按鈕（只在已編輯時顯示）
-    if (segment.isEdited) {
-      const revertBtn = document.createElement('button');
-      revertBtn.className = 'segment-action-btn';
-      revertBtn.innerHTML = '↩️';
-      revertBtn.title = '復原到原始文字';
-      revertBtn.onclick = () => this.revertSegment(index);
-      actionsEl.appendChild(revertBtn);
-    }
-    
     // 組合元素
     div.appendChild(timeEl);
     div.appendChild(textEl);
     div.appendChild(actionsEl);
+    
+    // 更新操作按鈕
+    this.updateSegmentActions(div, segment, index);
     
     // 綁定事件
     this.bindSegmentEvents(div, segment, index);
@@ -197,12 +192,40 @@ export class TranscriptionEditor {
     const actionsEl = segmentEl.querySelector('.segment-actions');
     actionsEl.innerHTML = '';
     
+    // 分割按鈕
+    const splitBtn = document.createElement('button');
+    splitBtn.className = 'segment-action-btn';
+    splitBtn.innerHTML = '✂️';
+    splitBtn.title = '分割段落';
+    splitBtn.onclick = (e) => {
+      e.stopPropagation();
+      this.showSplitDialog(index);
+    };
+    actionsEl.appendChild(splitBtn);
+    
+    // 合併按鈕（如果不是最後一個段落）
+    if (index < this.segments.length - 1) {
+      const mergeBtn = document.createElement('button');
+      mergeBtn.className = 'segment-action-btn';
+      mergeBtn.innerHTML = '🔗';
+      mergeBtn.title = '與下一段合併';
+      mergeBtn.onclick = (e) => {
+        e.stopPropagation();
+        this.mergeWithNext(index);
+      };
+      actionsEl.appendChild(mergeBtn);
+    }
+    
+    // 復原按鈕
     if (segment.isEdited) {
       const revertBtn = document.createElement('button');
       revertBtn.className = 'segment-action-btn';
       revertBtn.innerHTML = '↩️';
       revertBtn.title = '復原到原始文字';
-      revertBtn.onclick = () => this.revertSegment(index);
+      revertBtn.onclick = (e) => {
+        e.stopPropagation();
+        this.revertSegment(index);
+      };
       actionsEl.appendChild(revertBtn);
     }
   }
@@ -318,6 +341,217 @@ export class TranscriptionEditor {
     }
     
     this.setCurrentSegment(nextIndex);
+  }
+  
+  // 跳轉到上一個搜尋結果
+  prevSearchResult() {
+    if (!this.searchTerm) return;
+    
+    const matches = this.search(this.searchTerm);
+    if (matches.length === 0) return;
+    
+    // 找到當前位置之前的匹配
+    let prevIndex = matches[matches.length - 1].index;
+    for (let i = matches.length - 1; i >= 0; i--) {
+      if (matches[i].index < this.currentSegmentIndex) {
+        prevIndex = matches[i].index;
+        break;
+      }
+    }
+    
+    this.setCurrentSegment(prevIndex);
+  }
+  
+  // 取代當前匹配
+  replaceCurrent(replaceText) {
+    if (!this.searchTerm || this.currentSegmentIndex === null) return false;
+    
+    const segment = this.segments[this.currentSegmentIndex];
+    if (!segment) return false;
+    
+    const text = segment.edited || segment.text;
+    const regex = new RegExp(this.escapeRegExp(this.searchTerm), 'gi');
+    
+    // 檢查當前段落是否包含搜尋詞
+    if (!regex.test(text)) return false;
+    
+    // 執行取代
+    segment.edited = text.replace(regex, replaceText);
+    segment.isEdited = true;
+    
+    // 重新渲染該段落
+    const segmentEl = this.container.querySelector(`[data-index="${this.currentSegmentIndex}"]`);
+    if (segmentEl) {
+      const newEl = this.createSegmentElement(segment, this.currentSegmentIndex);
+      segmentEl.replaceWith(newEl);
+    }
+    
+    // 觸發編輯事件
+    this.emit('edit', { segment, index: this.currentSegmentIndex });
+    this.triggerAutoSave();
+    
+    // 移動到下一個搜尋結果
+    this.nextSearchResult();
+    
+    return true;
+  }
+  
+  // 取代所有匹配
+  replaceAll(replaceText) {
+    if (!this.searchTerm) return 0;
+    
+    let replaceCount = 0;
+    const regex = new RegExp(this.escapeRegExp(this.searchTerm), 'gi');
+    
+    this.segments.forEach((segment, index) => {
+      const text = segment.edited || segment.text;
+      
+      // 檢查是否包含搜尋詞
+      if (regex.test(text)) {
+        segment.edited = text.replace(regex, replaceText);
+        segment.isEdited = true;
+        replaceCount++;
+      }
+    });
+    
+    if (replaceCount > 0) {
+      // 重新渲染所有內容
+      this.render();
+      
+      // 觸發編輯事件
+      this.emit('edit', { type: 'replaceAll', count: replaceCount });
+      this.triggerAutoSave();
+    }
+    
+    return replaceCount;
+  }
+  
+  // 顯示分割對話框
+  async showSplitDialog(index) {
+    const segment = this.segments[index];
+    if (!segment) return;
+    
+    const text = segment.edited || segment.text;
+    const selection = window.getSelection();
+    let splitPosition = -1;
+    
+    // 檢查是否有選擇文字
+    if (selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const segmentEl = this.container.querySelector(`[data-index="${index}"] .segment-text`);
+      
+      if (segmentEl && segmentEl.contains(range.commonAncestorContainer)) {
+        // 計算分割位置
+        const preRange = document.createRange();
+        preRange.selectNodeContents(segmentEl);
+        preRange.setEnd(range.startContainer, range.startOffset);
+        splitPosition = preRange.toString().length;
+      }
+    }
+    
+    // 如果沒有選擇，使用對話框
+    if (splitPosition === -1) {
+      const position = await dialog.prompt({
+        title: '分割段落',
+        message: `請輸入分割位置：`,
+        defaultValue: Math.floor(text.length / 2).toString(),
+        placeholder: `1-${text.length}`,
+        hint: `段落長度：${text.length} 字`,
+        validate: (value) => {
+          const num = parseInt(value);
+          if (isNaN(num) || num < 1 || num >= text.length) {
+            return `請輸入 1 到 ${text.length - 1} 之間的數字`;
+          }
+          return null;
+        }
+      });
+      
+      if (!position) return;
+      splitPosition = parseInt(position);
+    }
+    
+    this.splitSegment(index, splitPosition);
+  }
+  
+  // 分割段落
+  splitSegment(index, position) {
+    const segment = this.segments[index];
+    if (!segment) return;
+    
+    const text = segment.edited || segment.text;
+    if (position < 1 || position >= text.length) return;
+    
+    // 計算新的時間點
+    const duration = segment.end - segment.start;
+    const splitRatio = position / text.length;
+    const splitTime = segment.start + (duration * splitRatio);
+    
+    // 建立兩個新段落
+    const firstSegment = {
+      start: segment.start,
+      end: splitTime,
+      text: segment.text.substring(0, position).trim(),
+      edited: text.substring(0, position).trim(),
+      isEdited: true
+    };
+    
+    const secondSegment = {
+      start: splitTime,
+      end: segment.end,
+      text: segment.text.substring(position).trim(),
+      edited: text.substring(position).trim(),
+      isEdited: true
+    };
+    
+    // 替換原段落
+    this.segments.splice(index, 1, firstSegment, secondSegment);
+    
+    // 重新渲染
+    this.render();
+    
+    // 觸發編輯事件
+    this.emit('edit', { type: 'split', index });
+    this.triggerAutoSave();
+    
+    this.showNotification('段落已分割', 'success');
+  }
+  
+  // 與下一段合併
+  mergeWithNext(index) {
+    if (index >= this.segments.length - 1) return;
+    
+    const currentSegment = this.segments[index];
+    const nextSegment = this.segments[index + 1];
+    
+    // 合併文字
+    const currentText = currentSegment.edited || currentSegment.text;
+    const nextText = nextSegment.edited || nextSegment.text;
+    
+    // 建立合併後的段落
+    const mergedSegment = {
+      start: currentSegment.start,
+      end: nextSegment.end,
+      text: currentSegment.text + ' ' + nextSegment.text,
+      edited: currentText + ' ' + nextText,
+      isEdited: true
+    };
+    
+    // 替換段落
+    this.segments.splice(index, 2, mergedSegment);
+    
+    // 重新渲染
+    this.render();
+    
+    // 觸發編輯事件
+    this.emit('edit', { type: 'merge', index });
+    this.triggerAutoSave();
+    
+    this.showNotification('段落已合併', 'success');
+  }
+  
+  // 顯示通知
+  showNotification(message, type = 'info') {
+    notify[type](message);
   }
   
   // 觸發自動儲存

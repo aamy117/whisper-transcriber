@@ -716,29 +716,64 @@ body {
 /* Search Bar */
 .search-bar {
   display: flex;
+  flex-direction: column;
   gap: var(--spacing-sm);
   margin-bottom: var(--spacing-md);
   padding: var(--spacing-sm);
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
+  position: relative;
+}
+
+.search-row,
+.replace-row {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
 }
 
 .search-bar input {
   flex: 1;
   padding: var(--spacing-sm);
-  border: none;
-  background-color: transparent;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-primary);
   color: var(--text-primary);
   outline: none;
+  border-radius: var(--radius-sm);
+}
+
+.search-bar input:focus {
+  border-color: var(--primary-color);
 }
 
 .search-btn {
-  padding: var(--spacing-sm);
-  background-color: transparent;
-  border: none;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
   cursor: pointer;
-  color: var(--text-secondary);
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.search-btn:hover {
+  background-color: var(--bg-primary);
+  border-color: var(--border-hover);
+}
+
+.search-close {
+  position: absolute;
+  top: var(--spacing-xs);
+  right: var(--spacing-xs);
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Modal */
@@ -997,8 +1032,10 @@ kbd {
   display: flex;
   gap: var(--spacing-md);
   padding: var(--spacing-md);
+  padding-right: 120px; /* 為操作按鈕預留空間 */
   border-bottom: 1px solid var(--border-color);
   transition: background-color 0.2s;
+  position: relative;
 }
 
 .segment:hover {
@@ -1088,6 +1125,9 @@ kbd {
   transform: translateY(-50%);
   opacity: 0;
   transition: opacity 0.2s;
+  display: flex;
+  gap: var(--spacing-xs);
+  align-items: center;
 }
 
 .segment:hover .segment-actions {
@@ -1095,18 +1135,25 @@ kbd {
 }
 
 .segment-action-btn {
-  background: none;
+  background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   padding: var(--spacing-xs);
   cursor: pointer;
   font-size: 0.875rem;
   transition: all 0.2s;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 .segment-action-btn:hover {
   background-color: var(--bg-secondary);
   border-color: var(--border-hover);
+  transform: scale(1.05);
 }
 
 /* 搜尋高亮 */

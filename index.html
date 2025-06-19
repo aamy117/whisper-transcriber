@@ -183,6 +183,9 @@
                             <button class="toolbar-btn" id="searchBtn" title="搜尋 (Ctrl+F)">
                                 <span class="icon">🔍</span>
                             </button>
+                            <button class="toolbar-btn" id="replaceToolbarBtn" title="尋找和取代 (Ctrl+H)">
+                                <span class="icon">🔄</span>
+                            </button>
                             <button class="toolbar-btn" id="exportBtn" title="匯出 (Ctrl+E)">
                                 <span class="icon">💾</span>
                             </button>
@@ -193,8 +196,17 @@
                     </div>
                     
                     <div class="search-bar" id="searchBar">
-                        <input type="text" id="searchInput" placeholder="搜尋文字...">
-                        <button class="search-btn" id="searchCloseBtn">✕</button>
+                        <div class="search-row">
+                            <input type="text" id="searchInput" placeholder="搜尋文字...">
+                            <button class="search-btn" id="searchNextBtn" title="下一個 (F3)">↓</button>
+                            <button class="search-btn" id="searchPrevBtn" title="上一個 (Shift+F3)">↑</button>
+                        </div>
+                        <div class="replace-row" id="replaceRow" style="display: none;">
+                            <input type="text" id="replaceInput" placeholder="取代為...">
+                            <button class="search-btn" id="replaceBtn">取代</button>
+                            <button class="search-btn" id="replaceAllBtn">全部取代</button>
+                        </div>
+                        <button class="search-btn search-close" id="searchCloseBtn">✕</button>
                     </div>
                     
                     <div class="editor-content" id="editorContent">
@@ -247,32 +259,32 @@
                     <h2>使用說明</h2>
                     <button class="modal-close" id="helpCloseBtn">✕</button>
                 </div>
-                <div class="modal-body">
-                    <h3>快捷鍵</h3>
-                    <ul class="hotkey-list">
-                        <li><kbd>Space</kbd> - 播放/暫停</li>
-                        <li><kbd>Home</kbd> - 重頭播放</li>
-                        <li><kbd>Ctrl + ←</kbd> - 快退 3 秒</li>
-                        <li><kbd>Ctrl + →</kbd> - 快進 3 秒</li>
-                        <li><kbd>Ctrl + ↑</kbd> - 加速播放</li>
-                        <li><kbd>Ctrl + ↓</kbd> - 減速播放</li>
-                        <li><kbd>1</kbd> / <kbd>2</kbd> - 設定標記點</li>
-                        <li><kbd>Shift + 1</kbd> / <kbd>Shift + 2</kbd> - 跳轉到標記點</li>
-                        <li><kbd>Ctrl + T</kbd> - 插入時間戳</li>
-                        <li><kbd>Ctrl + S</kbd> - 儲存編輯</li>
-                        <li><kbd>Ctrl + F</kbd> - 搜尋文字</li>
-                        <li><kbd>Ctrl + E</kbd> - 匯出檔案</li>
-                    </ul>
+                <div class="modal-body" style="text-align: center; padding: 40px;">
+                    <h3 style="margin-bottom: 20px;">需要協助嗎？</h3>
+                    <p style="margin-bottom: 30px;">查看完整的使用說明和教學</p>
+                    <a href="help.html" target="_blank" style="
+                        display: inline-block;
+                        padding: 12px 30px;
+                        background: var(--primary-color);
+                        color: white;
+                        text-decoration: none;
+                        border-radius: 8px;
+                        font-weight: 500;
+                        transition: transform 0.2s;
+                    " onmouseover="this.style.transform='scale(1.05)'" 
+                       onmouseout="this.style.transform='scale(1)'">
+                        開啟使用說明 →
+                    </a>
                     
-                    <h3>使用步驟</h3>
-                    <ol>
-                        <li>設定您的 OpenAI API Key（點擊右上角設定按鈕）</li>
-                        <li>上傳音訊檔案（支援 MP3、WAV 等格式，播放最大 2GB）</li>
-                        <li>點擊「開始轉譯」按鈕</li>
-                        <li>等待轉譯完成後，即可編輯文字內容</li>
-                        <li>點擊段落可跳轉到對應時間點播放</li>
-                        <li>編輯完成後可匯出為多種格式</li>
-                    </ol>
+                    <div style="margin-top: 40px; text-align: left;">
+                        <h4>快速提示：</h4>
+                        <ul style="line-height: 1.8;">
+                            <li>按 <kbd>Ctrl+F</kbd> 搜尋文字</li>
+                            <li>按 <kbd>Ctrl+H</kbd> 尋找和取代</li>
+                            <li>按 <kbd>空白鍵</kbd> 播放/暫停音訊</li>
+                            <li>點擊時間戳跳轉到對應音訊位置</li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>

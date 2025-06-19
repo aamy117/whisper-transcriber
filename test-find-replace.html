@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>測試尋找和取代功能</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>測試尋找和取代功能</h1>
+        
+        <div class="editor-section">
+            <div class="section-header">
+                <h2>編輯器</h2>
+                <div class="editor-toolbar">
+                    <button class="toolbar-btn" id="searchBtn" title="搜尋 (Ctrl+F)">
+                        <span class="icon">🔍</span>
+                    </button>
+                    <button class="toolbar-btn" id="replaceToolbarBtn" title="尋找和取代 (Ctrl+H)">
+                        <span class="icon">🔄</span>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="search-bar" id="searchBar" style="display: none;">
+                <div class="search-row">
+                    <input type="text" id="searchInput" placeholder="搜尋文字...">
+                    <button class="search-btn" id="searchNextBtn" title="下一個 (F3)">↓</button>
+                    <button class="search-btn" id="searchPrevBtn" title="上一個 (Shift+F3)">↑</button>
+                </div>
+                <div class="replace-row" id="replaceRow" style="display: none;">
+                    <input type="text" id="replaceInput" placeholder="取代為...">
+                    <button class="search-btn" id="replaceBtn">取代</button>
+                    <button class="search-btn" id="replaceAllBtn">全部取代</button>
+                </div>
+                <button class="search-btn search-close" id="searchCloseBtn">✕</button>
+            </div>
+            
+            <div class="editor-content" id="editorContent"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { TranscriptionEditor } from './js/editor.js';
+        
+        // 建立測試資料
+        const testSegments = [
+            {
+                start: 0,
+                end: 5,
+                text: "這是第一段測試文字。測試尋找和取代功能。",
+                edited: null,
+                isEdited: false
+            },
+            {
+                start: 5,
+                end: 10,
+                text: "測試文字可以包含重複的字詞。測試是很重要的。",
+                edited: null,
+                isEdited: false
+            },
+            {
+                start: 10,
+                end: 15,
+                text: "這裡有更多的測試內容。我們要測試各種情況。",
+                edited: null,
+                isEdited: false
+            },
+            {
+                start: 15,
+                end: 20,
+                text: "尋找和取代功能應該要能正確運作。測試完成！",
+                edited: null,
+                isEdited: false
+            }
+        ];
+        
+        // 初始化編輯器
+        const editorContent = document.getElementById('editorContent');
+        const editor = new TranscriptionEditor(editorContent);
+        editor.setSegments(testSegments);
+        
+        // 設定搜尋功能
+        const searchBtn = document.getElementById('searchBtn');
+        const replaceToolbarBtn = document.getElementById('replaceToolbarBtn');
+        const searchBar = document.getElementById('searchBar');
+        const searchInput = document.getElementById('searchInput');
+        const searchCloseBtn = document.getElementById('searchCloseBtn');
+        const searchNextBtn = document.getElementById('searchNextBtn');
+        const searchPrevBtn = document.getElementById('searchPrevBtn');
+        const replaceInput = document.getElementById('replaceInput');
+        const replaceBtn = document.getElementById('replaceBtn');
+        const replaceAllBtn = document.getElementById('replaceAllBtn');
+        const replaceRow = document.getElementById('replaceRow');
+        
+        // 切換搜尋
+        function toggleSearch(showReplace = false) {
+            const isVisible = searchBar.style.display === 'block';
+            
+            if (isVisible && !showReplace) {
+                closeSearch();
+            } else {
+                searchBar.style.display = 'block';
+                replaceRow.style.display = showReplace ? 'flex' : 'none';
+                searchInput.focus();
+                searchInput.select();
+            }
+        }
+        
+        // 關閉搜尋
+        function closeSearch() {
+            searchBar.style.display = 'none';
+            searchInput.value = '';
+            replaceInput.value = '';
+            replaceRow.style.display = 'none';
+            editor.clearSearch();
+        }
+        
+        // 顯示通知
+        function showNotification(message, type = 'info') {
+            const bgColor = {
+                success: '#10b981',
+                error: '#ef4444',
+                warning: '#f59e0b',
+                info: '#3b82f6'
+            }[type] || '#64748b';
+            
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: ${bgColor};
+                color: white;
+                padding: 12px 24px;
+                border-radius: 8px;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                z-index: 2000;
+            `;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+        
+        // 事件監聽器
+        searchBtn.addEventListener('click', () => toggleSearch(false));
+        replaceToolbarBtn.addEventListener('click', () => toggleSearch(true));
+        searchCloseBtn.addEventListener('click', closeSearch);
+        
+        searchInput.addEventListener('input', (e) => {
+            const results = editor.search(e.target.value);
+            if (e.target.value && results.length === 0) {
+                showNotification('未找到匹配的內容', 'warning');
+            } else if (e.target.value && results.length > 0) {
+                showNotification(`找到 ${results.length} 個匹配項`, 'info');
+            }
+        });
+        
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeSearch();
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                editor.nextSearchResult();
+            }
+        });
+        
+        searchNextBtn.addEventListener('click', () => editor.nextSearchResult());
+        searchPrevBtn.addEventListener('click', () => editor.prevSearchResult());
+        
+        replaceBtn.addEventListener('click', () => {
+            const replaced = editor.replaceCurrent(replaceInput.value);
+            if (replaced) {
+                showNotification('已取代一個匹配項', 'success');
+            } else {
+                showNotification('目前位置沒有可取代的內容', 'warning');
+            }
+        });
+        
+        replaceAllBtn.addEventListener('click', () => {
+            const count = editor.replaceAll(replaceInput.value);
+            if (count > 0) {
+                showNotification(`已取代 ${count} 個匹配項`, 'success');
+            } else {
+                showNotification('沒有找到可取代的內容', 'warning');
+            }
+        });
+        
+        // 鍵盤快捷鍵
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault();
+                toggleSearch(false);
+            } else if ((e.ctrlKey || e.metaKey) && e.key === 'h') {
+                e.preventDefault();
+                toggleSearch(true);
+            } else if (e.key === 'F3' || ((e.ctrlKey || e.metaKey) && e.key === 'g')) {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    editor.prevSearchResult();
+                } else {
+                    editor.nextSearchResult();
+                }
+            }
+        });
+        
+        console.log('尋找和取代功能測試頁面已載入');
+        console.log('快捷鍵：');
+        console.log('- Ctrl+F: 開啟搜尋');
+        console.log('- Ctrl+H: 開啟尋找和取代');
+        console.log('- F3 或 Ctrl+G: 下一個搜尋結果');
+        console.log('- Shift+F3 或 Ctrl+Shift+G: 上一個搜尋結果');
+    </script>
+</body>
+</html>

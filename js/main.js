@@ -3,6 +3,8 @@ import { AudioPlayer } from './player.js';
 import { WhisperAPI } from './api.js';
 import { TranscriptionEditor } from './editor.js';
 import { exportManager } from './export.js';
+import { notify } from './notification.js';
+import { dialog } from './dialog.js';
 
 // 主應用程式類別
 class WhisperApp {
@@ -62,6 +64,10 @@ class WhisperApp {
           if (this.player) {
             this.player.seekTo(data.time);
           }
+        });
+        
+        this.editor.on('notification', (data) => {
+          this.showNotification(data.message, data.type);
         });
       } catch (error) {
         console.error('編輯器初始化失敗:', error);
@@ -192,13 +198,26 @@ class WhisperApp {
     
     // 搜尋功能
     const searchBtn = document.getElementById('searchBtn');
+    const replaceToolbarBtn = document.getElementById('replaceToolbarBtn');
     const searchBar = document.getElementById('searchBar');
     const searchInput = document.getElementById('searchInput');
     const searchCloseBtn = document.getElementById('searchCloseBtn');
+    const searchNextBtn = document.getElementById('searchNextBtn');
+    const searchPrevBtn = document.getElementById('searchPrevBtn');
+    const replaceInput = document.getElementById('replaceInput');
+    const replaceBtnAction = document.getElementById('replaceBtn');
+    const replaceAllBtn = document.getElementById('replaceAllBtn');
+    const replaceRow = document.getElementById('replaceRow');
     
     if (searchBtn) {
       searchBtn.addEventListener('click', () => {
-        this.toggleSearch();
+        this.toggleSearch(false);
+      });
+    }
+    
+    if (replaceToolbarBtn) {
+      replaceToolbarBtn.addEventListener('click', () => {
+        this.toggleSearch(true);
       });
     }
     
@@ -210,7 +229,40 @@ class WhisperApp {
       searchInput.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
           this.closeSearch();
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          if (this.editor) {
+            this.editor.nextSearchResult();
+          }
         }
+      });
+    }
+    
+    if (searchNextBtn) {
+      searchNextBtn.addEventListener('click', () => {
+        if (this.editor) {
+          this.editor.nextSearchResult();
+        }
+      });
+    }
+    
+    if (searchPrevBtn) {
+      searchPrevBtn.addEventListener('click', () => {
+        if (this.editor) {
+          this.editor.prevSearchResult();
+        }
+      });
+    }
+    
+    if (replaceBtnAction) {
+      replaceBtnAction.addEventListener('click', () => {
+        this.handleReplace();
+      });
+    }
+    
+    if (replaceAllBtn) {
+      replaceAllBtn.addEventListener('click', () => {
+        this.handleReplaceAll();
       });
     }
     
@@ -234,7 +286,25 @@ class WhisperApp {
       // Ctrl/Cmd + F: 搜尋
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
         e.preventDefault();
-        this.toggleSearch();
+        this.toggleSearch(false);
+      }
+      
+      // Ctrl/Cmd + H: 尋找和取代
+      if ((e.ctrlKey || e.metaKey) && e.key === 'h') {
+        e.preventDefault();
+        this.toggleSearch(true);
+      }
+      
+      // F3 或 Ctrl/Cmd + G: 下一個搜尋結果
+      if (e.key === 'F3' || ((e.ctrlKey || e.metaKey) && e.key === 'g')) {
+        e.preventDefault();
+        if (this.editor) {
+          if (e.shiftKey) {
+            this.editor.prevSearchResult();
+          } else {
+            this.editor.nextSearchResult();
+          }
+        }
       }
       
       // Ctrl/Cmd + S: 儲存
@@ -552,40 +622,7 @@ class WhisperApp {
   
   // 通知功能
   showNotification(message, type = 'success') {
-    // TODO: 實作更好的通知 UI
-    console.log(`[${type}] ${message}`);
-    
-    // 暫時使用簡單的提示
-    const bgColor = {
-      success: '#10b981',
-      error: '#ef4444',
-      warning: '#f59e0b',
-      info: '#3b82f6'
-    }[type] || '#64748b';
-    
-    const notification = document.createElement('div');
-    notification.style.cssText = `
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      background: ${bgColor};
-      color: white;
-      padding: 12px 24px;
-      border-radius: 8px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-      z-index: 2000;
-      animation: slideIn 0.3s ease-out;
-    `;
-    notification.textContent = message;
-    
-    document.body.appendChild(notification);
-    
-    setTimeout(() => {
-      notification.style.animation = 'slideOut 0.3s ease-out';
-      setTimeout(() => {
-        document.body.removeChild(notification);
-      }, 300);
-    }, 3000);
+    notify[type](message);
   }
   
   // 顯示轉譯狀態
@@ -674,18 +711,25 @@ class WhisperApp {
   }
   
   // 搜尋功能
-  toggleSearch() {
+  toggleSearch(showReplace = false) {
     const searchBar = document.getElementById('searchBar');
     const searchInput = document.getElementById('searchInput');
+    const replaceRow = document.getElementById('replaceRow');
     
     if (!searchBar) return;
     
     const isVisible = searchBar.style.display === 'block';
     
-    if (isVisible) {
+    if (isVisible && !showReplace) {
       this.closeSearch();
     } else {
       searchBar.style.display = 'block';
+      
+      // 顯示或隱藏取代列
+      if (replaceRow) {
+        replaceRow.style.display = showReplace ? 'flex' : 'none';
+      }
+      
       if (searchInput) {
         searchInput.focus();
         searchInput.select();
@@ -696,6 +740,8 @@ class WhisperApp {
   closeSearch() {
     const searchBar = document.getElementById('searchBar');
     const searchInput = document.getElementById('searchInput');
+    const replaceInput = document.getElementById('replaceInput');
+    const replaceRow = document.getElementById('replaceRow');
     
     if (searchBar) {
       searchBar.style.display = 'none';
@@ -703,6 +749,14 @@ class WhisperApp {
     
     if (searchInput) {
       searchInput.value = '';
+    }
+    
+    if (replaceInput) {
+      replaceInput.value = '';
+    }
+    
+    if (replaceRow) {
+      replaceRow.style.display = 'none';
     }
     
     // 清除編輯器中的搜尋高亮
@@ -720,6 +774,30 @@ class WhisperApp {
       this.showNotification('未找到匹配的內容', 'warning');
     } else if (term && results.length > 0) {
       this.showNotification(`找到 ${results.length} 個匹配項`, 'info');
+    }
+  }
+  
+  handleReplace() {
+    const replaceInput = document.getElementById('replaceInput');
+    if (!this.editor || !replaceInput) return;
+    
+    const replaced = this.editor.replaceCurrent(replaceInput.value);
+    if (replaced) {
+      this.showNotification('已取代一個匹配項', 'success');
+    } else {
+      this.showNotification('目前位置沒有可取代的內容', 'warning');
+    }
+  }
+  
+  handleReplaceAll() {
+    const replaceInput = document.getElementById('replaceInput');
+    if (!this.editor || !replaceInput) return;
+    
+    const count = this.editor.replaceAll(replaceInput.value);
+    if (count > 0) {
+      this.showNotification(`已取代 ${count} 個匹配項`, 'success');
+    } else {
+      this.showNotification('沒有找到可取代的內容', 'warning');
     }
   }
   
@@ -766,9 +844,15 @@ class WhisperApp {
       });
       
       listContainer.querySelectorAll('.btn-delete-project').forEach(btn => {
-        btn.addEventListener('click', (e) => {
+        btn.addEventListener('click', async (e) => {
           const projectId = e.target.dataset.projectId;
-          if (confirm('確定要刪除此專案嗎？')) {
+          const confirmed = await dialog.confirm({
+            title: '刪除專案',
+            message: '確定要刪除此專案嗎？此操作無法復原。',
+            type: 'warning'
+          });
+          
+          if (confirmed) {
             this.deleteProject(projectId);
             this.showRecentProjects(); // 重新整理列表
           }

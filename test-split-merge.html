@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>測試段落分割/合併功能</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>測試段落分割/合併功能</h1>
+        
+        <div class="instruction-box" style="background: #f0f9ff; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <h3>使用說明：</h3>
+            <ul>
+                <li><strong>分割段落 ✂️</strong>：選擇文字後點擊分割按鈕，或點擊後輸入分割位置</li>
+                <li><strong>合併段落 🔗</strong>：點擊合併按鈕將當前段落與下一段合併</li>
+                <li><strong>復原編輯 ↩️</strong>：恢復到原始文字</li>
+            </ul>
+        </div>
+        
+        <div class="editor-section">
+            <div class="section-header">
+                <h2>編輯器</h2>
+            </div>
+            
+            <div class="editor-content" id="editorContent"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { TranscriptionEditor } from './js/editor.js';
+        
+        // 建立測試資料 - 較長的段落以便測試分割
+        const testSegments = [
+            {
+                start: 0,
+                end: 10,
+                text: "這是一個很長的段落，包含了許多內容。我們可以在這裡測試分割功能，將一個長段落分成兩個較短的段落。這對於調整轉譯結果的結構很有幫助。",
+                edited: null,
+                isEdited: false
+            },
+            {
+                start: 10,
+                end: 20,
+                text: "這是第二個段落。",
+                edited: null,
+                isEdited: false
+            },
+            {
+                start: 20,
+                end: 30,
+                text: "這是第三個段落。",
+                edited: null,
+                isEdited: false
+            },
+            {
+                start: 30,
+                end: 40,
+                text: "第四個段落可以和第五個段落合併。",
+                edited: null,
+                isEdited: false
+            },
+            {
+                start: 40,
+                end: 50,
+                text: "第五個段落包含結尾內容。",
+                edited: null,
+                isEdited: false
+            }
+        ];
+        
+        // 初始化編輯器
+        const editorContent = document.getElementById('editorContent');
+        const editor = new TranscriptionEditor(editorContent);
+        editor.setSegments(testSegments);
+        
+        // 監聽通知事件
+        editor.on('notification', (data) => {
+            showNotification(data.message, data.type);
+        });
+        
+        // 監聽編輯事件
+        editor.on('edit', (data) => {
+            if (data.type === 'split') {
+                console.log('段落已分割', data);
+            } else if (data.type === 'merge') {
+                console.log('段落已合併', data);
+            }
+        });
+        
+        // 顯示通知
+        function showNotification(message, type = 'info') {
+            const bgColor = {
+                success: '#10b981',
+                error: '#ef4444',
+                warning: '#f59e0b',
+                info: '#3b82f6'
+            }[type] || '#64748b';
+            
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: ${bgColor};
+                color: white;
+                padding: 12px 24px;
+                border-radius: 8px;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                z-index: 2000;
+            `;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+        
+        console.log('段落分割/合併功能測試頁面已載入');
+        console.log('提示：');
+        console.log('- 點擊段落右側的 ✂️ 按鈕來分割段落');
+        console.log('- 點擊段落右側的 🔗 按鈕來合併段落');
+        console.log('- 編輯後的段落會顯示 ↩️ 按鈕用於復原');
+    </script>
+</body>
+</html>

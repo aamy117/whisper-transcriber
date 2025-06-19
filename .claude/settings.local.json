@@ -4,7 +4,12 @@
       "Bash(grep:*)",
       "Bash(mkdir:*)",
       "Bash(python3:*)",
-      "Bash(rg:*)"
+      "Bash(rg:*)",
+      "mcp__project-files__directory_tree",
+      "mcp__project-files__read_multiple_files",
+      "mcp__project-files__read_file",
+      "mcp__thinking__sequentialthinking",
+      "mcp__project-files__list_directory"
     ],
     "deny": []
   }

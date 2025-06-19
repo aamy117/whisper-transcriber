@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>測試對話框系統</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .demo-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+        }
+        
+        .demo-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .demo-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+            font-weight: 500;
+            transition: transform 0.2s;
+        }
+        
+        .demo-btn:hover {
+            transform: scale(1.05);
+            background: #0056b3;
+        }
+        
+        .result-box {
+            margin-top: 20px;
+            padding: 15px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-family: monospace;
+            min-height: 100px;
+        }
+        
+        .result-box:empty::before {
+            content: '結果將顯示在這裡...';
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>對話框系統測試</h1>
+        
+        <div class="demo-section">
+            <h2>輸入對話框 (Prompt)</h2>
+            <div class="demo-buttons">
+                <button class="demo-btn" onclick="testBasicPrompt()">基本輸入</button>
+                <button class="demo-btn" onclick="testPromptWithDefault()">預設值輸入</button>
+                <button class="demo-btn" onclick="testPromptWithValidation()">驗證輸入</button>
+                <button class="demo-btn" onclick="testSplitSegment()">分割段落場景</button>
+            </div>
+        </div>
+        
+        <div class="demo-section">
+            <h2>確認對話框 (Confirm)</h2>
+            <div class="demo-buttons">
+                <button class="demo-btn" onclick="testBasicConfirm()">基本確認</button>
+                <button class="demo-btn" onclick="testDeleteConfirm()">刪除確認</button>
+                <button class="demo-btn" onclick="testWarningConfirm()">警告確認</button>
+            </div>
+        </div>
+        
+        <div class="demo-section">
+            <h2>結果顯示</h2>
+            <div id="resultBox" class="result-box"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { dialog } from './js/dialog.js';
+        import { notify } from './js/notification.js';
+        
+        const resultBox = document.getElementById('resultBox');
+        
+        function showResult(result) {
+            resultBox.textContent = JSON.stringify(result, null, 2);
+        }
+        
+        // Prompt 測試
+        window.testBasicPrompt = async () => {
+            const result = await dialog.prompt({
+                title: '請輸入您的名字',
+                message: '這將用於個人化您的體驗'
+            });
+            
+            showResult({ action: 'prompt', value: result });
+            
+            if (result) {
+                notify.success(`歡迎，${result}！`);
+            } else {
+                notify.info('取消輸入');
+            }
+        };
+        
+        window.testPromptWithDefault = async () => {
+            const result = await dialog.prompt({
+                title: '編輯檔案名稱',
+                message: '請輸入新的檔案名稱：',
+                defaultValue: 'untitled.txt',
+                placeholder: '輸入檔案名稱...'
+            });
+            
+            showResult({ action: 'prompt', value: result });
+        };
+        
+        window.testPromptWithValidation = async () => {
+            const result = await dialog.prompt({
+                title: '設定年齡',
+                message: '請輸入您的年齡：',
+                placeholder: '1-120',
+                hint: '必須是 1 到 120 之間的數字',
+                validate: (value) => {
+                    const age = parseInt(value);
+                    if (isNaN(age)) {
+                        return '請輸入有效的數字';
+                    }
+                    if (age < 1 || age > 120) {
+                        return '年齡必須在 1 到 120 之間';
+                    }
+                    return null;
+                }
+            });
+            
+            showResult({ action: 'prompt', value: result });
+        };
+        
+        window.testSplitSegment = async () => {
+            const text = '這是一個很長的段落，包含了許多內容。我們可以在這裡測試分割功能，將一個長段落分成兩個較短的段落。';
+            const result = await dialog.prompt({
+                title: '分割段落',
+                message: `請輸入分割位置：`,
+                defaultValue: Math.floor(text.length / 2).toString(),
+                placeholder: `1-${text.length}`,
+                hint: `段落長度：${text.length} 字`,
+                validate: (value) => {
+                    const num = parseInt(value);
+                    if (isNaN(num) || num < 1 || num >= text.length) {
+                        return `請輸入 1 到 ${text.length - 1} 之間的數字`;
+                    }
+                    return null;
+                }
+            });
+            
+            showResult({ 
+                action: 'split',
+                position: result,
+                firstPart: result ? text.substring(0, parseInt(result)) : null,
+                secondPart: result ? text.substring(parseInt(result)) : null
+            });
+        };
+        
+        // Confirm 測試
+        window.testBasicConfirm = async () => {
+            const result = await dialog.confirm({
+                title: '確認操作',
+                message: '您確定要繼續嗎？'
+            });
+            
+            showResult({ action: 'confirm', value: result });
+            
+            if (result) {
+                notify.success('已確認操作');
+            } else {
+                notify.info('已取消操作');
+            }
+        };
+        
+        window.testDeleteConfirm = async () => {
+            const result = await dialog.confirm({
+                title: '刪除專案',
+                message: '確定要刪除此專案嗎？此操作無法復原。',
+                type: 'warning'
+            });
+            
+            showResult({ action: 'delete', confirmed: result });
+            
+            if (result) {
+                notify.warning('專案已刪除');
+            }
+        };
+        
+        window.testWarningConfirm = async () => {
+            const result = await dialog.confirm({
+                title: '系統警告',
+                message: '偵測到未儲存的變更。確定要離開嗎？',
+                okText: '離開',
+                cancelText: '留下',
+                type: 'warning'
+            });
+            
+            showResult({ action: 'leave', confirmed: result });
+        };
+        
+        // 初始訊息
+        setTimeout(() => {
+            notify.info('點擊按鈕測試對話框功能');
+        }, 500);
+    </script>
+</body>
+</html>

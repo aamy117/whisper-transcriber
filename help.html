@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Whisper 轉譯器 - 使用說明</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .help-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .help-nav {
+            position: sticky;
+            top: 20px;
+            float: right;
+            width: 250px;
+            margin-left: 30px;
+            padding: 20px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .help-nav h3 {
+            margin-top: 0;
+            font-size: 1rem;
+            color: var(--text-primary);
+        }
+        
+        .help-nav ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .help-nav li {
+            margin: 5px 0;
+        }
+        
+        .help-nav a {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        
+        .help-nav a:hover {
+            text-decoration: underline;
+        }
+        
+        .help-content {
+            margin-right: 300px;
+        }
+        
+        .help-section {
+            margin-bottom: 40px;
+            padding: 20px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .help-section h2 {
+            color: var(--primary-color);
+            margin-top: 0;
+        }
+        
+        .help-section h3 {
+            color: var(--text-primary);
+            margin-top: 20px;
+        }
+        
+        .shortcut-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        
+        .shortcut-table th,
+        .shortcut-table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .shortcut-table th {
+            background: var(--bg-tertiary);
+            font-weight: 600;
+        }
+        
+        .shortcut-table kbd {
+            display: inline-block;
+            padding: 3px 8px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.85em;
+        }
+        
+        .step-list {
+            counter-reset: step-counter;
+            list-style: none;
+            padding: 0;
+        }
+        
+        .step-list li {
+            counter-increment: step-counter;
+            margin: 15px 0;
+            padding-left: 40px;
+            position: relative;
+        }
+        
+        .step-list li::before {
+            content: counter(step-counter);
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 30px;
+            height: 30px;
+            background: var(--primary-color);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        
+        .tip-box {
+            padding: 15px;
+            margin: 15px 0;
+            background: var(--bg-tertiary);
+            border-left: 4px solid var(--primary-color);
+            border-radius: 4px;
+        }
+        
+        .warning-box {
+            padding: 15px;
+            margin: 15px 0;
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            border-radius: 4px;
+            color: #856404;
+        }
+        
+        .back-to-app {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background: var(--primary-color);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            transition: transform 0.2s;
+        }
+        
+        .back-to-app:hover {
+            transform: translateY(-2px);
+        }
+        
+        @media (max-width: 768px) {
+            .help-nav {
+                display: none;
+            }
+            
+            .help-content {
+                margin-right: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="help-container">
+        <nav class="help-nav">
+            <h3>快速導航</h3>
+            <ul>
+                <li><a href="#quick-start">快速開始</a></li>
+                <li><a href="#features">功能介紹</a></li>
+                <li><a href="#shortcuts">快捷鍵</a></li>
+                <li><a href="#editing">編輯功能</a></li>
+                <li><a href="#export">匯出選項</a></li>
+                <li><a href="#faq">常見問題</a></li>
+                <li><a href="#troubleshooting">疑難排解</a></li>
+            </ul>
+        </nav>
+        
+        <div class="help-content">
+            <h1>Whisper 轉譯器使用說明</h1>
+            
+            <section id="quick-start" class="help-section">
+                <h2>🚀 快速開始</h2>
+                <ol class="step-list">
+                    <li>
+                        <strong>設定 API Key</strong><br>
+                        點擊設定按鈕 ⚙️，輸入您的 OpenAI API Key
+                    </li>
+                    <li>
+                        <strong>上傳音訊檔案</strong><br>
+                        點擊「選擇音訊檔案」，選擇要轉譯的音訊（最大 25MB）
+                    </li>
+                    <li>
+                        <strong>開始轉譯</strong><br>
+                        點擊「開始轉譯」按鈕，等待處理完成
+                    </li>
+                    <li>
+                        <strong>編輯和匯出</strong><br>
+                        編輯轉譯結果，然後匯出為需要的格式
+                    </li>
+                </ol>
+                
+                <div class="tip-box">
+                    💡 <strong>提示</strong>：第一次使用建議先用短音訊測試（1-2分鐘），確認一切正常後再處理長音訊。
+                </div>
+            </section>
+            
+            <section id="features" class="help-section">
+                <h2>✨ 功能介紹</h2>
+                
+                <h3>音訊播放器</h3>
+                <ul>
+                    <li>支援常見音訊格式（MP3、WAV、M4A 等）</li>
+                    <li>可調整播放速度（0.5x - 2.0x）</li>
+                    <li>顯示當前播放時間和總時長</li>
+                    <li>支援鍵盤控制（空白鍵播放/暫停）</li>
+                </ul>
+                
+                <h3>轉譯功能</h3>
+                <ul>
+                    <li>使用 OpenAI Whisper API 進行高準確度轉譯</li>
+                    <li>自動偵測語言（中文優化）</li>
+                    <li>保留時間戳資訊</li>
+                    <li>分段顯示結果</li>
+                </ul>
+                
+                <h3>編輯器</h3>
+                <ul>
+                    <li>即時編輯轉譯文字</li>
+                    <li>尋找和取代功能</li>
+                    <li>段落分割與合併</li>
+                    <li>撤銷/重做支援</li>
+                    <li>自動儲存編輯內容</li>
+                </ul>
+            </section>
+            
+            <section id="shortcuts" class="help-section">
+                <h2>⌨️ 鍵盤快捷鍵</h2>
+                
+                <table class="shortcut-table">
+                    <tr>
+                        <th>功能</th>
+                        <th>Windows/Linux</th>
+                        <th>Mac</th>
+                    </tr>
+                    <tr>
+                        <td colspan="3" style="background: var(--bg-tertiary); font-weight: bold;">編輯功能</td>
+                    </tr>
+                    <tr>
+                        <td>搜尋</td>
+                        <td><kbd>Ctrl</kbd>+<kbd>F</kbd></td>
+                        <td><kbd>Cmd</kbd>+<kbd>F</kbd></td>
+                    </tr>
+                    <tr>
+                        <td>尋找和取代</td>
+                        <td><kbd>Ctrl</kbd>+<kbd>H</kbd></td>
+                        <td><kbd>Cmd</kbd>+<kbd>H</kbd></td>
+                    </tr>
+                    <tr>
+                        <td>儲存專案</td>
+                        <td><kbd>Ctrl</kbd>+<kbd>S</kbd></td>
+                        <td><kbd>Cmd</kbd>+<kbd>S</kbd></td>
+                    </tr>
+                    <tr>
+                        <td>匯出</td>
+                        <td><kbd>Ctrl</kbd>+<kbd>E</kbd></td>
+                        <td><kbd>Cmd</kbd>+<kbd>E</kbd></td>
+                    </tr>
+                    <tr>
+                        <td>撤銷</td>
+                        <td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td>
+                        <td><kbd>Cmd</kbd>+<kbd>Z</kbd></td>
+                    </tr>
+                    <tr>
+                        <td>重做</td>
+                        <td><kbd>Ctrl</kbd>+<kbd>Y</kbd></td>
+                        <td><kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td>
+                    </tr>
+                    <tr>
+                        <td>下一個搜尋結果</td>
+                        <td colspan="2"><kbd>F3</kbd></td>
+                    </tr>
+                    <tr>
+                        <td colspan="3" style="background: var(--bg-tertiary); font-weight: bold;">播放控制</td>
+                    </tr>
+                    <tr>
+                        <td>播放/暫停</td>
+                        <td colspan="2"><kbd>空白鍵</kbd></td>
+                    </tr>
+                    <tr>
+                        <td>重頭播放</td>
+                        <td colspan="2"><kbd>Home</kbd></td>
+                    </tr>
+                    <tr>
+                        <td>快退 3 秒</td>
+                        <td><kbd>Ctrl</kbd>+<kbd>←</kbd></td>
+                        <td><kbd>Cmd</kbd>+<kbd>←</kbd></td>
+                    </tr>
+                    <tr>
+                        <td>快進 3 秒</td>
+                        <td><kbd>Ctrl</kbd>+<kbd>→</kbd></td>
+                        <td><kbd>Cmd</kbd>+<kbd>→</kbd></td>
+                    </tr>
+                    <tr>
+                        <td>加速播放</td>
+                        <td><kbd>Ctrl</kbd>+<kbd>↑</kbd></td>
+                        <td><kbd>Cmd</kbd>+<kbd>↑</kbd></td>
+                    </tr>
+                    <tr>
+                        <td>減速播放</td>
+                        <td><kbd>Ctrl</kbd>+<kbd>↓</kbd></td>
+                        <td><kbd>Cmd</kbd>+<kbd>↓</kbd></td>
+                    </tr>
+                    <tr>
+                        <td>設定標記點 1/2</td>
+                        <td colspan="2"><kbd>1</kbd> / <kbd>2</kbd></td>
+                    </tr>
+                    <tr>
+                        <td>跳轉到標記點 1/2</td>
+                        <td colspan="2"><kbd>Shift</kbd>+<kbd>1</kbd> / <kbd>Shift</kbd>+<kbd>2</kbd></td>
+                    </tr>
+                </table>
+            </section>
+            
+            <section id="editing" class="help-section">
+                <h2>✏️ 編輯功能詳解</h2>
+                
+                <h3>基本編輯</h3>
+                <p>點擊任何段落即可開始編輯。編輯過的段落會顯示黃色邊框標記。</p>
+                
+                <h3>尋找和取代</h3>
+                <ol>
+                    <li>按 <kbd>Ctrl</kbd>+<kbd>F</kbd> 開啟搜尋</li>
+                    <li>輸入要尋找的文字</li>
+                    <li>按 <kbd>Ctrl</kbd>+<kbd>H</kbd> 切換到取代模式</li>
+                    <li>輸入取代文字</li>
+                    <li>選擇「取代」或「全部取代」</li>
+                </ol>
+                
+                <h3>段落操作</h3>
+                <ul>
+                    <li><strong>分割段落 ✂️</strong>：選擇要分割的位置，點擊分割按鈕</li>
+                    <li><strong>合併段落 🔗</strong>：點擊合併按鈕，將當前段落與下一段合併</li>
+                    <li><strong>復原編輯 ↩️</strong>：恢復段落到原始轉譯文字</li>
+                </ul>
+                
+                <div class="tip-box">
+                    💡 <strong>提示</strong>：點擊時間戳可以讓音訊跳到對應時間點，方便對照編輯。
+                </div>
+            </section>
+            
+            <section id="export" class="help-section">
+                <h2>💾 匯出選項</h2>
+                
+                <h3>純文字 (TXT)</h3>
+                <p>只包含編輯後的文字內容，適合用於文件處理。</p>
+                
+                <h3>含時間戳文字</h3>
+                <p>每段前顯示時間標記，方便對照原始音訊。</p>
+                
+                <h3>SRT 字幕</h3>
+                <p>標準字幕格式，可用於影片編輯軟體。</p>
+                
+                <h3>WebVTT 字幕</h3>
+                <p>網頁字幕格式，適合 HTML5 影片播放器。</p>
+            </section>
+            
+            <section id="faq" class="help-section">
+                <h2>❓ 常見問題</h2>
+                
+                <h3>需要付費嗎？</h3>
+                <p>應用程式本身免費，但使用 OpenAI API 需要付費。目前價格約 $0.006 USD/分鐘。</p>
+                
+                <h3>支援哪些語言？</h3>
+                <p>Whisper 支援 90+ 種語言，包括中文、英文、日文、韓文等。系統會自動偵測語言。</p>
+                
+                <h3>檔案大小限制？</h3>
+                <p>OpenAI API 限制單檔最大 25MB。建議長音訊分段處理。</p>
+                
+                <h3>轉譯需要多久？</h3>
+                <p>通常是音訊長度的 10-30%。例如 10 分鐘音訊約需 1-3 分鐘。</p>
+                
+                <h3>資料安全嗎？</h3>
+                <p>API Key 和轉譯結果都儲存在您的瀏覽器本地，不會上傳到我們的伺服器。音訊檔案直接傳送到 OpenAI。</p>
+            </section>
+            
+            <section id="troubleshooting" class="help-section">
+                <h2>🔧 疑難排解</h2>
+                
+                <h3>API Key 錯誤</h3>
+                <ul>
+                    <li>確認 Key 以 "sk-" 開頭</li>
+                    <li>檢查是否完整複製（沒有空格）</li>
+                    <li>確認帳戶有餘額</li>
+                </ul>
+                
+                <h3>轉譯失敗</h3>
+                <ul>
+                    <li>檢查網路連線</li>
+                    <li>確認檔案格式支援</li>
+                    <li>嘗試較小的檔案</li>
+                </ul>
+                
+                <h3>無法播放音訊</h3>
+                <ul>
+                    <li>更新瀏覽器到最新版本</li>
+                    <li>嘗試不同的音訊格式</li>
+                    <li>檢查音訊檔案是否損壞</li>
+                </ul>
+                
+                <div class="warning-box">
+                    ⚠️ <strong>重要</strong>：必須使用本地伺服器啟動，不能直接開啟 HTML 檔案，否則會出現 CORS 錯誤。
+                </div>
+            </section>
+        </div>
+    </div>
+    
+    <a href="index.html" class="back-to-app">
+        ← 返回應用程式
+    </a>
+    
+    <script>
+        // 平滑捲動到錨點
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+        
+        // 套用主題
+        const savedTheme = localStorage.getItem('whisper_theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+    </script>
+</body>
+</html>
