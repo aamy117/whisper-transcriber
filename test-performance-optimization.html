@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>效能優化測試 - Whisper Transcriber</title>
+  <link rel="stylesheet" href="css/shared.css">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .test-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    
+    .test-controls {
+      background: var(--surface-color);
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .test-controls h2 {
+      margin-top: 0;
+      color: var(--primary-color);
+    }
+    
+    .control-group {
+      margin: 15px 0;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
+    
+    .control-group label {
+      font-weight: 500;
+      min-width: 150px;
+    }
+    
+    .stats-panel {
+      background: var(--surface-color);
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+    }
+    
+    .stat-item {
+      background: var(--background-color);
+      padding: 15px;
+      border-radius: 6px;
+      text-align: center;
+    }
+    
+    .stat-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: var(--primary-color);
+    }
+    
+    .stat-label {
+      color: var(--text-secondary);
+      font-size: 14px;
+      margin-top: 5px;
+    }
+    
+    .editor-wrapper {
+      background: var(--surface-color);
+      border-radius: 8px;
+      padding: 20px;
+      min-height: 500px;
+      position: relative;
+    }
+    
+    .editor-wrapper h3 {
+      margin-top: 0;
+      color: var(--primary-color);
+    }
+    
+    .comparison-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-top: 20px;
+    }
+    
+    .search-controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    
+    .search-controls input {
+      flex: 1;
+    }
+    
+    .performance-log {
+      background: #f5f5f5;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 10px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 12px;
+      margin-top: 20px;
+    }
+    
+    .performance-log .log-entry {
+      margin: 2px 0;
+    }
+    
+    .performance-log .log-time {
+      color: #666;
+    }
+    
+    .performance-log .log-success {
+      color: #4caf50;
+    }
+    
+    .performance-log .log-warning {
+      color: #ff9800;
+    }
+    
+    .performance-log .log-error {
+      color: #f44336;
+    }
+    
+    .toggle-switch {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .switch {
+      position: relative;
+      width: 50px;
+      height: 24px;
+      background: #ccc;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    
+    .switch.active {
+      background: var(--primary-color);
+    }
+    
+    .switch::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 20px;
+      height: 20px;
+      background: white;
+      border-radius: 50%;
+      transition: transform 0.3s;
+    }
+    
+    .switch.active::after {
+      transform: translateX(26px);
+    }
+  </style>
+</head>
+<body>
+  <div class="test-container">
+    <h1>效能優化測試</h1>
+    
+    <!-- 測試控制面板 -->
+    <div class="test-controls">
+      <h2>測試控制</h2>
+      
+      <div class="control-group">
+        <label>段落數量：</label>
+        <input type="number" id="segmentCount" value="100" min="10" max="5000" step="10">
+        <button id="generateBtn" class="btn btn-primary">生成測試資料</button>
+      </div>
+      
+      <div class="control-group">
+        <label>使用虛擬滾動：</label>
+        <div class="toggle-switch">
+          <div id="virtualScrollToggle" class="switch active"></div>
+          <span id="virtualScrollStatus">啟用</span>
+        </div>
+      </div>
+      
+      <div class="control-group">
+        <label>搜尋延遲 (ms)：</label>
+        <input type="number" id="searchDelay" value="300" min="0" max="2000" step="100">
+      </div>
+    </div>
+    
+    <!-- 效能統計面板 -->
+    <div class="stats-panel">
+      <div class="stat-item">
+        <div class="stat-value" id="renderTime">0</div>
+        <div class="stat-label">渲染時間 (ms)</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value" id="domNodes">0</div>
+        <div class="stat-label">DOM 節點數</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value" id="memoryUsage">0</div>
+        <div class="stat-label">記憶體使用 (MB)</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value" id="searchTime">0</div>
+        <div class="stat-label">搜尋時間 (ms)</div>
+      </div>
+    </div>
+    
+    <!-- 比較測試 -->
+    <div class="comparison-grid">
+      <!-- 優化版編輯器 -->
+      <div class="editor-wrapper">
+        <h3>優化版編輯器</h3>
+        <div class="search-controls">
+          <input type="text" id="searchOptimized" placeholder="搜尋文字...">
+          <button id="searchOptimizedBtn" class="btn btn-secondary">搜尋</button>
+        </div>
+        <div id="editorOptimized" class="editor-container"></div>
+      </div>
+      
+      <!-- 原始版編輯器 -->
+      <div class="editor-wrapper">
+        <h3>原始版編輯器</h3>
+        <div class="search-controls">
+          <input type="text" id="searchOriginal" placeholder="搜尋文字...">
+          <button id="searchOriginalBtn" class="btn btn-secondary">搜尋</button>
+        </div>
+        <div id="editorOriginal" class="editor-container"></div>
+      </div>
+    </div>
+    
+    <!-- 效能日誌 -->
+    <div class="performance-log" id="perfLog">
+      <div class="log-entry">
+        <span class="log-time">[00:00:00]</span>
+        <span class="log-success">效能測試準備就緒</span>
+      </div>
+    </div>
+  </div>
+  
+  <script type="module">
+    import { TranscriptionEditor as OptimizedEditor } from './js/editor-optimized.js';
+    import { TranscriptionEditor as OriginalEditor } from './js/editor.js';
+    
+    let optimizedEditor = null;
+    let originalEditor = null;
+    let testSegments = [];
+    
+    // 效能監測工具
+    class PerformanceMonitor {
+      constructor() {
+        this.startTime = 0;
+        this.measurements = {};
+      }
+      
+      start(label) {
+        this.startTime = performance.now();
+      }
+      
+      end(label) {
+        const endTime = performance.now();
+        const duration = endTime - this.startTime;
+        this.measurements[label] = duration;
+        return duration;
+      }
+      
+      getMemoryUsage() {
+        if (performance.memory) {
+          return Math.round(performance.memory.usedJSHeapSize / 1024 / 1024);
+        }
+        return 0;
+      }
+      
+      countDOMNodes(container) {
+        return container.querySelectorAll('*').length;
+      }
+    }
+    
+    const monitor = new PerformanceMonitor();
+    
+    // 日誌功能
+    function log(message, type = 'info') {
+      const logEl = document.getElementById('perfLog');
+      const time = new Date().toLocaleTimeString();
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      entry.innerHTML = `
+        <span class="log-time">[${time}]</span>
+        <span class="log-${type}">${message}</span>
+      `;
+      logEl.appendChild(entry);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+    
+    // 更新統計資訊
+    function updateStats(renderTime, searchTime = null) {
+      document.getElementById('renderTime').textContent = Math.round(renderTime);
+      
+      const optimizedContainer = document.getElementById('editorOptimized');
+      const domNodes = monitor.countDOMNodes(optimizedContainer);
+      document.getElementById('domNodes').textContent = domNodes;
+      
+      const memoryUsage = monitor.getMemoryUsage();
+      document.getElementById('memoryUsage').textContent = memoryUsage;
+      
+      if (searchTime !== null) {
+        document.getElementById('searchTime').textContent = Math.round(searchTime);
+      }
+    }
+    
+    // 生成測試資料
+    function generateTestData(count) {
+      const segments = [];
+      const sampleTexts = [
+        '這是一個測試段落，包含一些範例文字內容。',
+        '在這個段落中，我們將測試編輯器的效能表現。',
+        '虛擬滾動技術可以大幅提升大量資料的渲染效能。',
+        'DocumentFragment 可以減少 DOM 操作的重排次數。',
+        'Debounce 技術能夠優化高頻事件的處理效率。',
+        '這個專案使用純原生 JavaScript 開發，無需外部依賴。',
+        '效能優化是提升使用者體驗的重要環節。',
+        '我們需要在功能豐富性和效能之間找到平衡點。'
+      ];
+      
+      for (let i = 0; i < count; i++) {
+        const text = sampleTexts[i % sampleTexts.length] + ` (段落 ${i + 1})`;
+        segments.push({
+          id: i,
+          start: i * 5,
+          end: (i + 1) * 5,
+          text: text,
+          edited: null,
+          isEdited: false
+        });
+      }
+      
+      return segments;
+    }
+    
+    // 載入測試資料
+    function loadTestData() {
+      const count = parseInt(document.getElementById('segmentCount').value);
+      log(`開始生成 ${count} 個段落的測試資料...`);
+      
+      testSegments = generateTestData(count);
+      
+      // 載入到優化版編輯器
+      monitor.start('optimized');
+      optimizedEditor.loadTranscription({ segments: testSegments });
+      const optimizedTime = monitor.end('optimized');
+      log(`優化版編輯器渲染完成：${Math.round(optimizedTime)}ms`, 'success');
+      
+      // 載入到原始版編輯器
+      monitor.start('original');
+      originalEditor.loadTranscription({ segments: [...testSegments] });
+      const originalTime = monitor.end('original');
+      log(`原始版編輯器渲染完成：${Math.round(originalTime)}ms`, 'warning');
+      
+      // 計算效能提升
+      const improvement = ((originalTime - optimizedTime) / originalTime * 100).toFixed(1);
+      log(`效能提升：${improvement}%`, improvement > 0 ? 'success' : 'error');
+      
+      updateStats(optimizedTime);
+    }
+    
+    // 測試搜尋功能
+    function testSearch(editor, searchTerm, label) {
+      monitor.start(`search-${label}`);
+      editor.search(searchTerm);
+      const searchTime = monitor.end(`search-${label}`);
+      log(`${label}搜尋完成：${Math.round(searchTime)}ms`);
+      return searchTime;
+    }
+    
+    // 初始化
+    function init() {
+      // 建立編輯器實例
+      const optimizedContainer = document.getElementById('editorOptimized');
+      const originalContainer = document.getElementById('editorOriginal');
+      
+      optimizedEditor = new OptimizedEditor(optimizedContainer);
+      originalEditor = new OriginalEditor(originalContainer);
+      
+      // 綁定事件
+      document.getElementById('generateBtn').addEventListener('click', loadTestData);
+      
+      // 虛擬滾動開關
+      const virtualScrollToggle = document.getElementById('virtualScrollToggle');
+      const virtualScrollStatus = document.getElementById('virtualScrollStatus');
+      
+      virtualScrollToggle.addEventListener('click', () => {
+        const isActive = virtualScrollToggle.classList.toggle('active');
+        virtualScrollStatus.textContent = isActive ? '啟用' : '停用';
+        optimizedEditor.setUseVirtualScroll(isActive);
+        log(`虛擬滾動已${isActive ? '啟用' : '停用'}`);
+        
+        if (testSegments.length > 0) {
+          loadTestData();
+        }
+      });
+      
+      // 搜尋功能
+      document.getElementById('searchOptimizedBtn').addEventListener('click', () => {
+        const searchTerm = document.getElementById('searchOptimized').value;
+        if (searchTerm) {
+          const time = testSearch(optimizedEditor, searchTerm, '優化版');
+          updateStats(null, time);
+        }
+      });
+      
+      document.getElementById('searchOriginalBtn').addEventListener('click', () => {
+        const searchTerm = document.getElementById('searchOriginal').value;
+        if (searchTerm) {
+          testSearch(originalEditor, searchTerm, '原始版');
+        }
+      });
+      
+      // 搜尋輸入事件（測試 debounce）
+      let searchCount = 0;
+      document.getElementById('searchOptimized').addEventListener('input', (e) => {
+        searchCount++;
+        const count = searchCount;
+        log(`搜尋輸入 #${count}: "${e.target.value}"`);
+        
+        // 優化版會自動 debounce
+        optimizedEditor.search(e.target.value);
+      });
+      
+      // 載入初始資料
+      loadTestData();
+    }
+    
+    // 啟動應用
+    init();
+  </script>
+</body>
+</html>
