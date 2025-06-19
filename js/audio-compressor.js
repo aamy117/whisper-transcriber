@@ -66,8 +66,8 @@ export class AudioCompressor {
       // 執行壓縮
       const compressedBuffer = await this.processAudio(audioBuffer, compressionProfile, onProgress);
       
-      // 編碼為檔案
-      const compressedBlob = await this.encodeAudioBuffer(compressedBuffer, 'audio/mp3', compressionProfile);
+      // 編碼為檔案（使用 WAV 格式）
+      const compressedBlob = await this.encodeAudioBuffer(compressedBuffer, 'audio/wav', compressionProfile);
       
       // 檢查壓縮結果
       if (compressedBlob.size > targetSize) {
@@ -79,8 +79,8 @@ export class AudioCompressor {
       // 建立檔案物件
       const compressedFile = new File(
         [compressedBlob],
-        file.name.replace(/\.[^/.]+$/, '_compressed.mp3'),
-        { type: 'audio/mp3' }
+        file.name.replace(/\.[^/.]+$/, '_compressed.wav'),
+        { type: 'audio/wav' }
       );
       
       return {
@@ -281,13 +281,10 @@ export class AudioCompressor {
    * 編碼音訊緩衝
    */
   async encodeAudioBuffer(audioBuffer, mimeType, profile) {
-    // 對於 MP3，我們需要使用 WAV 作為中間格式
-    // 因為瀏覽器不直接支援 MP3 編碼
-    const wavBlob = await this.audioBufferToWav(audioBuffer);
-    
-    // 這裡理想情況下應該使用真正的 MP3 編碼器
-    // 但在瀏覽器環境中，我們返回 WAV 並標記需要伺服器端處理
-    return wavBlob;
+    // 直接使用 WAV 格式
+    // WAV 是無損格式，瀏覽器支援最好
+    // 壓縮主要通過降低取樣率和轉換為單聲道來實現
+    return await this.audioBufferToWav(audioBuffer);
   }
   
   /**
@@ -359,12 +356,12 @@ export class AudioCompressor {
     };
     
     const compressedBuffer = await this.processAudio(audioBuffer, aggressiveProfile, onProgress);
-    const compressedBlob = await this.encodeAudioBuffer(compressedBuffer, 'audio/mp3', aggressiveProfile);
+    const compressedBlob = await this.encodeAudioBuffer(compressedBuffer, 'audio/wav', aggressiveProfile);
     
     const compressedFile = new File(
       [compressedBlob],
-      'compressed_extreme.mp3',
-      { type: 'audio/mp3' }
+      'compressed_extreme.wav',
+      { type: 'audio/wav' }
     );
     
     return {

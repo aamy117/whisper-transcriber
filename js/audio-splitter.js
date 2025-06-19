@@ -214,11 +214,11 @@ export class AudioSplitter {
       // 編碼為檔案
       const segmentBlob = await this.encodeAudioBuffer(segmentBuffer, originalFile.type);
       
-      // 建立檔案物件
+      // 建立檔案物件（使用 WAV 格式）
       const segmentFile = new File(
         [segmentBlob],
-        `${originalFile.name.replace(/\.[^/.]+$/, '')}_segment_${i + 1}.${this.getFileExtension(originalFile.type)}`,
-        { type: originalFile.type }
+        `${originalFile.name.replace(/\.[^/.]+$/, '')}_segment_${i + 1}.wav`,
+        { type: 'audio/wav' }
       );
       
       segments.push({
@@ -295,13 +295,9 @@ export class AudioSplitter {
     
     const renderedBuffer = await offlineContext.startRendering();
     
-    // 轉換為 WAV 格式（瀏覽器支援最好）
-    if (mimeType.includes('wav') || !window.MediaRecorder) {
-      return this.audioBufferToWav(renderedBuffer);
-    }
-    
-    // 使用 MediaRecorder 編碼其他格式
-    return await this.encodeWithMediaRecorder(renderedBuffer, mimeType);
+    // 始終使用 WAV 格式，因為瀏覽器對其他格式的支援不一致
+    // WAV 格式雖然較大，但相容性最好
+    return this.audioBufferToWav(renderedBuffer);
   }
   
   /**
@@ -359,59 +355,6 @@ export class AudioSplitter {
     return new Blob([buffer], { type: 'audio/wav' });
   }
   
-  /**
-   * 使用 MediaRecorder 編碼
-   */
-  async encodeWithMediaRecorder(audioBuffer, mimeType) {
-    // 建立 MediaStream
-    const audioContext = new AudioContext();
-    const source = audioContext.createBufferSource();
-    const destination = audioContext.createMediaStreamDestination();
-    
-    source.buffer = audioBuffer;
-    source.connect(destination);
-    
-    // 錄製
-    const chunks = [];
-    const recorder = new MediaRecorder(destination.stream, {
-      mimeType: mimeType
-    });
-    
-    return new Promise((resolve, reject) => {
-      recorder.ondataavailable = (e) => chunks.push(e.data);
-      recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: mimeType });
-        resolve(blob);
-      };
-      recorder.onerror = reject;
-      
-      recorder.start();
-      source.start();
-      
-      // 等待錄製完成
-      setTimeout(() => {
-        recorder.stop();
-        source.stop();
-        audioContext.close();
-      }, audioBuffer.duration * 1000 + 100);
-    });
-  }
-  
-  /**
-   * 取得檔案副檔名
-   */
-  getFileExtension(mimeType) {
-    const extensions = {
-      'audio/wav': 'wav',
-      'audio/mp3': 'mp3',
-      'audio/mpeg': 'mp3',
-      'audio/ogg': 'ogg',
-      'audio/webm': 'webm',
-      'audio/flac': 'flac'
-    };
-    
-    return extensions[mimeType] || 'wav';
-  }
   
   /**
    * 清理資源
