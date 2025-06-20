@@ -102,13 +102,20 @@ export class AudioSplitter {
   async findSplitPoints(audioBuffer, fileSize, maxSize) {
     const duration = audioBuffer.duration;
     const bytesPerSecond = fileSize / duration;
-    const maxDurationPerSegment = maxSize / bytesPerSecond;
+    let maxDurationPerSegment = maxSize / bytesPerSecond;
+    
+    // 限制每段最長時間為 10 分鐘（600秒），避免記憶體問題
+    const MAX_SEGMENT_DURATION = 600; // 10 分鐘
+    if (maxDurationPerSegment > MAX_SEGMENT_DURATION) {
+      maxDurationPerSegment = MAX_SEGMENT_DURATION;
+      console.log(`限制分段時長為 ${MAX_SEGMENT_DURATION} 秒以避免記憶體問題`);
+    }
     
     const splitPoints = [];
     let currentTime = 0;
     
-    // 如果使用靜音檢測
-    const useSilenceDetection = duration < 3600; // 小於1小時使用靜音檢測
+    // 如果使用靜音檢測（僅用於較短的音訊）
+    const useSilenceDetection = duration < 1800; // 小於30分鐘使用靜音檢測
     
     if (useSilenceDetection) {
       // 檢測靜音位置作為分割點
@@ -304,11 +311,57 @@ export class AudioSplitter {
    * 編碼音訊緩衝為 Blob
    */
   async encodeAudioBuffer(audioBuffer, mimeType) {
-    // 使用 OfflineAudioContext 進行渲染
+    try {
+      // 檢查音訊緩衝大小
+      const totalSamples = audioBuffer.length * audioBuffer.numberOfChannels;
+      const estimatedSize = totalSamples * 2; // 16-bit samples
+      
+      // 如果預估大小超過 100MB，警告並使用較低品質
+      if (estimatedSize > 100 * 1024 * 1024) {
+        console.warn(`音訊段落過大 (約 ${Math.round(estimatedSize / 1024 / 1024)}MB)，可能導致記憶體問題`);
+        
+        // 嘗試降低取樣率
+        if (audioBuffer.sampleRate > 22050) {
+          console.log('嘗試降低取樣率以減少記憶體使用');
+          return await this.encodeWithLowerSampleRate(audioBuffer);
+        }
+      }
+      
+      // 使用 OfflineAudioContext 進行渲染
+      const offlineContext = new OfflineAudioContext(
+        audioBuffer.numberOfChannels,
+        audioBuffer.length,
+        audioBuffer.sampleRate
+      );
+      
+      const source = offlineContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(offlineContext.destination);
+      source.start();
+      
+      const renderedBuffer = await offlineContext.startRendering();
+      
+      // 始終使用 WAV 格式，因為瀏覽器對其他格式的支援不一致
+      // WAV 格式雖然較大，但相容性最好
+      return this.audioBufferToWav(renderedBuffer);
+      
+    } catch (error) {
+      console.error('編碼失敗，嘗試使用備用方法:', error);
+      
+      // 如果標準方法失敗，嘗試直接編碼
+      return this.audioBufferToWav(audioBuffer);
+    }
+  }
+  
+  /**
+   * 使用較低取樣率編碼
+   */
+  async encodeWithLowerSampleRate(audioBuffer) {
+    const targetSampleRate = 22050;
     const offlineContext = new OfflineAudioContext(
       audioBuffer.numberOfChannels,
-      audioBuffer.length,
-      audioBuffer.sampleRate
+      Math.floor(audioBuffer.length * targetSampleRate / audioBuffer.sampleRate),
+      targetSampleRate
     );
     
     const source = offlineContext.createBufferSource();
@@ -317,9 +370,6 @@ export class AudioSplitter {
     source.start();
     
     const renderedBuffer = await offlineContext.startRendering();
-    
-    // 始終使用 WAV 格式，因為瀏覽器對其他格式的支援不一致
-    // WAV 格式雖然較大，但相容性最好
     return this.audioBufferToWav(renderedBuffer);
   }
   
@@ -335,16 +385,12 @@ export class AudioSplitter {
     const bytesPerSample = bitDepth / 8;
     const blockAlign = numberOfChannels * bytesPerSample;
     
-    const data = [];
-    for (let i = 0; i < audioBuffer.length; i++) {
-      for (let channel = 0; channel < numberOfChannels; channel++) {
-        const sample = audioBuffer.getChannelData(channel)[i];
-        const value = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
-        data.push(value);
-      }
-    }
+    // 計算總樣本數
+    const totalSamples = audioBuffer.length * numberOfChannels;
+    const dataSize = totalSamples * bytesPerSample;
     
-    const buffer = new ArrayBuffer(44 + data.length * bytesPerSample);
+    // 直接建立正確大小的 ArrayBuffer，避免使用陣列
+    const buffer = new ArrayBuffer(44 + dataSize);
     const view = new DataView(buffer);
     
     // WAV 檔頭
@@ -355,7 +401,7 @@ export class AudioSplitter {
     };
     
     writeString(0, 'RIFF');
-    view.setUint32(4, 36 + data.length * bytesPerSample, true);
+    view.setUint32(4, 36 + dataSize, true);
     writeString(8, 'WAVE');
     writeString(12, 'fmt ');
     view.setUint32(16, 16, true);
@@ -366,13 +412,17 @@ export class AudioSplitter {
     view.setUint16(32, blockAlign, true);
     view.setUint16(34, bitDepth, true);
     writeString(36, 'data');
-    view.setUint32(40, data.length * bytesPerSample, true);
+    view.setUint32(40, dataSize, true);
     
-    // 寫入音訊資料
+    // 直接寫入音訊資料到 ArrayBuffer，避免中間陣列
     let offset = 44;
-    for (const sample of data) {
-      view.setInt16(offset, sample, true);
-      offset += 2;
+    for (let i = 0; i < audioBuffer.length; i++) {
+      for (let channel = 0; channel < numberOfChannels; channel++) {
+        const sample = audioBuffer.getChannelData(channel)[i];
+        const value = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+        view.setInt16(offset, value, true);
+        offset += 2;
+      }
     }
     
     return new Blob([buffer], { type: 'audio/wav' });
