@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>音訊分割修復測試</title>
+    
+    <!-- 引入專案樣式 -->
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/notification.css">
+    
+    <style>
+        .test-container {
+            max-width: 1000px;
+            margin: 2rem auto;
+            padding: 2rem;
+        }
+        
+        .test-header {
+            text-align: center;
+            padding: 2rem;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            margin-bottom: 2rem;
+        }
+        
+        .test-section {
+            background: var(--bg-secondary);
+            padding: 2rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+        
+        .upload-area {
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 3rem;
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+            margin-top: 1rem;
+        }
+        
+        .upload-area:hover {
+            border-color: var(--primary-color);
+            background: var(--bg-tertiary);
+        }
+        
+        .upload-area.dragover {
+            border-color: var(--success-color);
+            background: rgba(34, 197, 94, 0.1);
+        }
+        
+        #fileInput {
+            display: none;
+        }
+        
+        .test-log {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 1rem;
+            height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.85rem;
+            margin-top: 1rem;
+        }
+        
+        .log-entry {
+            padding: 0.25rem 0;
+            border-bottom: 1px solid var(--border-lighter);
+        }
+        
+        .log-info { color: var(--text-secondary); }
+        .log-success { color: var(--success-color); }
+        .log-error { color: var(--error-color); }
+        .log-warning { color: var(--warning-color); }
+        
+        .result-section {
+            margin-top: 2rem;
+            padding: 1rem;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+        }
+        
+        .segment-list {
+            display: grid;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+        
+        .segment-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem;
+            background: var(--bg-primary);
+            border-radius: 4px;
+            font-size: 0.85rem;
+        }
+        
+        .test-buttons {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="test-header">
+            <h1>🔧 音訊分割修復測試</h1>
+            <p>測試音訊分割功能，特別是針對解碼錯誤的處理</p>
+        </div>
+
+        <!-- 檔案上傳 -->
+        <div class="test-section">
+            <h3>上傳音訊檔案</h3>
+            <div class="upload-area" id="uploadArea">
+                <p>🎵 拖放音訊檔案到此處</p>
+                <p>或點擊選擇檔案</p>
+                <input type="file" id="fileInput" accept="audio/*">
+            </div>
+            
+            <div class="test-buttons">
+                <button class="btn btn-primary" id="testSplitBtn" disabled>測試音訊分割</button>
+                <button class="btn btn-secondary" id="clearLogBtn">清除日誌</button>
+            </div>
+        </div>
+
+        <!-- 測試結果 -->
+        <div class="test-section" id="resultSection" style="display: none;">
+            <h3>分割結果</h3>
+            <div class="result-section">
+                <p><strong>總段數：</strong><span id="totalSegments">0</span></p>
+                <p><strong>原始時長：</strong><span id="originalDuration">N/A</span></p>
+                <p><strong>處理方式：</strong><span id="processMethod">N/A</span></p>
+                <div class="segment-list" id="segmentList"></div>
+            </div>
+        </div>
+
+        <!-- 測試日誌 -->
+        <div class="test-section">
+            <h3>測試日誌</h3>
+            <div class="test-log" id="testLog">
+                <div class="log-entry log-info">[系統] 音訊分割測試就緒</div>
+            </div>
+        </div>
+
+        <!-- 通知容器 -->
+        <div id="notification-container"></div>
+    </div>
+
+    <script type="module">
+        import { audioSplitter } from './js/audio-splitter.js';
+        import { notify } from './js/notification.js';
+        
+        let currentFile = null;
+        
+        // 日誌功能
+        function log(message, type = 'info') {
+            const logEl = document.getElementById('testLog');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            const time = new Date().toLocaleTimeString();
+            entry.textContent = `[${time}] ${message}`;
+            logEl.appendChild(entry);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+        
+        // 格式化檔案大小
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        // 格式化時間
+        function formatDuration(seconds) {
+            if (!seconds) return 'N/A';
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+        
+        // 初始化
+        function init() {
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInput = document.getElementById('fileInput');
+            const testSplitBtn = document.getElementById('testSplitBtn');
+            const clearLogBtn = document.getElementById('clearLogBtn');
+            
+            // 綁定檔案上傳
+            uploadArea.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', handleFileSelect);
+            
+            // 拖放支援
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
+            
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.classList.remove('dragover');
+            });
+            
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    handleFile(files[0]);
+                }
+            });
+            
+            // 測試按鈕
+            testSplitBtn.addEventListener('click', testSplit);
+            clearLogBtn.addEventListener('click', clearLog);
+            
+            log('測試環境初始化完成', 'success');
+        }
+        
+        // 處理檔案選擇
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                handleFile(file);
+            }
+        }
+        
+        // 處理檔案
+        function handleFile(file) {
+            currentFile = file;
+            log(`已選擇檔案: ${file.name} (${formatFileSize(file.size)})`, 'info');
+            log(`檔案類型: ${file.type || '未知'}`, 'info');
+            
+            // 嘗試獲取音訊時長
+            const audio = new Audio();
+            const url = URL.createObjectURL(file);
+            audio.src = url;
+            
+            audio.addEventListener('loadedmetadata', () => {
+                log(`音訊時長: ${formatDuration(audio.duration)}`, 'info');
+                URL.revokeObjectURL(url);
+            });
+            
+            audio.addEventListener('error', (e) => {
+                log(`無法載入音訊 metadata: ${e.message || '未知錯誤'}`, 'warning');
+                URL.revokeObjectURL(url);
+            });
+            
+            document.getElementById('testSplitBtn').disabled = false;
+        }
+        
+        // 測試分割
+        async function testSplit() {
+            if (!currentFile) {
+                notify.error('請先選擇檔案');
+                return;
+            }
+            
+            log('開始測試音訊分割...', 'info');
+            
+            try {
+                const startTime = Date.now();
+                
+                // 調用分割功能
+                const result = await audioSplitter.splitAudioFile(currentFile, {
+                    maxSize: 20 * 1024 * 1024, // 20MB
+                    overlap: 5, // 5秒重疊
+                    onProgress: (progress) => {
+                        if (progress.stage) {
+                            log(`進度: ${progress.stage}`, 'info');
+                        }
+                        if (progress.percentage) {
+                            log(`完成度: ${Math.round(progress.percentage)}%`, 'info');
+                        }
+                    }
+                });
+                
+                const endTime = Date.now();
+                const duration = ((endTime - startTime) / 1000).toFixed(2);
+                
+                log(`分割完成！耗時: ${duration} 秒`, 'success');
+                log(`總段數: ${result.segments.length}`, 'success');
+                
+                // 顯示結果
+                displayResults(result);
+                
+            } catch (error) {
+                log(`分割失敗: ${error.message}`, 'error');
+                console.error('詳細錯誤:', error);
+                
+                // 顯示詳細錯誤資訊
+                if (error.stack) {
+                    log(`錯誤堆疊: ${error.stack}`, 'error');
+                }
+            } finally {
+                audioSplitter.cleanup();
+            }
+        }
+        
+        // 顯示結果
+        function displayResults(result) {
+            const resultSection = document.getElementById('resultSection');
+            const totalSegmentsEl = document.getElementById('totalSegments');
+            const originalDurationEl = document.getElementById('originalDuration');
+            const processMethodEl = document.getElementById('processMethod');
+            const segmentListEl = document.getElementById('segmentList');
+            
+            // 更新總覽資訊
+            totalSegmentsEl.textContent = result.segments.length;
+            originalDurationEl.textContent = formatDuration(result.originalDuration);
+            processMethodEl.textContent = result.warning ? '備用方法（簡單分割）' : '智能分割（靜音檢測）';
+            
+            // 清空並更新段落列表
+            segmentListEl.innerHTML = '';
+            result.segments.forEach((segment, index) => {
+                const segmentEl = document.createElement('div');
+                segmentEl.className = 'segment-item';
+                
+                let timeInfo = 'N/A';
+                if (segment.startTime !== null && segment.endTime !== null) {
+                    timeInfo = `${formatDuration(segment.startTime)} - ${formatDuration(segment.endTime)}`;
+                } else if (segment.startByte !== undefined && segment.endByte !== undefined) {
+                    timeInfo = `位元組: ${formatFileSize(segment.startByte)} - ${formatFileSize(segment.endByte)}`;
+                }
+                
+                segmentEl.innerHTML = `
+                    <span>段落 ${index + 1}: ${segment.file.name}</span>
+                    <span>${formatFileSize(segment.file.size)} | ${timeInfo}</span>
+                `;
+                
+                segmentListEl.appendChild(segmentEl);
+            });
+            
+            // 顯示結果區域
+            resultSection.style.display = 'block';
+            
+            // 如果有警告，顯示警告訊息
+            if (result.warning) {
+                log(`警告: ${result.warning}`, 'warning');
+            }
+        }
+        
+        // 清除日誌
+        function clearLog() {
+            const logEl = document.getElementById('testLog');
+            logEl.innerHTML = '<div class="log-entry log-info">[系統] 日誌已清除</div>';
+        }
+        
+        // 啟動
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
