@@ -9,11 +9,15 @@ import { dialog } from './dialog.js';
 import { notify } from './notification.js';
 import { audioSplitter } from './audio-splitter.js';
 import { audioCompressor } from './audio-compressor.js';
+import { WhisperWASMManager } from './wasm/whisper-wasm-manager.js';
 
 export class TranscriptionPreprocessor {
   constructor() {
     this.maxFileSize = Config.api.maxFileSize; // 25MB
     this.audioContext = null;
+    // 功能開關：是否啟用 WASM 本地轉譯
+    this.ENABLE_WASM = true; // 設為 true 以啟用 WASM 選項
+    
     this.processingOptions = {
       split: {
         name: '智能分割',
@@ -31,6 +35,11 @@ export class TranscriptionPreprocessor {
         icon: '🔄'
       }
     };
+    
+    // 不再將 WASM 作為處理選項，而是作為獨立的轉譯方式
+    
+    // WASM 管理器實例
+    this.wasmManager = null;
   }
   
   /**
@@ -38,47 +47,226 @@ export class TranscriptionPreprocessor {
    * 這是主要入口，只在使用者要求轉譯時調用
    */
   async prepareForTranscription(file) {
-    // 檢查檔案大小
-    if (file.size <= this.maxFileSize) {
-      // 檔案大小符合限制，直接返回
-      return {
-        strategy: 'direct',
-        files: [file],
-        totalDuration: null,
-        estimatedCost: this.estimateCost(file.size, 1)
-      };
-    }
+    // 第一步：讓使用者選擇轉譯方式（本地 or API）
+    const transcriptionMethod = await this.showTranscriptionMethodChoice(file);
     
-    // 檔案超過限制，顯示處理選項
-    const fileInfo = {
-      name: file.name,
-      size: file.size,
-      sizeMB: (file.size / 1024 / 1024).toFixed(2),
-      exceedBy: ((file.size - this.maxFileSize) / 1024 / 1024).toFixed(2)
-    };
-    
-    // 讓使用者選擇處理策略
-    const strategy = await this.showProcessingOptions(fileInfo);
-    
-    if (!strategy) {
+    if (!transcriptionMethod) {
       // 使用者取消
-      throw new Error('使用者取消處理');
+      throw new Error('使用者取消選擇');
     }
     
-    // 根據選擇的策略處理檔案
-    notify.info(`正在使用${this.processingOptions[strategy].name}處理檔案...`);
-    
-    try {
-      const result = await this.processFile(file, strategy);
-      return result;
-    } catch (error) {
-      notify.error(`檔案處理失敗：${error.message}`);
-      throw error;
+    // 根據選擇的方式處理
+    if (transcriptionMethod === 'local') {
+      // 本地轉譯流程
+      notify.info('準備使用本地轉譯...');
+      return await this.processWithWASM(file);
+      
+    } else if (transcriptionMethod === 'api') {
+      // API 轉譯流程
+      
+      // 檢查檔案大小
+      if (file.size <= this.maxFileSize) {
+        // 檔案大小符合限制，直接使用 API
+        return {
+          strategy: 'direct',
+          files: [file],
+          totalDuration: null,
+          estimatedCost: this.estimateCost(file.size, 1)
+        };
+      }
+      
+      // 檔案超過限制，顯示處理選項（分割/壓縮/混合）
+      const fileInfo = {
+        name: file.name,
+        size: file.size,
+        sizeMB: (file.size / 1024 / 1024).toFixed(2),
+        exceedBy: ((file.size - this.maxFileSize) / 1024 / 1024).toFixed(2)
+      };
+      
+      // 讓使用者選擇處理策略
+      const strategy = await this.showProcessingOptions(fileInfo);
+      
+      if (!strategy) {
+        // 使用者取消
+        throw new Error('使用者取消處理');
+      }
+      
+      // 根據選擇的策略處理檔案
+      notify.info(`正在使用${this.processingOptions[strategy].name}處理檔案...`);
+      
+      try {
+        const result = await this.processFile(file, strategy);
+        return result;
+      } catch (error) {
+        notify.error(`檔案處理失敗：${error.message}`);
+        throw error;
+      }
     }
   }
   
   /**
-   * 顯示處理選項對話框
+   * 顯示轉譯方式選擇對話框（第一層選擇）
+   */
+  async showTranscriptionMethodChoice(file) {
+    const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
+    const estimatedDuration = this.estimateAudioDuration(file.size);
+    const apiCost = this.estimateCost(file.size, 1);
+    
+    const content = `
+      <div class="method-choice-container">
+        <div class="file-summary">
+          <div class="file-icon">🎵</div>
+          <div class="file-details">
+            <h4>${file.name}</h4>
+            <p>大小：${fileSizeMB} MB | 預估長度：${Math.round(estimatedDuration)} 分鐘</p>
+          </div>
+        </div>
+        
+        <p class="choice-prompt">請選擇轉譯方式：</p>
+        
+        <div class="method-options">
+          <div class="method-card" data-method="local">
+            <div class="method-header">
+              <div class="method-icon">🖥️</div>
+              <div class="method-title">
+                <h3>本地轉譯</h3>
+                <span class="badge badge-privacy">隱私保護</span>
+              </div>
+            </div>
+            <div class="method-features">
+              <div class="feature-item">✅ 完全離線，100% 隱私</div>
+              <div class="feature-item">✅ 無需上傳檔案</div>
+              <div class="feature-item">✅ 免費使用</div>
+              <div class="feature-item">⏱️ 處理時間較長</div>
+              <div class="feature-item">💾 需要下載模型（首次）</div>
+            </div>
+            <div class="method-footer">
+              <span class="cost">費用：免費</span>
+              <span class="time">預估：${Math.round(estimatedDuration * 2)}-${Math.round(estimatedDuration * 3)} 分鐘</span>
+            </div>
+          </div>
+          
+          <div class="method-card" data-method="api">
+            <div class="method-header">
+              <div class="method-icon">☁️</div>
+              <div class="method-title">
+                <h3>雲端 API 轉譯</h3>
+                <span class="badge badge-fast">高速高精度</span>
+              </div>
+            </div>
+            <div class="method-features">
+              <div class="feature-item">✅ 轉譯速度快</div>
+              <div class="feature-item">✅ 精度最高</div>
+              <div class="feature-item">✅ 支援所有格式</div>
+              <div class="feature-item">💰 需要付費</div>
+              <div class="feature-item">🌐 需要網路連線</div>
+            </div>
+            <div class="method-footer">
+              <span class="cost">費用：$${apiCost.toFixed(3)} USD</span>
+              <span class="time">預估：${Math.round(estimatedDuration / 5)}-${Math.round(estimatedDuration / 3)} 分鐘</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="remember-choice">
+          <label>
+            <input type="checkbox" id="rememberChoice">
+            <span>記住我的選擇</span>
+          </label>
+        </div>
+      </div>
+    `;
+    
+    return new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.className = 'dialog-overlay';
+      overlay.innerHTML = `
+        <div class="dialog method-choice-dialog">
+          <div class="dialog-header">
+            <h3>選擇轉譯方式</h3>
+          </div>
+          <div class="dialog-content">
+            ${content}
+          </div>
+          <div class="dialog-footer">
+            <button class="btn btn-secondary" id="cancelBtn">取消</button>
+            <button class="btn btn-primary" id="confirmBtn" disabled>開始轉譯</button>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(overlay);
+      
+      // 添加顯示動畫
+      requestAnimationFrame(() => {
+        overlay.classList.add('show');
+      });
+      
+      const closeModal = () => {
+        overlay.classList.remove('show');
+        setTimeout(() => {
+          document.body.removeChild(overlay);
+        }, 300);
+      };
+      
+      let selectedMethod = null;
+      const confirmBtn = overlay.querySelector('#confirmBtn');
+      
+      // 檢查是否有記住的選擇
+      const savedChoice = localStorage.getItem('preferredTranscriptionMethod');
+      if (savedChoice && this.ENABLE_WASM) {
+        // 如果有保存的選擇且 WASM 啟用，自動選擇
+        const savedCard = overlay.querySelector(`[data-method="${savedChoice}"]`);
+        if (savedCard) {
+          savedCard.click();
+          // 可選：自動開始
+          // setTimeout(() => confirmBtn.click(), 500);
+        }
+      }
+      
+      // 綁定選項點擊事件
+      overlay.querySelectorAll('.method-card').forEach(card => {
+        // 如果是本地轉譯但 WASM 未啟用，則禁用
+        if (card.dataset.method === 'local' && !this.ENABLE_WASM) {
+          card.classList.add('disabled');
+          card.innerHTML += '<div class="disabled-notice">⚠️ 本地轉譯功能未啟用</div>';
+          return;
+        }
+        
+        card.addEventListener('click', () => {
+          // 移除其他選中狀態
+          overlay.querySelectorAll('.method-card').forEach(c => {
+            c.classList.remove('selected');
+          });
+          
+          // 設定選中狀態
+          card.classList.add('selected');
+          selectedMethod = card.dataset.method;
+          confirmBtn.disabled = false;
+        });
+      });
+      
+      // 綁定按鈕事件
+      overlay.querySelector('#cancelBtn').addEventListener('click', () => {
+        closeModal();
+        resolve(null);
+      });
+      
+      confirmBtn.addEventListener('click', () => {
+        // 檢查是否要記住選擇
+        const rememberCheckbox = overlay.querySelector('#rememberChoice');
+        if (rememberCheckbox && rememberCheckbox.checked && selectedMethod) {
+          localStorage.setItem('preferredTranscriptionMethod', selectedMethod);
+        }
+        
+        closeModal();
+        resolve(selectedMethod);
+      });
+    });
+  }
+  
+  /**
+   * 顯示處理選項對話框（第二層選擇 - 僅限 API 大檔案）
    */
   async showProcessingOptions(fileInfo) {
     const content = `
@@ -218,6 +406,18 @@ export class TranscriptionPreprocessor {
           <li>預計需要 ${this.estimateHybridSegments(fileInfo.size)} 次 API 調用</li>
           <li>適合大多數使用場景</li>
         </ul>
+      `,
+      wasm: `
+        <h4>本地轉譯說明</h4>
+        <ul>
+          <li>使用瀏覽器內建的 WebAssembly 技術</li>
+          <li>完全在您的電腦上處理，無需上傳檔案</li>
+          <li>100% 隱私保護，適合敏感內容</li>
+          <li>支援離線使用（模型下載後）</li>
+          <li>處理速度取決於您的電腦效能</li>
+          <li>預計處理時間：音訊長度的 1-3 倍</li>
+        </ul>
+        <p class="warning-note">⚠️ 首次使用需要下載模型檔案（75-466MB）</p>
       `
     };
     
@@ -238,11 +438,20 @@ export class TranscriptionPreprocessor {
       hybrid: this.estimateHybridSegments(fileInfo.size) * estimatedDuration * costPerMinute
     };
     
+    // 如果啟用了 WASM，添加其成本（免費）
+    if (this.ENABLE_WASM) {
+      estimates.wasm = 0;
+    }
+    
     // 更新顯示
     Object.entries(estimates).forEach(([strategy, cost]) => {
       const el = overlay.querySelector(`.option-item[data-strategy="${strategy}"] .cost-estimate`);
       if (el) {
-        el.textContent = `預估費用：$${cost.toFixed(3)} USD`;
+        if (strategy === 'wasm') {
+          el.textContent = '預估費用：免費（本地處理）';
+        } else {
+          el.textContent = `預估費用：$${cost.toFixed(3)} USD`;
+        }
       }
     });
   }
@@ -377,6 +586,161 @@ export class TranscriptionPreprocessor {
   }
   
   /**
+   * 使用 WASM 本地處理
+   */
+  async processWithWASM(file) {
+    try {
+      // 初始化 WASM 管理器
+      if (!this.wasmManager) {
+        this.wasmManager = new WhisperWASMManager();
+      }
+      
+      // 顯示模型選擇對話框
+      const modelChoice = await this.showModelSelectionDialog();
+      if (!modelChoice) {
+        throw new Error('使用者取消選擇模型');
+      }
+      
+      // 顯示進度
+      const progressModal = this.showProgressModal('準備本地轉譯...');
+      
+      try {
+        // 檢查模型是否已快取
+        const isCached = await this.wasmManager.isModelCached(modelChoice);
+        if (!isCached) {
+          const modelInfo = this.wasmManager.getModelInfo(modelChoice);
+          progressModal.updateMessage(`正在下載 ${modelChoice} 模型 (${Math.round(modelInfo.size / 1024 / 1024)}MB)...`);
+        }
+        
+        // 初始化 WASM 和載入模型
+        progressModal.updateMessage('正在初始化轉譯引擎...');
+        await this.wasmManager.initialize(modelChoice);
+        
+        // 返回結果（實際轉譯將在主程式中執行）
+        progressModal.close();
+        
+        return {
+          strategy: 'wasm',
+          files: [file], // WASM 不需要分割檔案
+          model: modelChoice,
+          wasmManager: this.wasmManager,
+          totalDuration: null,
+          estimatedCost: 0, // 本地處理無費用
+          note: '使用本地 WASM 處理，無需上傳檔案'
+        };
+        
+      } catch (error) {
+        progressModal.close();
+        throw error;
+      }
+      
+    } catch (error) {
+      notify.error(`本地處理失敗：${error.message}`);
+      throw error;
+    }
+  }
+  
+  /**
+   * 顯示模型選擇對話框
+   */
+  async showModelSelectionDialog() {
+    const models = [
+      { id: 'tiny', name: 'Tiny', size: '75MB', speed: '快', accuracy: '基本', description: '最快速度，適合快速預覽' },
+      { id: 'base', name: 'Base', size: '142MB', speed: '中', accuracy: '良好', description: '平衡速度與品質（推薦）' },
+      { id: 'small', name: 'Small', size: '466MB', speed: '慢', accuracy: '高', description: '最佳品質，速度較慢' }
+    ];
+    
+    const content = `
+      <div class="model-selection">
+        <p>請選擇轉譯模型：</p>
+        <div class="model-list">
+          ${models.map(model => `
+            <div class="model-item" data-model="${model.id}">
+              <div class="model-header">
+                <h4>${model.name}</h4>
+                <span class="model-size">${model.size}</span>
+              </div>
+              <div class="model-info">
+                <span class="model-speed">速度：${model.speed}</span>
+                <span class="model-accuracy">準確度：${model.accuracy}</span>
+              </div>
+              <p class="model-desc">${model.description}</p>
+            </div>
+          `).join('')}
+        </div>
+        <p class="model-note">
+          <strong>注意：</strong>首次使用需要下載模型檔案，之後會從快取載入。
+        </p>
+      </div>
+    `;
+    
+    return new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.className = 'dialog-overlay';
+      overlay.innerHTML = `
+        <div class="dialog" style="max-width: 500px;">
+          <div class="dialog-header">
+            <h3>選擇轉譯模型</h3>
+          </div>
+          <div class="dialog-content">
+            ${content}
+          </div>
+          <div class="dialog-footer">
+            <button class="btn btn-secondary" id="cancelBtn">取消</button>
+            <button class="btn btn-primary" id="confirmBtn" disabled>確認</button>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(overlay);
+      
+      // 添加顯示動畫
+      requestAnimationFrame(() => {
+        overlay.classList.add('show');
+      });
+      
+      const closeModal = () => {
+        overlay.classList.remove('show');
+        setTimeout(() => {
+          document.body.removeChild(overlay);
+        }, 300);
+      };
+      
+      let selectedModel = null;
+      const confirmBtn = overlay.querySelector('#confirmBtn');
+      
+      // 綁定模型選擇事件
+      overlay.querySelectorAll('.model-item').forEach(item => {
+        item.addEventListener('click', () => {
+          overlay.querySelectorAll('.model-item').forEach(i => {
+            i.classList.remove('selected');
+          });
+          item.classList.add('selected');
+          selectedModel = item.dataset.model;
+          confirmBtn.disabled = false;
+        });
+      });
+      
+      // 綁定按鈕事件
+      overlay.querySelector('#cancelBtn').addEventListener('click', () => {
+        closeModal();
+        resolve(null);
+      });
+      
+      confirmBtn.addEventListener('click', () => {
+        closeModal();
+        resolve(selectedModel);
+      });
+      
+      // 預設選擇 base 模型
+      const baseModel = overlay.querySelector('[data-model="base"]');
+      if (baseModel) {
+        baseModel.click();
+      }
+    });
+  }
+  
+  /**
    * 估算音訊時長（基於檔案大小）
    */
   estimateAudioDuration(fileSize) {
@@ -466,6 +830,12 @@ export class TranscriptionPreprocessor {
         
         if (progress.current && progress.total) {
           stageEl.textContent = `處理中 (${progress.current}/${progress.total})`;
+        }
+      },
+      updateMessage: (message) => {
+        const stageEl = overlay.querySelector('.progress-stage');
+        if (stageEl) {
+          stageEl.textContent = message;
         }
       },
       close: () => {

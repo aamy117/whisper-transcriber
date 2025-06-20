@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASM 本地轉譯測試</title>
+    
+    <!-- 引入專案樣式 -->
+    <link rel="stylesheet" href="../css/styles.css">
+    <link rel="stylesheet" href="../css/dialog.css">
+    <link rel="stylesheet" href="../css/notification.css">
+    <link rel="stylesheet" href="../css/preprocessing.css">
+    
+    <style>
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .test-section {
+            background: var(--bg-secondary);
+            padding: 2rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+        }
+        
+        .test-header {
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .status-card {
+            background: var(--bg-primary);
+            padding: 1rem;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .status-card h4 {
+            margin: 0 0 0.5rem 0;
+            color: var(--primary-color);
+        }
+        
+        .status-value {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+        
+        .status-ok { color: var(--success-color); }
+        .status-error { color: var(--error-color); }
+        .status-warning { color: var(--warning-color); }
+        
+        .test-controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+        
+        .test-log {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 1rem;
+            height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+        
+        .log-entry {
+            margin-bottom: 0.5rem;
+            padding: 0.25rem;
+        }
+        
+        .log-info { color: var(--text-secondary); }
+        .log-success { color: var(--success-color); }
+        .log-error { color: var(--error-color); }
+        .log-warning { color: var(--warning-color); }
+        
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+        
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+        
+        .model-status {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .model-card {
+            background: var(--bg-primary);
+            padding: 1rem;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            text-align: center;
+        }
+        
+        .model-card.cached {
+            border-color: var(--success-color);
+        }
+        
+        .progress-section {
+            margin-top: 2rem;
+            display: none;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: var(--bg-tertiary);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 1rem;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: var(--primary-color);
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        
+        .result-section {
+            margin-top: 2rem;
+            display: none;
+        }
+        
+        .result-text {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 1rem;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="test-header">
+            <h1>🧪 WASM 本地轉譯測試</h1>
+            <p>測試 WebAssembly 本地轉譯功能的整合</p>
+        </div>
+
+        <!-- 系統狀態 -->
+        <div class="test-section">
+            <h2>系統狀態</h2>
+            <div class="status-grid">
+                <div class="status-card">
+                    <h4>WebAssembly 支援</h4>
+                    <div class="status-value" id="wasmStatus">檢測中...</div>
+                </div>
+                <div class="status-card">
+                    <h4>Web Worker 支援</h4>
+                    <div class="status-value" id="workerStatus">檢測中...</div>
+                </div>
+                <div class="status-card">
+                    <h4>記憶體使用</h4>
+                    <div class="status-value" id="memoryStatus">檢測中...</div>
+                </div>
+                <div class="status-card">
+                    <h4>開發模式</h4>
+                    <div class="status-value" id="devModeStatus">檢測中...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 模型狀態 -->
+        <div class="test-section">
+            <h2>模型狀態</h2>
+            <div class="model-status" id="modelStatus">
+                <div class="model-card" data-model="tiny">
+                    <h4>Tiny</h4>
+                    <div>75MB</div>
+                    <div class="model-cache-status">未快取</div>
+                </div>
+                <div class="model-card" data-model="base">
+                    <h4>Base</h4>
+                    <div>142MB</div>
+                    <div class="model-cache-status">未快取</div>
+                </div>
+                <div class="model-card" data-model="small">
+                    <h4>Small</h4>
+                    <div>466MB</div>
+                    <div class="model-cache-status">未快取</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 測試控制 -->
+        <div class="test-section">
+            <h2>測試功能</h2>
+            <div class="test-controls">
+                <button class="btn btn-primary" onclick="testBasicInit()">測試初始化</button>
+                <button class="btn btn-secondary" onclick="testModelLoading()">測試模型載入</button>
+                <button class="btn btn-secondary" onclick="clearModelCache()">清除模型快取</button>
+                
+                <div class="file-input-wrapper">
+                    <button class="btn btn-primary">選擇音訊檔案測試</button>
+                    <input type="file" id="audioFile" accept="audio/*" onchange="testTranscription(this.files[0])">
+                </div>
+                
+                <button class="btn btn-warning" onclick="clearLog()">清除日誌</button>
+            </div>
+
+            <!-- 進度顯示 -->
+            <div class="progress-section" id="progressSection">
+                <h3>處理進度</h3>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressBar"></div>
+                </div>
+                <div id="progressText">準備中...</div>
+            </div>
+
+            <!-- 結果顯示 -->
+            <div class="result-section" id="resultSection">
+                <h3>轉譯結果</h3>
+                <div class="result-text" id="resultText"></div>
+            </div>
+        </div>
+
+        <!-- 測試日誌 -->
+        <div class="test-section">
+            <h2>測試日誌</h2>
+            <div class="test-log" id="testLog"></div>
+        </div>
+    </div>
+
+    <!-- 引入模組 -->
+    <script type="module">
+        import { WhisperWASMManager } from '../js/wasm/whisper-wasm-manager.js';
+        import { notify } from '../js/notification.js';
+        
+        // 全域變數
+        window.wasmManager = null;
+        window.currentModel = null;
+        
+        // 日誌功能
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('testLog');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        // 檢查系統狀態
+        async function checkSystemStatus() {
+            // WebAssembly 支援
+            const hasWASM = 'WebAssembly' in window;
+            updateStatus('wasmStatus', hasWASM, hasWASM ? '支援' : '不支援');
+            
+            // Web Worker 支援
+            const hasWorker = 'Worker' in window;
+            updateStatus('workerStatus', hasWorker, hasWorker ? '支援' : '不支援');
+            
+            // 記憶體狀態
+            if ('memory' in performance) {
+                const mem = performance.memory;
+                const used = Math.round(mem.usedJSHeapSize / 1024 / 1024);
+                const limit = Math.round(mem.jsHeapSizeLimit / 1024 / 1024);
+                updateStatus('memoryStatus', true, `${used}MB / ${limit}MB`);
+            } else {
+                updateStatus('memoryStatus', false, '無法檢測');
+            }
+            
+            // 開發模式
+            const manager = new WhisperWASMManager();
+            updateStatus('devModeStatus', true, manager.ENABLE_REAL_WASM ? '生產模式' : '開發模式');
+            
+            log('系統狀態檢查完成', 'info');
+        }
+        
+        function updateStatus(id, isOk, text) {
+            const element = document.getElementById(id);
+            element.textContent = text;
+            element.className = `status-value ${isOk ? 'status-ok' : 'status-error'}`;
+        }
+        
+        // 測試基本初始化
+        window.testBasicInit = async function() {
+            try {
+                log('開始測試 WASM 管理器初始化...', 'info');
+                
+                if (!window.wasmManager) {
+                    window.wasmManager = new WhisperWASMManager();
+                }
+                
+                log('檢查 WebAssembly 支援...', 'info');
+                const supported = window.wasmManager.checkWASMSupport();
+                log(`WebAssembly 支援: ${supported}`, supported ? 'success' : 'error');
+                
+                if (!supported) {
+                    throw new Error('瀏覽器不支援 WebAssembly');
+                }
+                
+                log('WASM 管理器初始化成功', 'success');
+                notify.success('初始化測試通過');
+                
+            } catch (error) {
+                log(`初始化失敗: ${error.message}`, 'error');
+                notify.error(`初始化失敗: ${error.message}`);
+            }
+        };
+        
+        // 測試模型載入
+        window.testModelLoading = async function() {
+            try {
+                log('開始測試模型載入...', 'info');
+                
+                if (!window.wasmManager) {
+                    window.wasmManager = new WhisperWASMManager();
+                }
+                
+                // 測試 tiny 模型
+                log('嘗試載入 tiny 模型...', 'info');
+                await window.wasmManager.initialize('tiny');
+                log('Tiny 模型載入成功', 'success');
+                
+                // 更新模型狀態
+                await updateModelStatus();
+                
+                notify.success('模型載入測試通過');
+                
+            } catch (error) {
+                log(`模型載入失敗: ${error.message}`, 'error');
+                notify.error(`模型載入失敗: ${error.message}`);
+            }
+        };
+        
+        // 測試轉譯
+        window.testTranscription = async function(file) {
+            if (!file) return;
+            
+            try {
+                log(`開始測試轉譯檔案: ${file.name}`, 'info');
+                
+                if (!window.wasmManager) {
+                    window.wasmManager = new WhisperWASMManager();
+                }
+                
+                // 確保已初始化
+                if (!window.wasmManager.isInitialized) {
+                    log('初始化 WASM (base 模型)...', 'info');
+                    await window.wasmManager.initialize('base');
+                }
+                
+                // 顯示進度
+                const progressSection = document.getElementById('progressSection');
+                progressSection.style.display = 'block';
+                
+                // 執行轉譯
+                log('開始轉譯...', 'info');
+                const result = await window.wasmManager.transcribe(file, {
+                    onProgress: (progress) => {
+                        updateProgress(progress.percentage, progress.message);
+                    }
+                });
+                
+                // 顯示結果
+                log('轉譯完成', 'success');
+                showResult(result);
+                notify.success('轉譯測試完成');
+                
+            } catch (error) {
+                log(`轉譯失敗: ${error.message}`, 'error');
+                notify.error(`轉譯失敗: ${error.message}`);
+                hideProgress();
+            }
+        };
+        
+        // 更新進度
+        function updateProgress(percentage, message) {
+            document.getElementById('progressBar').style.width = `${percentage}%`;
+            document.getElementById('progressText').textContent = message;
+            log(`進度: ${percentage}% - ${message}`, 'info');
+        }
+        
+        function hideProgress() {
+            document.getElementById('progressSection').style.display = 'none';
+        }
+        
+        // 顯示結果
+        function showResult(result) {
+            const resultSection = document.getElementById('resultSection');
+            const resultText = document.getElementById('resultText');
+            
+            resultSection.style.display = 'block';
+            resultText.textContent = JSON.stringify(result, null, 2);
+            
+            log(`轉譯結果:`, 'success');
+            log(`- 文字長度: ${result.text.length}`, 'info');
+            log(`- 段落數: ${result.segments.length}`, 'info');
+            log(`- 語言: ${result.language}`, 'info');
+            log(`- 持續時間: ${result.duration}秒`, 'info');
+        }
+        
+        // 清除模型快取
+        window.clearModelCache = async function() {
+            try {
+                log('清除模型快取...', 'info');
+                
+                if (!window.wasmManager) {
+                    window.wasmManager = new WhisperWASMManager();
+                }
+                
+                await window.wasmManager.clearCache();
+                log('模型快取已清除', 'success');
+                
+                await updateModelStatus();
+                notify.success('快取清除成功');
+                
+            } catch (error) {
+                log(`清除快取失敗: ${error.message}`, 'error');
+                notify.error(`清除快取失敗: ${error.message}`);
+            }
+        };
+        
+        // 更新模型狀態
+        async function updateModelStatus() {
+            if (!window.wasmManager) {
+                window.wasmManager = new WhisperWASMManager();
+            }
+            
+            const models = ['tiny', 'base', 'small'];
+            for (const model of models) {
+                const isCached = await window.wasmManager.isModelCached(model);
+                const card = document.querySelector(`[data-model="${model}"]`);
+                if (card) {
+                    card.classList.toggle('cached', isCached);
+                    card.querySelector('.model-cache-status').textContent = isCached ? '已快取' : '未快取';
+                }
+            }
+        }
+        
+        // 清除日誌
+        window.clearLog = function() {
+            document.getElementById('testLog').innerHTML = '';
+            log('日誌已清除', 'info');
+        };
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', async () => {
+            log('WASM 測試頁面載入完成', 'info');
+            await checkSystemStatus();
+            await updateModelStatus();
+        });
+    </script>
+</body>
+</html>

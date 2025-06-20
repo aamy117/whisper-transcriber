@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>新轉譯流程測試</title>
+    
+    <!-- 引入專案樣式 -->
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/dialog.css">
+    <link rel="stylesheet" href="css/notification.css">
+    <link rel="stylesheet" href="css/preprocessing.css">
+    
+    <style>
+        .test-container {
+            max-width: 1000px;
+            margin: 2rem auto;
+            padding: 2rem;
+        }
+        
+        .test-header {
+            text-align: center;
+            padding: 2rem;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            margin-bottom: 2rem;
+        }
+        
+        .test-section {
+            background: var(--bg-secondary);
+            padding: 2rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+        
+        .file-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .file-card {
+            background: var(--bg-primary);
+            padding: 1rem;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .file-card:hover {
+            border-color: var(--primary-color);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+        
+        .test-log {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 1rem;
+            height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.85rem;
+            margin-top: 1rem;
+        }
+        
+        .log-entry {
+            padding: 0.25rem 0;
+        }
+        
+        .log-info { color: var(--text-secondary); }
+        .log-success { color: var(--success-color); }
+        .log-error { color: var(--error-color); }
+        .log-warning { color: var(--warning-color); }
+        
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .setting-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .upload-area {
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 3rem;
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+            margin-top: 1rem;
+        }
+        
+        .upload-area:hover {
+            border-color: var(--primary-color);
+            background: var(--bg-tertiary);
+        }
+        
+        .upload-area.dragover {
+            border-color: var(--success-color);
+            background: rgba(34, 197, 94, 0.1);
+        }
+        
+        #fileInput {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="test-header">
+            <h1>🎯 新轉譯流程測試</h1>
+            <p>測試先選擇轉譯方式（本地/API），再處理大檔案的新流程</p>
+        </div>
+
+        <!-- 設定區域 -->
+        <div class="test-section">
+            <h3>測試設定</h3>
+            <div class="settings-grid">
+                <div class="setting-item">
+                    <input type="checkbox" id="enableWASM" checked>
+                    <label for="enableWASM">啟用 WASM 本地轉譯</label>
+                </div>
+                <div class="setting-item">
+                    <input type="checkbox" id="rememberChoice">
+                    <label for="rememberChoice">記住選擇偏好</label>
+                </div>
+                <div class="setting-item">
+                    <button class="btn btn-secondary" onclick="clearPreference()">清除記住的選擇</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 預設檔案測試 -->
+        <div class="test-section">
+            <h3>快速測試（模擬檔案）</h3>
+            <div class="file-grid">
+                <div class="file-card" onclick="testWithSize(5)">
+                    <h4>小檔案測試</h4>
+                    <p>5 MB - 直接 API</p>
+                </div>
+                <div class="file-card" onclick="testWithSize(15)">
+                    <h4>中檔案測試</h4>
+                    <p>15 MB - 直接 API</p>
+                </div>
+                <div class="file-card" onclick="testWithSize(30)">
+                    <h4>大檔案測試</h4>
+                    <p>30 MB - 需要處理</p>
+                </div>
+                <div class="file-card" onclick="testWithSize(100)">
+                    <h4>超大檔案測試</h4>
+                    <p>100 MB - 需要處理</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 自訂檔案上傳 -->
+        <div class="test-section">
+            <h3>自訂檔案測試</h3>
+            <div class="upload-area" id="uploadArea">
+                <p>🎵 拖放音訊檔案到此處</p>
+                <p>或點擊選擇檔案</p>
+                <input type="file" id="fileInput" accept="audio/*">
+            </div>
+        </div>
+
+        <!-- 測試日誌 -->
+        <div class="test-section">
+            <h3>測試日誌</h3>
+            <div class="test-log" id="testLog">
+                <div class="log-entry log-info">[系統] 新轉譯流程測試就緒</div>
+            </div>
+        </div>
+
+        <!-- 通知容器 -->
+        <div id="notification-container"></div>
+    </div>
+
+    <script type="module">
+        import { TranscriptionPreprocessor } from './js/transcription-preprocessor.js';
+        import { notify } from './js/notification.js';
+        
+        let preprocessor = null;
+        
+        // 日誌功能
+        function log(message, type = 'info') {
+            const logEl = document.getElementById('testLog');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            const time = new Date().toLocaleTimeString();
+            entry.textContent = `[${time}] ${message}`;
+            logEl.appendChild(entry);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+        
+        // 初始化
+        function init() {
+            preprocessor = new TranscriptionPreprocessor();
+            
+            // 設定 WASM 狀態
+            const enableWASM = document.getElementById('enableWASM');
+            preprocessor.ENABLE_WASM = enableWASM.checked;
+            
+            enableWASM.addEventListener('change', (e) => {
+                preprocessor.ENABLE_WASM = e.target.checked;
+                log(`WASM 功能 ${e.target.checked ? '已啟用' : '已停用'}`, 'info');
+            });
+            
+            // 綁定檔案上傳
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInput = document.getElementById('fileInput');
+            
+            uploadArea.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', handleFileSelect);
+            
+            // 拖放支援
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
+            
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.classList.remove('dragover');
+            });
+            
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    testWithFile(files[0]);
+                }
+            });
+            
+            log('測試環境初始化完成', 'success');
+        }
+        
+        // 處理檔案選擇
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                testWithFile(file);
+            }
+        }
+        
+        // 模擬檔案測試
+        window.testWithSize = async function(sizeMB) {
+            // 創建模擬檔案
+            const size = sizeMB * 1024 * 1024;
+            const mockFile = new File(['x'.repeat(size)], `test-${sizeMB}MB.mp3`, {
+                type: 'audio/mp3'
+            });
+            
+            await testWithFile(mockFile);
+        };
+        
+        // 測試檔案
+        async function testWithFile(file) {
+            log(`開始測試檔案: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`, 'info');
+            
+            try {
+                // 是否記住選擇
+                const rememberChoice = document.getElementById('rememberChoice').checked;
+                if (rememberChoice) {
+                    log('將記住使用者的選擇', 'info');
+                }
+                
+                // 呼叫預處理器
+                const result = await preprocessor.prepareForTranscription(file);
+                
+                log(`預處理完成！`, 'success');
+                log(`策略: ${result.strategy}`, 'info');
+                
+                if (result.strategy === 'wasm') {
+                    log('選擇了本地轉譯', 'success');
+                    log(`模型: ${result.model || '未指定'}`, 'info');
+                    log('無需上傳檔案，完全本地處理', 'info');
+                } else if (result.strategy === 'direct') {
+                    log('選擇了 API 轉譯 - 直接處理', 'success');
+                    log(`預估費用: $${result.estimatedCost.toFixed(3)} USD`, 'info');
+                } else {
+                    log(`選擇了 API 轉譯 - ${result.strategy} 處理`, 'success');
+                    log(`檔案數量: ${result.files.length}`, 'info');
+                    log(`預估費用: $${result.estimatedCost.toFixed(3)} USD`, 'info');
+                }
+                
+                // 顯示詳細結果
+                log('詳細結果:', 'info');
+                log(JSON.stringify(result, null, 2), 'info');
+                
+            } catch (error) {
+                log(`錯誤: ${error.message}`, 'error');
+                if (error.message.includes('取消')) {
+                    log('使用者取消了操作', 'warning');
+                }
+            }
+        }
+        
+        // 清除記住的選擇
+        window.clearPreference = function() {
+            localStorage.removeItem('preferredTranscriptionMethod');
+            log('已清除記住的轉譯方式偏好', 'success');
+            notify.success('已清除記住的選擇');
+        };
+        
+        // 啟動
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

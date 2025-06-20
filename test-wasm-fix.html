@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASM 修復測試</title>
+    
+    <!-- 引入專案樣式 -->
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/dialog.css">
+    <link rel="stylesheet" href="css/notification.css">
+    <link rel="stylesheet" href="css/preprocessing.css">
+    
+    <style>
+        .test-container {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 2rem;
+        }
+        
+        .test-section {
+            background: var(--bg-secondary);
+            padding: 2rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .upload-btn {
+            display: inline-block;
+            padding: 1rem 2rem;
+            background: var(--primary-color);
+            color: white;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-bottom: 1rem;
+        }
+        
+        .status {
+            padding: 1rem;
+            border-radius: 6px;
+            margin-top: 1rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+        }
+        
+        .error {
+            color: var(--error-color);
+            background: rgba(239, 68, 68, 0.1);
+            border-color: var(--error-color);
+        }
+        
+        .success {
+            color: var(--success-color);
+            background: rgba(34, 197, 94, 0.1);
+            border-color: var(--success-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🔧 WASM 修復測試</h1>
+        <p>測試修復後的 WASM 本地轉譯功能</p>
+        
+        <div class="test-section">
+            <h3>步驟 1：選擇大檔案（> 25MB）</h3>
+            <label class="upload-btn">
+                選擇音訊檔案
+                <input type="file" class="file-input" id="fileInput" accept="audio/*">
+            </label>
+            <div id="fileInfo"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>步驟 2：測試結果</h3>
+            <div id="status"></div>
+        </div>
+        
+        <!-- 通知容器 -->
+        <div id="notification-container"></div>
+    </div>
+
+    <script type="module">
+        import { TranscriptionPreprocessor } from './js/transcription-preprocessor.js';
+        import { notify } from './js/notification.js';
+        
+        const preprocessor = new TranscriptionPreprocessor();
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const status = document.getElementById('status');
+        
+        // 確保 WASM 已啟用
+        preprocessor.ENABLE_WASM = true;
+        
+        function updateStatus(message, type = 'info') {
+            status.className = `status ${type}`;
+            status.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong>: ${message}`;
+        }
+        
+        fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            fileInfo.innerHTML = `
+                <p><strong>檔案名稱：</strong>${file.name}</p>
+                <p><strong>檔案大小：</strong>${(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                <p><strong>檔案類型：</strong>${file.type}</p>
+            `;
+            
+            if (file.size <= 25 * 1024 * 1024) {
+                updateStatus('檔案小於 25MB，請選擇更大的檔案來測試 WASM 功能', 'error');
+                return;
+            }
+            
+            try {
+                updateStatus('開始處理檔案...');
+                
+                // 測試預處理器
+                const result = await preprocessor.prepareForTranscription(file);
+                
+                updateStatus(`預處理完成！策略：${result.strategy}`, 'success');
+                
+                if (result.strategy === 'wasm') {
+                    updateStatus('成功選擇 WASM 本地轉譯！', 'success');
+                    
+                    // 如果有 wasmManager，測試轉譯
+                    if (result.wasmManager) {
+                        updateStatus('開始測試 WASM 轉譯...');
+                        
+                        const transcriptionResult = await result.wasmManager.transcribe(file, {
+                            onProgress: (progress) => {
+                                updateStatus(`轉譯進度：${progress.percentage}% - ${progress.message}`);
+                            }
+                        });
+                        
+                        updateStatus('WASM 轉譯成功！結果：' + JSON.stringify(transcriptionResult).substring(0, 200) + '...', 'success');
+                    }
+                } else {
+                    updateStatus(`選擇了其他策略：${result.strategy}`, 'info');
+                }
+                
+            } catch (error) {
+                console.error('詳細錯誤：', error);
+                updateStatus(`錯誤：${error.message}<br>堆疊：<pre>${error.stack}</pre>`, 'error');
+            }
+        });
+        
+        // 初始化
+        updateStatus('請選擇一個大於 25MB 的音訊檔案進行測試');
+    </script>
+</body>
+</html>

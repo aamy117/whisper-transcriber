@@ -548,6 +548,32 @@ class WhisperApp {
           prompt: '以下是普通話的對話內容。',
           skipSizeCheck: false  // 原始檔案需要檢查大小
         });
+      } else if (preprocessResult.strategy === 'wasm') {
+        // 使用 WASM 本地轉譯
+        this.showTranscriptionStatus('正在使用本地 WebAssembly 進行轉譯...');
+        
+        try {
+          // 使用預處理器返回的 WASM 管理器
+          const wasmManager = preprocessResult.wasmManager;
+          
+          // 執行本地轉譯
+          finalResult = await wasmManager.transcribe(file, {
+            onProgress: (progress) => {
+              this.showTranscriptionStatus(
+                `本地處理中... ${progress.percentage}% - ${progress.message}`,
+                true
+              );
+            }
+          });
+          
+          // 標記為 WASM 處理
+          finalResult.method = 'wasm';
+          finalResult.model = preprocessResult.model;
+          
+        } catch (error) {
+          console.error('WASM 轉譯失敗:', error);
+          throw new Error(`本地轉譯失敗: ${error.message}`);
+        }
       } else {
         // 需要分段或壓縮處理
         this.showTranscriptionStatus(`使用${preprocessResult.strategy}策略處理...`);

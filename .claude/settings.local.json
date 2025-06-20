@@ -9,7 +9,11 @@
       "mcp__project-files__read_multiple_files",
       "mcp__project-files__read_file",
       "mcp__thinking__sequentialthinking",
-      "mcp__project-files__list_directory"
+      "mcp__project-files__list_directory",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git rm:*)",
+      "Bash(ls:*)"
     ],
     "deny": []
   }

@@ -31,7 +31,24 @@ export class AudioSplitter {
       
       // 解碼音訊
       notify.info('正在解碼音訊...');
-      const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+      let audioBuffer;
+      
+      try {
+        // 嘗試解碼音訊
+        audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer.slice(0));
+      } catch (decodeError) {
+        console.error('音訊解碼失敗:', decodeError);
+        
+        // 如果解碼失敗，嘗試其他方法
+        if (decodeError.name === 'EncodingError' || decodeError.message.includes('Unable to decode')) {
+          notify.warning('音訊格式可能不受支援，嘗試轉換格式...');
+          
+          // 嘗試使用替代方法處理
+          return await this.fallbackSplitMethod(file, maxSize, overlap, onProgress);
+        }
+        
+        throw decodeError;
+      }
       
       // 分析音訊並找到分割點
       const splitPoints = await this.findSplitPoints(audioBuffer, file.size, maxSize);
@@ -48,6 +65,12 @@ export class AudioSplitter {
       
     } catch (error) {
       console.error('音訊分割失敗:', error);
+      
+      // 提供更詳細的錯誤訊息
+      if (error.name === 'EncodingError') {
+        throw new Error(`音訊格式不支援: ${file.type || '未知格式'}。請嘗試將檔案轉換為 MP3 或 WAV 格式。`);
+      }
+      
       throw new Error(`音訊分割失敗: ${error.message}`);
     }
   }
@@ -355,6 +378,94 @@ export class AudioSplitter {
     return new Blob([buffer], { type: 'audio/wav' });
   }
   
+  
+  /**
+   * 備用分割方法（當音訊解碼失敗時使用）
+   */
+  async fallbackSplitMethod(file, maxSize, overlap, onProgress) {
+    notify.info('使用備用方法分割音訊...');
+    
+    const fileSize = file.size;
+    const segmentSize = maxSize * 0.9; // 留 10% 緩衝
+    const totalSegments = Math.ceil(fileSize / segmentSize);
+    const segments = [];
+    
+    for (let i = 0; i < totalSegments; i++) {
+      const start = i * segmentSize;
+      const end = Math.min(start + segmentSize, fileSize);
+      
+      // 創建分段檔案
+      const segmentBlob = file.slice(start, end, file.type);
+      const segmentFile = new File([segmentBlob], `segment_${i + 1}_${file.name}`, {
+        type: file.type
+      });
+      
+      segments.push({
+        file: segmentFile,
+        index: i,
+        startTime: null, // 無法確定精確時間
+        endTime: null,
+        startByte: start,
+        endByte: end
+      });
+      
+      // 更新進度
+      if (onProgress) {
+        onProgress({
+          stage: `分割段落 ${i + 1}/${totalSegments}`,
+          percentage: ((i + 1) / totalSegments) * 100,
+          current: i + 1,
+          total: totalSegments
+        });
+      }
+    }
+    
+    notify.warning('由於音訊格式限制，使用了簡單的檔案分割方式。轉譯結果可能需要手動調整時間軸。');
+    
+    return {
+      success: true,
+      segments: segments,
+      originalDuration: null, // 無法確定
+      totalSegments: segments.length,
+      warning: '使用備用分割方法，無法保證精確的時間對齊'
+    };
+  }
+  
+  /**
+   * 嘗試轉換音訊格式
+   */
+  async tryConvertAudio(file) {
+    try {
+      // 創建一個新的 AudioContext 嘗試不同的採樣率
+      const tempContext = new (window.AudioContext || window.webkitAudioContext)({
+        sampleRate: 44100 // 標準採樣率
+      });
+      
+      // 使用 FileReader 讀取檔案
+      const arrayBuffer = await this.readFileAsArrayBuffer(file);
+      
+      // 嘗試使用 createMediaElementSource
+      const audio = new Audio();
+      const objectUrl = URL.createObjectURL(file);
+      audio.src = objectUrl;
+      
+      // 等待 metadata 載入
+      await new Promise((resolve, reject) => {
+        audio.addEventListener('loadedmetadata', resolve);
+        audio.addEventListener('error', reject);
+      });
+      
+      // 清理
+      URL.revokeObjectURL(objectUrl);
+      tempContext.close();
+      
+      return audio.duration;
+      
+    } catch (error) {
+      console.error('音訊轉換失敗:', error);
+      return null;
+    }
+  }
   
   /**
    * 清理資源
