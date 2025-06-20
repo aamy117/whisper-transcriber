@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>大檔案處理診斷</title>
+    
+    <!-- 引入專案樣式 -->
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/dialog.css">
+    <link rel="stylesheet" href="css/notification.css">
+    <link rel="stylesheet" href="css/preprocessing.css">
+    
+    <style>
+        .test-container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 2rem;
+        }
+        
+        .test-header {
+            text-align: center;
+            padding: 2rem;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            margin-bottom: 2rem;
+        }
+        
+        .test-section {
+            background: var(--bg-secondary);
+            padding: 2rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+        
+        .upload-area {
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 3rem;
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+            margin-top: 1rem;
+        }
+        
+        .upload-area:hover {
+            border-color: var(--primary-color);
+            background: var(--bg-tertiary);
+        }
+        
+        .upload-area.dragover {
+            border-color: var(--success-color);
+            background: rgba(34, 197, 94, 0.1);
+        }
+        
+        #fileInput {
+            display: none;
+        }
+        
+        .diagnosis-log {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 1rem;
+            height: 500px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.85rem;
+            margin-top: 1rem;
+        }
+        
+        .log-entry {
+            padding: 0.5rem;
+            border-bottom: 1px solid var(--border-lighter);
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+        }
+        
+        .log-time {
+            color: var(--text-tertiary);
+            min-width: 80px;
+        }
+        
+        .log-level {
+            min-width: 60px;
+            font-weight: 600;
+        }
+        
+        .log-info { color: var(--text-secondary); }
+        .log-success { color: var(--success-color); }
+        .log-error { color: var(--error-color); }
+        .log-warning { color: var(--warning-color); }
+        
+        .log-message {
+            flex: 1;
+            word-break: break-word;
+        }
+        
+        .test-buttons {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .file-info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .info-card {
+            background: var(--bg-tertiary);
+            padding: 1rem;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .info-card h4 {
+            margin: 0 0 0.5rem 0;
+            color: var(--primary-color);
+        }
+        
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.25rem 0;
+        }
+        
+        .info-label {
+            color: var(--text-secondary);
+        }
+        
+        .info-value {
+            font-weight: 500;
+        }
+        
+        .step-indicator {
+            display: flex;
+            gap: 1rem;
+            margin: 1rem 0;
+            padding: 1rem;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+        }
+        
+        .step {
+            flex: 1;
+            text-align: center;
+            padding: 0.5rem;
+            border-radius: 4px;
+            background: var(--bg-primary);
+            border: 2px solid var(--border-color);
+            transition: all 0.3s;
+        }
+        
+        .step.active {
+            border-color: var(--primary-color);
+            background: rgba(37, 99, 235, 0.1);
+        }
+        
+        .step.completed {
+            border-color: var(--success-color);
+            background: rgba(34, 197, 94, 0.1);
+        }
+        
+        .step.failed {
+            border-color: var(--error-color);
+            background: rgba(239, 68, 68, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="test-header">
+            <h1>🔍 大檔案處理診斷工具</h1>
+            <p>詳細診斷大檔案轉譯流程，找出問題所在</p>
+        </div>
+
+        <!-- 檔案上傳 -->
+        <div class="test-section">
+            <h3>上傳測試檔案</h3>
+            <div class="upload-area" id="uploadArea">
+                <p>🎵 拖放您的大音訊檔案到此處</p>
+                <p>或點擊選擇檔案（建議使用超過 25MB 的檔案）</p>
+                <input type="file" id="fileInput" accept="audio/*">
+            </div>
+            
+            <div class="file-info-grid" id="fileInfoGrid" style="display: none;">
+                <div class="info-card">
+                    <h4>檔案資訊</h4>
+                    <div class="info-item">
+                        <span class="info-label">名稱：</span>
+                        <span class="info-value" id="fileName">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">大小：</span>
+                        <span class="info-value" id="fileSize">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">類型：</span>
+                        <span class="info-value" id="fileType">-</span>
+                    </div>
+                </div>
+                <div class="info-card">
+                    <h4>音訊屬性</h4>
+                    <div class="info-item">
+                        <span class="info-label">時長：</span>
+                        <span class="info-value" id="duration">檢測中...</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">可播放：</span>
+                        <span class="info-value" id="playable">檢測中...</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">解碼支援：</span>
+                        <span class="info-value" id="decodable">檢測中...</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="test-buttons">
+                <button class="btn btn-primary" id="testFullFlowBtn" disabled>測試完整流程</button>
+                <button class="btn btn-secondary" id="testSplitOnlyBtn" disabled>只測試分割</button>
+                <button class="btn btn-secondary" id="testCompressOnlyBtn" disabled>只測試壓縮</button>
+                <button class="btn btn-secondary" id="clearLogBtn">清除日誌</button>
+            </div>
+        </div>
+
+        <!-- 流程指示器 -->
+        <div class="test-section" id="stepIndicatorSection" style="display: none;">
+            <h3>處理流程</h3>
+            <div class="step-indicator">
+                <div class="step" id="step1">
+                    <strong>1. 檔案檢查</strong>
+                    <div>檢查檔案大小和格式</div>
+                </div>
+                <div class="step" id="step2">
+                    <strong>2. 選擇方式</strong>
+                    <div>本地或 API 轉譯</div>
+                </div>
+                <div class="step" id="step3">
+                    <strong>3. 處理策略</strong>
+                    <div>分割/壓縮/混合</div>
+                </div>
+                <div class="step" id="step4">
+                    <strong>4. 執行處理</strong>
+                    <div>處理音訊檔案</div>
+                </div>
+                <div class="step" id="step5">
+                    <strong>5. 完成</strong>
+                    <div>返回處理結果</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 診斷日誌 -->
+        <div class="test-section">
+            <h3>診斷日誌</h3>
+            <div class="diagnosis-log" id="diagnosisLog">
+                <div class="log-entry">
+                    <span class="log-time">00:00:00</span>
+                    <span class="log-level log-info">INFO</span>
+                    <span class="log-message">診斷工具就緒，請上傳檔案開始測試</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 通知容器 -->
+        <div id="notification-container"></div>
+    </div>
+
+    <script type="module">
+        import { transcriptionPreprocessor } from './js/transcription-preprocessor.js';
+        import { audioSplitter } from './js/audio-splitter.js';
+        import { audioCompressor } from './js/audio-compressor.js';
+        import { notify } from './js/notification.js';
+        
+        let currentFile = null;
+        let startTime = null;
+        
+        // 日誌功能
+        function log(message, level = 'info') {
+            const logEl = document.getElementById('diagnosisLog');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            
+            const time = new Date().toLocaleTimeString();
+            const elapsed = startTime ? ((Date.now() - startTime) / 1000).toFixed(2) + 's' : '0.00s';
+            
+            entry.innerHTML = `
+                <span class="log-time">${time}</span>
+                <span class="log-level log-${level}">${level.toUpperCase()}</span>
+                <span class="log-message">[${elapsed}] ${message}</span>
+            `;
+            
+            logEl.appendChild(entry);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+        
+        // 更新步驟狀態
+        function updateStep(stepNum, status) {
+            const step = document.getElementById(`step${stepNum}`);
+            if (step) {
+                step.classList.remove('active', 'completed', 'failed');
+                step.classList.add(status);
+            }
+        }
+        
+        // 格式化檔案大小
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        // 格式化時間
+        function formatDuration(seconds) {
+            if (!seconds || isNaN(seconds)) return '無法讀取';
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+        
+        // 初始化
+        function init() {
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInput = document.getElementById('fileInput');
+            
+            // 綁定檔案上傳
+            uploadArea.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', handleFileSelect);
+            
+            // 拖放支援
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
+            
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.classList.remove('dragover');
+            });
+            
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    analyzeFile(files[0]);
+                }
+            });
+            
+            // 測試按鈕
+            document.getElementById('testFullFlowBtn').addEventListener('click', testFullFlow);
+            document.getElementById('testSplitOnlyBtn').addEventListener('click', testSplitOnly);
+            document.getElementById('testCompressOnlyBtn').addEventListener('click', testCompressOnly);
+            document.getElementById('clearLogBtn').addEventListener('click', clearLog);
+            
+            log('診斷工具初始化完成', 'success');
+        }
+        
+        // 處理檔案選擇
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                analyzeFile(file);
+            }
+        }
+        
+        // 分析檔案
+        async function analyzeFile(file) {
+            currentFile = file;
+            startTime = Date.now();
+            
+            log(`開始分析檔案: ${file.name}`, 'info');
+            
+            // 顯示檔案資訊
+            document.getElementById('fileInfoGrid').style.display = 'grid';
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('fileSize').textContent = formatFileSize(file.size);
+            document.getElementById('fileType').textContent = file.type || '未知';
+            
+            // 檢查檔案大小
+            if (file.size > 25 * 1024 * 1024) {
+                log(`檔案大小 ${formatFileSize(file.size)} 超過 25MB 限制`, 'warning');
+            } else {
+                log(`檔案大小 ${formatFileSize(file.size)} 符合限制`, 'success');
+            }
+            
+            // 測試音訊播放
+            const audio = new Audio();
+            const url = URL.createObjectURL(file);
+            let canPlay = false;
+            let duration = null;
+            
+            try {
+                audio.src = url;
+                await new Promise((resolve, reject) => {
+                    audio.addEventListener('loadedmetadata', () => {
+                        canPlay = true;
+                        duration = audio.duration;
+                        resolve();
+                    });
+                    audio.addEventListener('error', reject);
+                    setTimeout(reject, 5000);
+                });
+                
+                document.getElementById('duration').textContent = formatDuration(duration);
+                document.getElementById('playable').textContent = '✓ 可以';
+                document.getElementById('playable').style.color = 'var(--success-color)';
+                log(`音訊可播放，時長: ${formatDuration(duration)}`, 'success');
+                
+            } catch (error) {
+                document.getElementById('duration').textContent = '無法讀取';
+                document.getElementById('playable').textContent = '✗ 不可';
+                document.getElementById('playable').style.color = 'var(--error-color)';
+                log(`音訊無法播放: ${error.message}`, 'error');
+            }
+            
+            URL.revokeObjectURL(url);
+            
+            // 測試 Web Audio API 解碼
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const arrayBuffer = await file.arrayBuffer();
+                await audioContext.decodeAudioData(arrayBuffer.slice(0));
+                
+                document.getElementById('decodable').textContent = '✓ 支援';
+                document.getElementById('decodable').style.color = 'var(--success-color)';
+                log('Web Audio API 可以解碼此檔案', 'success');
+                
+                audioContext.close();
+            } catch (error) {
+                document.getElementById('decodable').textContent = '✗ 不支援';
+                document.getElementById('decodable').style.color = 'var(--error-color)';
+                log(`Web Audio API 解碼失敗: ${error.message}`, 'error');
+            }
+            
+            // 啟用測試按鈕
+            document.getElementById('testFullFlowBtn').disabled = false;
+            document.getElementById('testSplitOnlyBtn').disabled = false;
+            document.getElementById('testCompressOnlyBtn').disabled = false;
+            
+            // 顯示步驟指示器
+            document.getElementById('stepIndicatorSection').style.display = 'block';
+        }
+        
+        // 測試完整流程
+        async function testFullFlow() {
+            if (!currentFile) return;
+            
+            startTime = Date.now();
+            log('=== 開始測試完整轉譯流程 ===', 'info');
+            
+            // 重置步驟狀態
+            for (let i = 1; i <= 5; i++) {
+                updateStep(i, '');
+            }
+            
+            try {
+                // 步驟 1: 檔案檢查
+                updateStep(1, 'active');
+                log('步驟 1: 檢查檔案...', 'info');
+                
+                if (currentFile.size > 25 * 1024 * 1024) {
+                    log(`檔案大小 ${formatFileSize(currentFile.size)} 超過限制，需要處理`, 'warning');
+                } else {
+                    log(`檔案大小 ${formatFileSize(currentFile.size)} 符合限制`, 'success');
+                }
+                updateStep(1, 'completed');
+                
+                // 步驟 2: 模擬選擇轉譯方式
+                updateStep(2, 'active');
+                log('步驟 2: 顯示轉譯方式選擇...', 'info');
+                
+                // 攔截對話框顯示
+                const originalShowMethod = transcriptionPreprocessor.showTranscriptionMethodChoice;
+                transcriptionPreprocessor.showTranscriptionMethodChoice = async (file) => {
+                    log('顯示轉譯方式選擇對話框（模擬選擇 API）', 'info');
+                    return 'api'; // 模擬選擇 API
+                };
+                
+                // 攔截處理選項對話框
+                const originalShowOptions = transcriptionPreprocessor.showProcessingOptions;
+                transcriptionPreprocessor.showProcessingOptions = async (fileInfo) => {
+                    log(`顯示處理選項對話框，檔案超出 ${fileInfo.exceedBy} MB`, 'info');
+                    log('模擬選擇：分割策略', 'info');
+                    return 'split'; // 模擬選擇分割
+                };
+                
+                updateStep(2, 'completed');
+                
+                // 步驟 3-5: 執行預處理
+                updateStep(3, 'active');
+                log('步驟 3: 準備轉譯...', 'info');
+                
+                const result = await transcriptionPreprocessor.prepareForTranscription(currentFile);
+                
+                log(`預處理完成！策略: ${result.strategy}`, 'success');
+                log(`處理後檔案數: ${result.files ? result.files.length : 1}`, 'info');
+                
+                if (result.segments) {
+                    log('分段資訊:', 'info');
+                    result.segments.forEach((seg, i) => {
+                        log(`  段落 ${i + 1}: ${formatFileSize(seg.size)}, ${formatDuration(seg.duration)}`, 'info');
+                    });
+                }
+                
+                if (result.estimatedCost) {
+                    log(`預估費用: $${result.estimatedCost.toFixed(3)} USD`, 'info');
+                }
+                
+                updateStep(3, 'completed');
+                updateStep(4, 'completed');
+                updateStep(5, 'completed');
+                
+                log('=== 測試完成，流程正常 ===', 'success');
+                notify.success('完整流程測試成功！');
+                
+                // 恢復原始方法
+                transcriptionPreprocessor.showTranscriptionMethodChoice = originalShowMethod;
+                transcriptionPreprocessor.showProcessingOptions = originalShowOptions;
+                
+            } catch (error) {
+                log(`錯誤: ${error.message}`, 'error');
+                log(`堆疊: ${error.stack}`, 'error');
+                
+                // 標記失敗的步驟
+                for (let i = 1; i <= 5; i++) {
+                    const step = document.getElementById(`step${i}`);
+                    if (step && step.classList.contains('active')) {
+                        updateStep(i, 'failed');
+                    }
+                }
+                
+                notify.error(`測試失敗: ${error.message}`);
+            }
+        }
+        
+        // 只測試分割
+        async function testSplitOnly() {
+            if (!currentFile) return;
+            
+            startTime = Date.now();
+            log('=== 開始測試音訊分割 ===', 'info');
+            
+            try {
+                const result = await audioSplitter.splitAudioFile(currentFile, {
+                    maxSize: 20 * 1024 * 1024,
+                    overlap: 5,
+                    onProgress: (progress) => {
+                        log(`分割進度: ${progress.percentage}%`, 'info');
+                    }
+                });
+                
+                log(`分割完成！總段數: ${result.segments.length}`, 'success');
+                
+                result.segments.forEach((seg, i) => {
+                    log(`段落 ${i + 1}: ${formatFileSize(seg.size)}, ${formatDuration(seg.duration)}`, 'info');
+                });
+                
+                if (result.warning) {
+                    log(`警告: ${result.warning}`, 'warning');
+                }
+                
+                notify.success('音訊分割測試成功！');
+                
+            } catch (error) {
+                log(`分割失敗: ${error.message}`, 'error');
+                notify.error(`分割失敗: ${error.message}`);
+            } finally {
+                audioSplitter.cleanup();
+            }
+        }
+        
+        // 只測試壓縮
+        async function testCompressOnly() {
+            if (!currentFile) return;
+            
+            startTime = Date.now();
+            log('=== 開始測試音訊壓縮 ===', 'info');
+            
+            try {
+                const result = await audioCompressor.compressAudioFile(currentFile, {
+                    targetSize: 25 * 1024 * 1024,
+                    profile: 'auto',
+                    onProgress: (progress) => {
+                        log(`壓縮進度: ${progress.percentage}%`, 'info');
+                    }
+                });
+                
+                log(`壓縮完成！`, 'success');
+                log(`原始大小: ${formatFileSize(currentFile.size)}`, 'info');
+                log(`壓縮後大小: ${formatFileSize(result.compressedSize)}`, 'info');
+                log(`壓縮率: ${(result.compressionRatio * 100).toFixed(1)}%`, 'info');
+                
+                if (result.warning) {
+                    log(`警告: ${result.warning}`, 'warning');
+                }
+                
+                notify.success('音訊壓縮測試成功！');
+                
+            } catch (error) {
+                log(`壓縮失敗: ${error.message}`, 'error');
+                notify.error(`壓縮失敗: ${error.message}`);
+            } finally {
+                audioCompressor.cleanup();
+            }
+        }
+        
+        // 清除日誌
+        function clearLog() {
+            const logEl = document.getElementById('diagnosisLog');
+            logEl.innerHTML = `
+                <div class="log-entry">
+                    <span class="log-time">${new Date().toLocaleTimeString()}</span>
+                    <span class="log-level log-info">INFO</span>
+                    <span class="log-message">日誌已清除</span>
+                </div>
+            `;
+        }
+        
+        // 啟動
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

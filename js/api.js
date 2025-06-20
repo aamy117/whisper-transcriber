@@ -1,5 +1,6 @@
 // Whisper API 模組
 import Config from './config.js';
+import { textConverter } from './utils/text-converter.js';
 
 class WhisperAPI {
   constructor() {
@@ -157,18 +158,25 @@ class WhisperAPI {
     };
     
     // 處理段落：確保每個段落都有必要的欄位
-    result.segments = result.segments.map((segment, index) => ({
-      id: segment.id || index,
-      seek: segment.seek || 0,
-      start: segment.start || 0,
-      end: segment.end || 0,
-      text: segment.text || '',
-      tokens: segment.tokens || [],
-      temperature: segment.temperature || 0,
-      avg_logprob: segment.avg_logprob || 0,
-      compression_ratio: segment.compression_ratio || 0,
-      no_speech_prob: segment.no_speech_prob || 0
-    }));
+    result.segments = result.segments.map((segment, index) => {
+      // 處理文字：簡轉繁、生成無標點版本
+      const processedText = textConverter.simplifiedToTraditional(segment.text || '');
+      const textWithoutPunctuation = textConverter.removePunctuation(processedText);
+      
+      return {
+        id: segment.id || index,
+        seek: segment.seek || 0,
+        start: segment.start || 0,
+        end: segment.end || 0,
+        text: processedText, // 繁體中文（含標點）
+        textWithoutPunctuation: textWithoutPunctuation, // 繁體中文（無標點）
+        tokens: segment.tokens || [],
+        temperature: segment.temperature || 0,
+        avg_logprob: segment.avg_logprob || 0,
+        compression_ratio: segment.compression_ratio || 0,
+        no_speech_prob: segment.no_speech_prob || 0
+      };
+    });
     
     return result;
   }

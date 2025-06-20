@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>真實 WASM 轉譯示範</title>
+    
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/notification.css">
+    
+    <style>
+        .demo-container {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 2rem;
+        }
+        
+        .demo-header {
+            text-align: center;
+            padding: 2rem;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            margin-bottom: 2rem;
+        }
+        
+        .demo-section {
+            background: var(--bg-secondary);
+            padding: 2rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+        
+        .upload-area {
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 3rem;
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+            margin: 1rem 0;
+        }
+        
+        .upload-area:hover {
+            border-color: var(--primary-color);
+            background: var(--bg-tertiary);
+        }
+        
+        .upload-area.dragover {
+            border-color: var(--success-color);
+            background: rgba(34, 197, 94, 0.1);
+        }
+        
+        #fileInput {
+            display: none;
+        }
+        
+        .status-box {
+            background: var(--bg-tertiary);
+            padding: 1.5rem;
+            border-radius: 6px;
+            margin: 1rem 0;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: var(--bg-primary);
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 1rem 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: var(--primary-color);
+            width: 0%;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 500;
+        }
+        
+        .result-box {
+            background: var(--bg-tertiary);
+            padding: 1.5rem;
+            border-radius: 6px;
+            margin: 1rem 0;
+            display: none;
+        }
+        
+        .result-text {
+            white-space: pre-wrap;
+            font-family: inherit;
+            line-height: 1.6;
+        }
+        
+        .model-selector {
+            margin: 1rem 0;
+        }
+        
+        .model-options {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-top: 0.5rem;
+        }
+        
+        .model-option {
+            padding: 1rem;
+            border: 2px solid var(--border-color);
+            border-radius: 6px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s;
+        }
+        
+        .model-option:hover {
+            border-color: var(--primary-color);
+            background: var(--bg-tertiary);
+        }
+        
+        .model-option.selected {
+            border-color: var(--primary-color);
+            background: rgba(37, 99, 235, 0.1);
+        }
+        
+        .model-size {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+        
+        .warning-box {
+            background: rgba(251, 191, 36, 0.1);
+            border: 1px solid rgba(251, 191, 36, 0.3);
+            border-radius: 6px;
+            padding: 1rem;
+            margin: 1rem 0;
+            color: var(--warning-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-container">
+        <div class="demo-header">
+            <h1>🎙️ 真實 WASM 轉譯示範</h1>
+            <p>使用 OpenAI Whisper 的開源實現進行本地語音識別</p>
+        </div>
+
+        <div class="warning-box">
+            <strong>⚠️ 注意：</strong>真實的 Whisper WASM 需要下載大型模型檔案（39MB-244MB），
+            首次載入可能需要較長時間。此示範使用替代方案展示概念。
+        </div>
+
+        <!-- 模型選擇 -->
+        <div class="demo-section">
+            <h3>選擇模型</h3>
+            <div class="model-options">
+                <div class="model-option selected" data-model="tiny">
+                    <strong>Tiny</strong>
+                    <div class="model-size">39 MB</div>
+                    <div>最快速度</div>
+                </div>
+                <div class="model-option" data-model="base">
+                    <strong>Base</strong>
+                    <div class="model-size">74 MB</div>
+                    <div>平衡選擇</div>
+                </div>
+                <div class="model-option" data-model="small">
+                    <strong>Small</strong>
+                    <div class="model-size">244 MB</div>
+                    <div>最佳品質</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 檔案上傳 -->
+        <div class="demo-section">
+            <h3>上傳音訊檔案</h3>
+            <div class="upload-area" id="uploadArea">
+                <p>🎵 拖放音訊檔案到此處</p>
+                <p>或點擊選擇檔案</p>
+                <input type="file" id="fileInput" accept="audio/*">
+            </div>
+            
+            <button class="btn btn-primary" id="transcribeBtn" style="display: none;">
+                開始轉譯
+            </button>
+        </div>
+
+        <!-- 狀態顯示 -->
+        <div class="demo-section" id="statusSection" style="display: none;">
+            <h3>處理狀態</h3>
+            <div class="status-box">
+                <div id="statusText">準備中...</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressBar">0%</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 結果顯示 -->
+        <div class="demo-section">
+            <h3>轉譯結果</h3>
+            <div class="result-box" id="resultBox">
+                <div class="result-text" id="resultText"></div>
+            </div>
+        </div>
+
+        <!-- 實現說明 -->
+        <div class="demo-section">
+            <h3>📖 實現說明</h3>
+            <p>真實的 Whisper WASM 實現需要：</p>
+            <ol>
+                <li><strong>whisper.cpp WASM 版本</strong> - C++ 實現的 WebAssembly 編譯版</li>
+                <li><strong>GGML 模型檔案</strong> - 量化後的模型權重</li>
+                <li><strong>音訊預處理</strong> - 轉換為 16kHz 單聲道 PCM</li>
+                <li><strong>Web Worker</strong> - 避免阻塞主執行緒</li>
+            </ol>
+            
+            <h4>可用的實現方案：</h4>
+            <ul>
+                <li><a href="https://github.com/ggerganov/whisper.cpp" target="_blank">whisper.cpp</a> - 原始 C++ 實現</li>
+                <li><a href="https://github.com/xenova/whisper-web" target="_blank">whisper-web</a> - 瀏覽器優化版</li>
+                <li><a href="https://huggingface.co/spaces/Xenova/whisper-web" target="_blank">HuggingFace 線上示範</a></li>
+            </ul>
+        </div>
+
+        <!-- 通知容器 -->
+        <div id="notification-container"></div>
+    </div>
+
+    <script type="module">
+        import { notify } from './js/notification.js';
+        
+        let currentFile = null;
+        let selectedModel = 'tiny';
+        
+        // 模擬的轉譯實現（展示概念）
+        class WhisperWASMDemo {
+            async initialize(model) {
+                notify.info(`正在載入 ${model} 模型...`);
+                
+                // 模擬載入時間
+                await this.simulateProgress('載入模型', 3000);
+                
+                notify.success('模型載入完成！');
+            }
+            
+            async transcribe(audioFile) {
+                const steps = [
+                    { name: '讀取音訊檔案', duration: 1000 },
+                    { name: '轉換音訊格式', duration: 1500 },
+                    { name: '執行語音識別', duration: 5000 },
+                    { name: '後處理結果', duration: 500 }
+                ];
+                
+                let totalProgress = 0;
+                const totalDuration = steps.reduce((sum, step) => sum + step.duration, 0);
+                
+                for (const step of steps) {
+                    await this.simulateProgress(step.name, step.duration, totalProgress / totalDuration);
+                    totalProgress += step.duration;
+                }
+                
+                // 生成示範結果
+                return {
+                    text: this.generateDemoText(),
+                    segments: this.generateDemoSegments(),
+                    language: 'zh',
+                    duration: 60
+                };
+            }
+            
+            async simulateProgress(message, duration, startProgress = 0) {
+                const statusEl = document.getElementById('statusText');
+                const progressBar = document.getElementById('progressBar');
+                const steps = 20;
+                const stepDuration = duration / steps;
+                
+                for (let i = 0; i <= steps; i++) {
+                    const progress = startProgress + (i / steps) * (1 - startProgress);
+                    const percentage = Math.round(progress * 100);
+                    
+                    statusEl.textContent = `${message}... ${percentage}%`;
+                    progressBar.style.width = percentage + '%';
+                    progressBar.textContent = percentage + '%';
+                    
+                    await new Promise(resolve => setTimeout(resolve, stepDuration));
+                }
+            }
+            
+            generateDemoText() {
+                return `這是一個真實 WASM 轉譯的示範實現。
+
+在實際應用中，這裡會顯示您音訊檔案的真實轉譯結果。
+Whisper 模型能夠識別多種語言，包括中文、英文、日文等。
+
+轉譯的準確度取決於：
+1. 選擇的模型大小（tiny、base、small）
+2. 音訊的品質和清晰度
+3. 背景噪音的程度
+
+使用本地 WASM 的優點是：
+- 完全離線運行，保護隱私
+- 無需 API 費用
+- 不受網路限制
+
+缺點是：
+- 需要下載模型檔案
+- 處理速度較 API 慢
+- 佔用較多記憶體`;
+            }
+            
+            generateDemoSegments() {
+                const segments = [
+                    { start: 0, end: 5, text: "這是一個真實 WASM 轉譯的示範實現。" },
+                    { start: 5, end: 10, text: "在實際應用中，這裡會顯示您音訊檔案的真實轉譯結果。" },
+                    { start: 10, end: 15, text: "Whisper 模型能夠識別多種語言，包括中文、英文、日文等。" }
+                ];
+                return segments;
+            }
+        }
+        
+        const whisperDemo = new WhisperWASMDemo();
+        
+        // 初始化
+        function init() {
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInput = document.getElementById('fileInput');
+            
+            // 模型選擇
+            document.querySelectorAll('.model-option').forEach(option => {
+                option.addEventListener('click', () => {
+                    document.querySelectorAll('.model-option').forEach(o => o.classList.remove('selected'));
+                    option.classList.add('selected');
+                    selectedModel = option.dataset.model;
+                });
+            });
+            
+            // 檔案上傳
+            uploadArea.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', handleFileSelect);
+            
+            // 拖放
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
+            
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.classList.remove('dragover');
+            });
+            
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+                if (e.dataTransfer.files[0]) {
+                    handleFile(e.dataTransfer.files[0]);
+                }
+            });
+            
+            // 轉譯按鈕
+            document.getElementById('transcribeBtn').addEventListener('click', startTranscription);
+        }
+        
+        function handleFileSelect(event) {
+            if (event.target.files[0]) {
+                handleFile(event.target.files[0]);
+            }
+        }
+        
+        function handleFile(file) {
+            currentFile = file;
+            document.getElementById('transcribeBtn').style.display = 'block';
+            notify.success(`已選擇檔案: ${file.name}`);
+        }
+        
+        async function startTranscription() {
+            if (!currentFile) return;
+            
+            const statusSection = document.getElementById('statusSection');
+            const resultBox = document.getElementById('resultBox');
+            const resultText = document.getElementById('resultText');
+            const transcribeBtn = document.getElementById('transcribeBtn');
+            
+            try {
+                // 顯示狀態
+                statusSection.style.display = 'block';
+                resultBox.style.display = 'none';
+                transcribeBtn.disabled = true;
+                
+                // 初始化模型
+                await whisperDemo.initialize(selectedModel);
+                
+                // 執行轉譯
+                const result = await whisperDemo.transcribe(currentFile);
+                
+                // 顯示結果
+                resultText.textContent = result.text;
+                resultBox.style.display = 'block';
+                
+                notify.success('轉譯完成！');
+                
+            } catch (error) {
+                notify.error(`轉譯失敗: ${error.message}`);
+            } finally {
+                transcribeBtn.disabled = false;
+                statusSection.style.display = 'none';
+            }
+        }
+        
+        // 啟動
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

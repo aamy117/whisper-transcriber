@@ -11,6 +11,7 @@ export class TranscriptionEditor {
     this.autoSaveTimer = null;
     this.searchTerm = '';
     this.isEditable = true;
+    this.showPunctuation = true; // 預設顯示標點符號
     
     // 編輯歷史（用於復原功能）
     this.editHistory = [];
@@ -46,6 +47,10 @@ export class TranscriptionEditor {
     this.segments = transcription.segments.map((seg, index) => ({
       ...seg,
       id: seg.id || index,
+      // 保存原始文字（含標點）和無標點版本
+      originalText: seg.text, // 原始文字（含標點）
+      textWithPunctuation: seg.text,
+      textWithoutPunctuation: seg.textWithoutPunctuation || this.removePunctuation(seg.text),
       edited: seg.edited !== undefined ? seg.edited : seg.text,
       isEdited: seg.isEdited || false,
       isHighlighted: false
@@ -107,7 +112,14 @@ export class TranscriptionEditor {
     const textEl = document.createElement('div');
     textEl.className = 'segment-text';
     textEl.contentEditable = this.isEditable;
-    textEl.textContent = segment.edited || segment.text;
+    
+    // 根據標點符號顯示設定選擇文字
+    let displayText = segment.edited || segment.text;
+    if (!this.showPunctuation && !segment.isEdited) {
+      // 如果隱藏標點且未編輯，顯示無標點版本
+      displayText = segment.textWithoutPunctuation || this.removePunctuation(displayText);
+    }
+    textEl.textContent = displayText;
     
     // 操作按鈕
     const actionsEl = document.createElement('div');
@@ -685,6 +697,25 @@ export class TranscriptionEditor {
     this.container.querySelectorAll('.segment-text').forEach(el => {
       el.contentEditable = editable;
     });
+  }
+  
+  // 移除標點符號
+  removePunctuation(text) {
+    if (!text) return text;
+    
+    // 定義要移除的標點符號（中英文）
+    const punctuationRegex = /[，。！？；：、,\.!?;:'"'"（）\[\]{}【】]/g;
+    
+    // 移除標點符號，但保留空格
+    return text.replace(punctuationRegex, ' ').replace(/\s+/g, ' ').trim();
+  }
+  
+  // 設定標點符號顯示
+  setShowPunctuation(show) {
+    this.showPunctuation = show;
+    
+    // 重新渲染所有段落
+    this.render();
   }
   
   // 清除內容

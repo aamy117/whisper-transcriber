@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文字轉換測試</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+        .input-output {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 15px 0;
+        }
+        .box {
+            padding: 15px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .box h3 {
+            margin-top: 0;
+            color: #666;
+        }
+        .text-display {
+            font-size: 16px;
+            line-height: 1.6;
+            min-height: 50px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        textarea {
+            width: 100%;
+            min-height: 100px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            font-family: inherit;
+        }
+        .test-case {
+            margin: 10px 0;
+            padding: 10px;
+            background: #e8f5e9;
+            border-radius: 4px;
+        }
+        .fail {
+            background: #ffebee;
+        }
+        .options {
+            margin: 15px 0;
+        }
+        label {
+            margin-right: 15px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔤 文字轉換測試</h1>
+        
+        <!-- 手動測試 -->
+        <div class="test-section">
+            <h2>手動測試</h2>
+            <textarea id="inputText" placeholder="輸入簡體中文或帶標點的文字...">
+这是一个测试句子，包含简体字和标点符号！请转换为繁体字。
+电脑、软件、网络、应用程序等词汇都需要转换。
+</textarea>
+            
+            <div class="options">
+                <label>
+                    <input type="checkbox" id="convertTraditional" checked> 簡轉繁
+                </label>
+                <label>
+                    <input type="checkbox" id="removePunctuation" checked> 移除標點
+                </label>
+            </div>
+            
+            <button onclick="testConversion()">轉換</button>
+            
+            <div class="input-output">
+                <div class="box">
+                    <h3>原始文字</h3>
+                    <div class="text-display" id="originalText"></div>
+                </div>
+                <div class="box">
+                    <h3>轉換結果</h3>
+                    <div class="text-display" id="convertedText"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 自動測試 -->
+        <div class="test-section">
+            <h2>自動測試案例</h2>
+            <button onclick="runAllTests()">執行所有測試</button>
+            <div id="testResults"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { textConverter } from './js/utils/text-converter.js';
+        
+        // 測試案例
+        const testCases = [
+            {
+                name: '基本簡繁轉換',
+                input: '这是简体中文',
+                expected: '這是簡體中文',
+                options: { removePunctuation: false }
+            },
+            {
+                name: '移除標點符號',
+                input: '你好，世界！這是測試。',
+                expected: '你好 世界 這是測試',
+                options: { convertToTraditional: false, removePunctuation: true }
+            },
+            {
+                name: '簡繁轉換 + 移除標點',
+                input: '这是测试，包含标点符号！',
+                expected: '這是測試 包含標點符號',
+                options: { convertToTraditional: true, removePunctuation: true }
+            },
+            {
+                name: '電腦相關詞彙',
+                input: '电脑软件网络应用程序数据库',
+                expected: '電腦軟件網絡應用程序數據庫',
+                options: { removePunctuation: false }
+            },
+            {
+                name: '常用字轉換',
+                input: '爱国会这对开关门时个来为发说',
+                expected: '愛國會這對開關門時個來為發說',
+                options: { removePunctuation: false }
+            },
+            {
+                name: '混合標點處理',
+                input: '中文標點，。！？和English punctuation, . ! ?',
+                expected: '中文標點 和English punctuation',
+                options: { removePunctuation: true }
+            }
+        ];
+        
+        // 手動測試函數
+        window.testConversion = function() {
+            const input = document.getElementById('inputText').value;
+            const convertTraditional = document.getElementById('convertTraditional').checked;
+            const removePunctuation = document.getElementById('removePunctuation').checked;
+            
+            const options = {
+                convertToTraditional: convertTraditional,
+                removePunctuation: removePunctuation
+            };
+            
+            const result = textConverter.processTranscriptionText(input, options);
+            
+            document.getElementById('originalText').textContent = input;
+            document.getElementById('convertedText').textContent = result;
+        };
+        
+        // 執行所有測試
+        window.runAllTests = function() {
+            const resultsDiv = document.getElementById('testResults');
+            resultsDiv.innerHTML = '';
+            
+            let passCount = 0;
+            let failCount = 0;
+            
+            testCases.forEach((testCase, index) => {
+                const result = textConverter.processTranscriptionText(testCase.input, testCase.options);
+                const passed = result === testCase.expected;
+                
+                if (passed) passCount++;
+                else failCount++;
+                
+                const caseDiv = document.createElement('div');
+                caseDiv.className = `test-case ${passed ? '' : 'fail'}`;
+                caseDiv.innerHTML = `
+                    <strong>測試 ${index + 1}: ${testCase.name}</strong><br>
+                    輸入: ${testCase.input}<br>
+                    預期: ${testCase.expected}<br>
+                    實際: ${result}<br>
+                    結果: ${passed ? '✅ 通過' : '❌ 失敗'}
+                `;
+                resultsDiv.appendChild(caseDiv);
+            });
+            
+            // 總結
+            const summaryDiv = document.createElement('div');
+            summaryDiv.style.marginTop = '20px';
+            summaryDiv.style.fontWeight = 'bold';
+            summaryDiv.innerHTML = `
+                測試總結: 通過 ${passCount} / ${testCases.length} 個測試
+                ${failCount > 0 ? `<br>失敗: ${failCount} 個` : ''}
+            `;
+            resultsDiv.appendChild(summaryDiv);
+        };
+        
+        // 初始化顯示
+        window.addEventListener('DOMContentLoaded', () => {
+            // 顯示初始範例
+            const input = document.getElementById('inputText').value;
+            document.getElementById('originalText').textContent = input;
+        });
+    </script>
+</body>
+</html>

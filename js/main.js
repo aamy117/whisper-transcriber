@@ -16,6 +16,7 @@ class WhisperApp {
     this.whisperAPI = null;
     this.editor = null;
     this.isTranscribing = false;
+    this.showPunctuation = true; // 預設顯示標點符號
     
     this.init();
   }
@@ -142,6 +143,14 @@ class WhisperApp {
     helpCloseBtn.addEventListener('click', () => {
       this.hideModal(helpModal);
     });
+    
+    // 標點符號切換按鈕
+    const punctuationToggleBtn = document.getElementById('punctuationToggleBtn');
+    if (punctuationToggleBtn) {
+      punctuationToggleBtn.addEventListener('click', () => {
+        this.togglePunctuation();
+      });
+    }
     
     // 匯出按鈕
     const exportBtn = document.getElementById('exportBtn');
@@ -381,6 +390,19 @@ class WhisperApp {
     if (autoSaveCheck) {
       autoSaveCheck.checked = autoSave;
     }
+    
+    // 載入標點符號顯示設定
+    const savedShowPunctuation = localStorage.getItem(Config.storage.prefix + 'showPunctuation');
+    this.showPunctuation = savedShowPunctuation === null ? true : savedShowPunctuation === 'true';
+    
+    // 更新標點符號按鈕狀態
+    const punctuationBtn = document.getElementById('punctuationToggleBtn');
+    if (punctuationBtn) {
+      if (!this.showPunctuation) {
+        punctuationBtn.classList.add('punctuation-hidden');
+        punctuationBtn.title = '標點符號已隱藏';
+      }
+    }
   }
   
   saveSettings() {
@@ -440,6 +462,38 @@ class WhisperApp {
     if (themeSelect) {
       themeSelect.value = newTheme;
     }
+  }
+  
+  // 切換標點符號顯示
+  togglePunctuation() {
+    this.showPunctuation = !this.showPunctuation;
+    
+    // 更新按鈕狀態
+    const btn = document.getElementById('punctuationToggleBtn');
+    const icon = document.getElementById('punctuationIcon');
+    
+    if (btn) {
+      if (this.showPunctuation) {
+        btn.classList.remove('punctuation-hidden');
+        btn.title = '切換標點符號顯示';
+        if (icon) icon.textContent = '。';
+      } else {
+        btn.classList.add('punctuation-hidden');
+        btn.title = '標點符號已隱藏';
+        if (icon) icon.textContent = '。';
+      }
+    }
+    
+    // 儲存偏好設定
+    localStorage.setItem(Config.storage.prefix + 'showPunctuation', this.showPunctuation);
+    
+    // 更新編輯器顯示
+    if (this.editor) {
+      this.editor.setShowPunctuation(this.showPunctuation);
+    }
+    
+    // 顯示通知
+    notify.info(this.showPunctuation ? '顯示標點符號' : '隱藏標點符號');
   }
   
   // API Key 檢查

@@ -703,6 +703,20 @@ body {
   border-color: var(--border-hover);
 }
 
+/* 標點符號切換按鈕樣式 */
+.toolbar-btn.punctuation-hidden {
+  background-color: var(--bg-tertiary);
+  opacity: 0.6;
+}
+
+.toolbar-btn.punctuation-hidden .icon {
+  text-decoration: line-through;
+}
+
+.toolbar-btn.punctuation-hidden:hover {
+  opacity: 0.8;
+}
+
 .editor-content {
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);

@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>簡單 WASM 測試</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .upload-area:hover {
+            border-color: #666;
+            background: #fafafa;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        .result {
+            background: #e8f5e9;
+            border: 1px solid #4caf50;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 20px;
+            display: none;
+        }
+        .error {
+            color: #d32f2f;
+        }
+        .success {
+            color: #388e3c;
+        }
+        .info {
+            color: #1976d2;
+        }
+        #fileInput {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 簡單 WASM 轉譯測試</h1>
+        
+        <div class="upload-area" id="uploadArea">
+            <p>點擊或拖放音訊檔案到此處</p>
+            <input type="file" id="fileInput" accept="audio/*">
+        </div>
+        
+        <div style="text-align: center;">
+            <button id="transcribeBtn" disabled>開始轉譯</button>
+            <button id="clearBtn">清除日誌</button>
+        </div>
+        
+        <div class="result" id="result">
+            <h3>轉譯結果：</h3>
+            <div id="resultText"></div>
+        </div>
+        
+        <div class="log" id="log">
+            <div class="info">系統就緒，等待檔案...</div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { WhisperTransformers } from './js/wasm/whisper-transformers.js';
+        
+        let currentFile = null;
+        let whisperModel = null;
+        
+        // 日誌功能
+        function log(message, type = 'info') {
+            const logEl = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = type;
+            entry.textContent = `[${time}] ${message}`;
+            logEl.appendChild(entry);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+        
+        // 清除日誌
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            document.getElementById('log').innerHTML = '<div class="info">日誌已清除</div>';
+        });
+        
+        // 檔案上傳
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        
+        uploadArea.addEventListener('click', () => fileInput.click());
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#666';
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.style.borderColor = '#ccc';
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#ccc';
+            if (e.dataTransfer.files[0]) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files[0]) {
+                handleFile(e.target.files[0]);
+            }
+        });
+        
+        function handleFile(file) {
+            currentFile = file;
+            log(`已選擇檔案: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`, 'success');
+            document.getElementById('transcribeBtn').disabled = false;
+        }
+        
+        // 初始化模型
+        async function initializeModel() {
+            try {
+                log('開始初始化 Whisper 模型...');
+                
+                whisperModel = new WhisperTransformers();
+                
+                // 設定進度回調
+                whisperModel.setProgressCallback((progress) => {
+                    log(progress.message || `進度: ${progress.progress}%`);
+                });
+                
+                await whisperModel.initialize('tiny');
+                
+                log('模型初始化完成！', 'success');
+                return true;
+                
+            } catch (error) {
+                log(`初始化失敗: ${error.message}`, 'error');
+                return false;
+            }
+        }
+        
+        // 轉譯功能
+        document.getElementById('transcribeBtn').addEventListener('click', async () => {
+            if (!currentFile) return;
+            
+            const btn = document.getElementById('transcribeBtn');
+            const resultEl = document.getElementById('result');
+            const resultText = document.getElementById('resultText');
+            
+            btn.disabled = true;
+            btn.textContent = '處理中...';
+            resultEl.style.display = 'none';
+            
+            try {
+                // 初始化模型（如果還沒初始化）
+                if (!whisperModel) {
+                    const initialized = await initializeModel();
+                    if (!initialized) {
+                        throw new Error('模型初始化失敗');
+                    }
+                }
+                
+                log('開始轉譯音訊...');
+                
+                // 執行轉譯
+                const result = await whisperModel.transcribe(currentFile, {
+                    language: 'zh-TW' // 使用繁體中文
+                });
+                
+                // 顯示結果
+                if (result.text) {
+                    resultText.textContent = result.text;
+                    resultEl.style.display = 'block';
+                    log('轉譯完成！', 'success');
+                    
+                    if (result.segments && result.segments.length > 0) {
+                        log(`共識別出 ${result.segments.length} 個段落`);
+                    }
+                } else {
+                    throw new Error('無轉譯結果');
+                }
+                
+            } catch (error) {
+                log(`轉譯失敗: ${error.message}`, 'error');
+                console.error('轉譯錯誤:', error);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '開始轉譯';
+            }
+        });
+        
+        // 頁面載入完成
+        log('頁面載入完成，可以開始使用');
+    </script>
+</body>
+</html>

@@ -3,6 +3,8 @@
  * 管理 WebAssembly 模組的載入、初始化和轉譯功能
  */
 
+import { WhisperTransformers } from './whisper-transformers.js';
+
 class WhisperWASMManager {
   constructor() {
     this.isInitialized = false;
@@ -35,8 +37,11 @@ class WhisperWASMManager {
       }
     };
 
-    // 功能開關（開發階段）
-    this.ENABLE_REAL_WASM = false; // 初期使用模擬模式
+    // 功能開關
+    this.ENABLE_REAL_WASM = true; // 預設啟用真實 WASM
+    
+    // 真實 WASM 實現
+    this.realWASM = null;
   }
 
   /**
@@ -46,6 +51,35 @@ class WhisperWASMManager {
   async initialize(modelName = 'base') {
     if (this.isInitialized && this.currentModel === modelName) {
       return; // 已經初始化相同模型
+    }
+    
+    // 如果啟用真實 WASM，使用 Transformers.js
+    if (this.ENABLE_REAL_WASM) {
+      try {
+        console.log('初始化真實 WASM (Transformers.js)...');
+        
+        if (!this.realWASM) {
+          this.realWASM = new WhisperTransformers();
+          
+          // 設定進度回調
+          this.realWASM.setProgressCallback((progress) => {
+            console.log('WASM 進度:', progress);
+            // 可以轉發給 UI
+          });
+        }
+        
+        await this.realWASM.initialize(modelName);
+        this.isInitialized = true;
+        this.currentModel = modelName;
+        
+        console.log('真實 WASM 初始化完成');
+        return;
+        
+      } catch (error) {
+        console.error('真實 WASM 初始化失敗:', error);
+        // 可以選擇回退到模擬模式
+        this.ENABLE_REAL_WASM = false;
+      }
     }
 
     try {
@@ -173,6 +207,19 @@ class WhisperWASMManager {
    * 使用 WASM 進行轉譯（真實實作）
    */
   async transcribeWithWASM(audioFile, options) {
+    // 如果使用真實 WASM，直接調用 WhisperTransformers
+    if (this.realWASM) {
+      try {
+        console.log('使用 Transformers.js 進行轉譯...');
+        const result = await this.realWASM.transcribe(audioFile, options);
+        return result;
+      } catch (error) {
+        console.error('Transformers.js 轉譯失敗:', error);
+        throw error;
+      }
+    }
+    
+    // 否則使用 Worker 方式
     return new Promise((resolve, reject) => {
       // 建立 Web Worker
       // 使用動態路徑，根據當前頁面位置調整
@@ -181,15 +228,25 @@ class WhisperWASMManager {
 
       // 準備音訊資料
       this.prepareAudioData(audioFile).then(audioData => {
-        this.worker.postMessage({
+        // 不傳遞函數，只傳遞可序列化的資料
+        const messageData = {
           command: 'transcribe',
           audioData: audioData,
           options: {
             language: options.language || 'auto',
-            task: options.task || 'transcribe',
-            ...options
+            task: options.task || 'transcribe'
+            // 移除所有函數類型的選項
+          }
+        };
+        
+        // 過濾掉函數類型的屬性
+        Object.keys(options).forEach(key => {
+          if (typeof options[key] !== 'function') {
+            messageData.options[key] = options[key];
           }
         });
+        
+        this.worker.postMessage(messageData);
       }).catch(reject);
 
       // 監聽 Worker 訊息
@@ -198,8 +255,11 @@ class WhisperWASMManager {
 
         switch (type) {
           case 'progress':
-            if (options.onProgress) {
-              options.onProgress(data);
+            // 使用事件發送進度，而不是回調函數
+            if (window.dispatchEvent) {
+              window.dispatchEvent(new CustomEvent('whisper-progress', {
+                detail: data
+              }));
             }
             break;
 
@@ -256,9 +316,9 @@ class WhisperWASMManager {
         if (currentStep >= totalSteps) {
           clearInterval(timer);
           
-          // 返回模擬結果
+          // 返回模擬結果（繁體中文、無標點）
           resolve({
-            text: `[開發模式] 這是 ${audioFile.name} 的模擬轉譯結果。\n音訊長度：${Math.round(duration)}秒\n使用模型：${this.currentModel}\n處理時間：${Math.round(processingTime / 1000)}秒`,
+            text: `[開發模式] 這是 ${audioFile.name} 的模擬轉譯結果 音訊長度 ${Math.round(duration)}秒 使用模型 ${this.currentModel} 處理時間 ${Math.round(processingTime / 1000)}秒`,
             segments: [
               {
                 id: 0,
@@ -267,7 +327,7 @@ class WhisperWASMManager {
                 text: `[開發模式] 模擬轉譯段落`
               }
             ],
-            language: 'zh',
+            language: 'zh-TW',
             duration: duration,
             method: 'local-wasm-simulated'
           });
