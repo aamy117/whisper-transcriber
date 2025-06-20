@@ -86,3 +86,7 @@ coverage/
 *.swp
 *.swo
 *~
+
+# Documentation files
+*.md
+CLAUDE.md
