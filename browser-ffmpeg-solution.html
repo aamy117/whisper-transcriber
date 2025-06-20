@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>瀏覽器內 FFmpeg 音訊轉換器</title>
+    
+    <!-- 引入專案樣式 -->
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/notification.css">
+    <link rel="stylesheet" href="css/dialog.css">
+    
+    <style>
+        .converter-container {
+            max-width: 900px;
+            margin: 2rem auto;
+            padding: 2rem;
+        }
+        
+        .converter-header {
+            text-align: center;
+            padding: 2rem;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            margin-bottom: 2rem;
+        }
+        
+        .info-banner {
+            background: rgba(37, 99, 235, 0.1);
+            border: 1px solid var(--primary-color);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .converter-section {
+            background: var(--bg-secondary);
+            padding: 2rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+        
+        .upload-area {
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 3rem;
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+            margin: 1rem 0;
+        }
+        
+        .upload-area:hover {
+            border-color: var(--primary-color);
+            background: var(--bg-tertiary);
+        }
+        
+        .upload-area.dragover {
+            border-color: var(--success-color);
+            background: rgba(34, 197, 94, 0.1);
+        }
+        
+        #fileInput {
+            display: none;
+        }
+        
+        .file-info {
+            display: none;
+            background: var(--bg-tertiary);
+            padding: 1rem;
+            border-radius: 6px;
+            margin: 1rem 0;
+        }
+        
+        .conversion-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        
+        .option-group {
+            padding: 1rem;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+        }
+        
+        .option-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+        
+        .option-group select,
+        .option-group input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+        
+        .progress-section {
+            display: none;
+            margin: 2rem 0;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: var(--bg-tertiary);
+            border-radius: 15px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: var(--primary-color);
+            width: 0%;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 500;
+        }
+        
+        .logs {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 1rem;
+            height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.85rem;
+            margin-top: 1rem;
+            display: none;
+        }
+        
+        .result-section {
+            display: none;
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid var(--success-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-top: 2rem;
+        }
+        
+        .result-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .loading-message {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+        }
+        
+        .loader {
+            display: inline-block;
+            width: 50px;
+            height: 50px;
+            border: 3px solid var(--border-color);
+            border-radius: 50%;
+            border-top-color: var(--primary-color);
+            animation: spin 1s ease-in-out infinite;
+            margin: 1rem auto;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .external-links {
+            background: var(--bg-tertiary);
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-top: 2rem;
+        }
+        
+        .link-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .link-card {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 1rem;
+            text-decoration: none;
+            color: var(--text-primary);
+            transition: all 0.3s;
+        }
+        
+        .link-card:hover {
+            border-color: var(--primary-color);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+        
+        .link-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        
+        .link-desc {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <div class="converter-container">
+        <div class="converter-header">
+            <h1>🌐 瀏覽器內 FFmpeg 音訊轉換器</h1>
+            <p>使用 WebAssembly 技術，無需安裝軟體，直接在瀏覽器轉換音訊</p>
+        </div>
+
+        <div class="info-banner">
+            <h3>ℹ️ 關於 FFmpeg.wasm</h3>
+            <p>FFmpeg.wasm 是 FFmpeg 的 WebAssembly 移植版本，可以直接在瀏覽器中執行音視訊處理。所有處理都在您的電腦本地完成，檔案不會上傳到任何伺服器，確保隱私安全。</p>
+        </div>
+
+        <!-- 內建轉換器 -->
+        <div class="converter-section">
+            <h3>內建音訊轉換器（實驗性功能）</h3>
+            
+            <div class="loading-message" id="loadingMessage">
+                <div class="loader"></div>
+                <p>正在載入 FFmpeg.wasm...</p>
+                <p style="font-size: 0.85rem; color: var(--text-tertiary);">首次載入需要下載約 20MB 的檔案</p>
+            </div>
+            
+            <div id="converterInterface" style="display: none;">
+                <div class="upload-area" id="uploadArea">
+                    <p>🎵 拖放音訊檔案到此處</p>
+                    <p>或點擊選擇檔案</p>
+                    <input type="file" id="fileInput" accept="audio/*">
+                </div>
+                
+                <div class="file-info" id="fileInfo">
+                    <strong>檔案：</strong><span id="fileName"></span><br>
+                    <strong>大小：</strong><span id="fileSize"></span><br>
+                    <strong>類型：</strong><span id="fileType"></span>
+                </div>
+                
+                <div class="conversion-options" id="conversionOptions" style="display: none;">
+                    <div class="option-group">
+                        <label for="outputFormat">輸出格式</label>
+                        <select id="outputFormat">
+                            <option value="mp3">MP3 (標準格式)</option>
+                            <option value="wav">WAV (無損)</option>
+                            <option value="aac">AAC (M4A)</option>
+                            <option value="ogg">OGG Vorbis</option>
+                            <option value="flac">FLAC (無損)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="option-group">
+                        <label for="sampleRate">取樣率</label>
+                        <select id="sampleRate">
+                            <option value="44100">44.1 kHz (標準)</option>
+                            <option value="48000">48 kHz</option>
+                            <option value="22050">22.05 kHz</option>
+                            <option value="16000">16 kHz (語音)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="option-group">
+                        <label for="bitrate">位元率 (kbps)</label>
+                        <select id="bitrate">
+                            <option value="128">128 kbps (標準)</option>
+                            <option value="192">192 kbps</option>
+                            <option value="256">256 kbps</option>
+                            <option value="320">320 kbps (高品質)</option>
+                            <option value="64">64 kbps (低)</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div style="text-align: center; margin: 1rem 0;">
+                    <button class="btn btn-primary" id="convertBtn" style="display: none;">開始轉換</button>
+                </div>
+                
+                <div class="progress-section" id="progressSection">
+                    <h4>轉換進度</h4>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill">0%</div>
+                    </div>
+                    <div class="logs" id="logs"></div>
+                </div>
+                
+                <div class="result-section" id="resultSection">
+                    <h4>✅ 轉換完成！</h4>
+                    <p>檔案名稱：<span id="resultFileName"></span></p>
+                    <p>檔案大小：<span id="resultFileSize"></span></p>
+                    <div class="result-actions">
+                        <button class="btn btn-primary" id="downloadBtn">下載檔案</button>
+                        <button class="btn btn-secondary" id="newConversionBtn">轉換新檔案</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 外部工具連結 -->
+        <div class="converter-section">
+            <h3>🔗 推薦的線上 FFmpeg 工具</h3>
+            <div class="external-links">
+                <p>如果內建轉換器無法使用，您可以嘗試以下線上工具：</p>
+                <div class="link-grid">
+                    <a href="https://ffmpegwasm.netlify.app/" target="_blank" class="link-card">
+                        <div class="link-title">FFmpeg.wasm 官方示範</div>
+                        <div class="link-desc">官方提供的線上轉換工具，支援多種格式</div>
+                    </a>
+                    
+                    <a href="https://ffmpeg-wasm.147180.com/" target="_blank" class="link-card">
+                        <div class="link-title">FFmpeg Online Converter</div>
+                        <div class="link-desc">簡單易用的線上轉換器，支援 MP3 轉 WAV 等</div>
+                    </a>
+                    
+                    <a href="https://github.com/Dinoosauro/ffmpeg-web" target="_blank" class="link-card">
+                        <div class="link-title">FFmpeg-Web UI</div>
+                        <div class="link-desc">功能完整的 FFmpeg 網頁介面，支援音訊和視訊</div>
+                    </a>
+                    
+                    <a href="https://matan-h.com/private-convert" target="_blank" class="link-card">
+                        <div class="link-title">Private Converter</div>
+                        <div class="link-desc">注重隱私的轉換器，所有處理都在本地完成</div>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 使用說明 -->
+        <div class="converter-section">
+            <h3>📖 使用說明</h3>
+            <ol>
+                <li><strong>選擇檔案</strong> - 點擊上傳區域或拖放您的錄音筆 MP3 檔案</li>
+                <li><strong>設定參數</strong> - 選擇輸出格式、取樣率和位元率</li>
+                <li><strong>開始轉換</strong> - 點擊「開始轉換」按鈕</li>
+                <li><strong>下載結果</strong> - 轉換完成後下載處理好的檔案</li>
+            </ol>
+            
+            <h4>💡 建議設定</h4>
+            <ul>
+                <li>格式：MP3（相容性最好）或 WAV（品質最好）</li>
+                <li>取樣率：44.1 kHz（標準）</li>
+                <li>位元率：128 kbps 以上（MP3）</li>
+            </ul>
+            
+            <h4>⚠️ 注意事項</h4>
+            <ul>
+                <li>首次使用需要下載 FFmpeg.wasm（約 20MB）</li>
+                <li>大檔案處理可能需要較長時間</li>
+                <li>所有處理都在您的瀏覽器本地完成，檔案不會上傳</li>
+                <li>建議使用 Chrome、Firefox 或 Edge 瀏覽器</li>
+            </ul>
+        </div>
+
+        <!-- 通知容器 -->
+        <div id="notification-container"></div>
+    </div>
+
+    <!-- FFmpeg.wasm 腳本 -->
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+    <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
+    
+    <script type="module">
+        import { notify } from './js/notification.js';
+        
+        // FFmpeg 實例
+        let ffmpeg = null;
+        let currentFile = null;
+        let outputBlob = null;
+        
+        // 初始化 FFmpeg
+        async function initFFmpeg() {
+            try {
+                const { FFmpeg } = FFmpegWASM;
+                const { fetchFile } = FFmpegUtil;
+                
+                ffmpeg = new FFmpeg();
+                
+                // 設定日誌回調
+                ffmpeg.on('log', ({ message }) => {
+                    console.log(message);
+                    addLog(message);
+                });
+                
+                // 設定進度回調
+                ffmpeg.on('progress', ({ progress }) => {
+                    updateProgress(Math.round(progress * 100));
+                });
+                
+                // 載入 FFmpeg
+                await ffmpeg.load({
+                    coreURL: "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js",
+                    wasmURL: "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm",
+                });
+                
+                // 顯示轉換介面
+                document.getElementById('loadingMessage').style.display = 'none';
+                document.getElementById('converterInterface').style.display = 'block';
+                
+                notify.success('FFmpeg.wasm 載入成功！');
+                
+            } catch (error) {
+                console.error('FFmpeg 初始化失敗:', error);
+                notify.error('FFmpeg 載入失敗，請嘗試使用外部工具');
+                document.getElementById('loadingMessage').innerHTML = `
+                    <p style="color: var(--error-color);">❌ FFmpeg.wasm 載入失敗</p>
+                    <p>請嘗試使用下方的外部工具連結</p>
+                    <p style="font-size: 0.85rem; color: var(--text-tertiary);">錯誤：${error.message}</p>
+                `;
+            }
+        }
+        
+        // 格式化檔案大小
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        // 添加日誌
+        function addLog(message) {
+            const logs = document.getElementById('logs');
+            const logEntry = document.createElement('div');
+            logEntry.textContent = message;
+            logs.appendChild(logEntry);
+            logs.scrollTop = logs.scrollHeight;
+        }
+        
+        // 更新進度
+        function updateProgress(percentage) {
+            const progressFill = document.getElementById('progressFill');
+            progressFill.style.width = percentage + '%';
+            progressFill.textContent = percentage + '%';
+        }
+        
+        // 處理檔案選擇
+        function handleFileSelect(file) {
+            currentFile = file;
+            
+            // 顯示檔案資訊
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('fileSize').textContent = formatFileSize(file.size);
+            document.getElementById('fileType').textContent = file.type || '未知';
+            document.getElementById('fileInfo').style.display = 'block';
+            
+            // 顯示轉換選項
+            document.getElementById('conversionOptions').style.display = 'grid';
+            document.getElementById('convertBtn').style.display = 'inline-block';
+            
+            // 隱藏結果區域
+            document.getElementById('resultSection').style.display = 'none';
+        }
+        
+        // 執行轉換
+        async function convertFile() {
+            if (!currentFile || !ffmpeg) return;
+            
+            try {
+                // 獲取設定
+                const format = document.getElementById('outputFormat').value;
+                const sampleRate = document.getElementById('sampleRate').value;
+                const bitrate = document.getElementById('bitrate').value;
+                
+                // 顯示進度區域
+                document.getElementById('progressSection').style.display = 'block';
+                document.getElementById('logs').style.display = 'block';
+                document.getElementById('logs').innerHTML = '';
+                document.getElementById('convertBtn').disabled = true;
+                
+                notify.info('開始轉換...');
+                
+                // 寫入輸入檔案
+                const { fetchFile } = FFmpegUtil;
+                const inputData = await fetchFile(currentFile);
+                await ffmpeg.writeFile('input', inputData);
+                
+                // 設定輸出檔名
+                const outputName = `output.${format}`;
+                
+                // 構建 FFmpeg 命令
+                let command = ['-i', 'input'];
+                
+                // 音訊參數
+                command.push('-ar', sampleRate);
+                
+                if (format === 'mp3') {
+                    command.push('-acodec', 'mp3', '-ab', bitrate + 'k');
+                } else if (format === 'wav') {
+                    command.push('-acodec', 'pcm_s16le');
+                } else if (format === 'aac') {
+                    command.push('-acodec', 'aac', '-ab', bitrate + 'k');
+                    outputName = 'output.m4a';
+                } else if (format === 'ogg') {
+                    command.push('-acodec', 'libvorbis', '-ab', bitrate + 'k');
+                } else if (format === 'flac') {
+                    command.push('-acodec', 'flac');
+                }
+                
+                command.push(outputName);
+                
+                // 執行轉換
+                await ffmpeg.exec(command);
+                
+                // 讀取輸出檔案
+                const data = await ffmpeg.readFile(outputName);
+                outputBlob = new Blob([data], { type: `audio/${format}` });
+                
+                // 顯示結果
+                const originalName = currentFile.name.replace(/\.[^/.]+$/, '');
+                const resultFileName = `${originalName}_converted.${format === 'aac' ? 'm4a' : format}`;
+                
+                document.getElementById('resultFileName').textContent = resultFileName;
+                document.getElementById('resultFileSize').textContent = formatFileSize(outputBlob.size);
+                document.getElementById('resultSection').style.display = 'block';
+                
+                // 設定下載
+                document.getElementById('downloadBtn').onclick = () => {
+                    const url = URL.createObjectURL(outputBlob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = resultFileName;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                };
+                
+                notify.success('轉換完成！');
+                
+            } catch (error) {
+                console.error('轉換失敗:', error);
+                notify.error(`轉換失敗：${error.message}`);
+            } finally {
+                document.getElementById('convertBtn').disabled = false;
+            }
+        }
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            // 初始化 FFmpeg
+            initFFmpeg();
+            
+            // 綁定上傳事件
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInput = document.getElementById('fileInput');
+            
+            uploadArea.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files[0]) {
+                    handleFileSelect(e.target.files[0]);
+                }
+            });
+            
+            // 拖放支援
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
+            
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.classList.remove('dragover');
+            });
+            
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+                if (e.dataTransfer.files[0]) {
+                    handleFileSelect(e.dataTransfer.files[0]);
+                }
+            });
+            
+            // 綁定轉換按鈕
+            document.getElementById('convertBtn').addEventListener('click', convertFile);
+            
+            // 新轉換按鈕
+            document.getElementById('newConversionBtn').addEventListener('click', () => {
+                currentFile = null;
+                outputBlob = null;
+                document.getElementById('fileInfo').style.display = 'none';
+                document.getElementById('conversionOptions').style.display = 'none';
+                document.getElementById('convertBtn').style.display = 'none';
+                document.getElementById('progressSection').style.display = 'none';
+                document.getElementById('resultSection').style.display = 'none';
+                fileInput.value = '';
+            });
+        });
+    </script>
+</body>
+</html>

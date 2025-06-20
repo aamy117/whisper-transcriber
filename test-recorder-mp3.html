@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>錄音筆 MP3 診斷工具</title>
+    
+    <!-- 引入專案樣式 -->
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/notification.css">
+    
+    <style>
+        .test-container {
+            max-width: 1000px;
+            margin: 2rem auto;
+            padding: 2rem;
+        }
+        
+        .test-header {
+            text-align: center;
+            padding: 2rem;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            margin-bottom: 2rem;
+        }
+        
+        .test-section {
+            background: var(--bg-secondary);
+            padding: 2rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+        
+        .upload-area {
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 3rem;
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+            margin-top: 1rem;
+        }
+        
+        .upload-area:hover {
+            border-color: var(--primary-color);
+            background: var(--bg-tertiary);
+        }
+        
+        .upload-area.dragover {
+            border-color: var(--success-color);
+            background: rgba(34, 197, 94, 0.1);
+        }
+        
+        #fileInput {
+            display: none;
+        }
+        
+        .diagnostic-results {
+            display: none;
+            margin-top: 2rem;
+        }
+        
+        .result-card {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .result-card h4 {
+            margin-top: 0;
+            color: var(--primary-color);
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: 200px 1fr;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+        
+        .info-label {
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+        
+        .info-value {
+            font-family: monospace;
+            color: var(--text-primary);
+        }
+        
+        .status-pass {
+            color: var(--success-color);
+        }
+        
+        .status-fail {
+            color: var(--error-color);
+        }
+        
+        .status-warning {
+            color: var(--warning-color);
+        }
+        
+        .test-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem;
+            background: var(--bg-primary);
+            border-radius: 4px;
+            margin-bottom: 0.5rem;
+        }
+        
+        .test-name {
+            font-weight: 500;
+        }
+        
+        .test-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .solutions {
+            background: rgba(37, 99, 235, 0.1);
+            border: 1px solid var(--primary-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-top: 1rem;
+        }
+        
+        .solutions h4 {
+            margin-top: 0;
+            color: var(--primary-color);
+        }
+        
+        .solution-list {
+            margin-left: 1.5rem;
+        }
+        
+        .solution-list li {
+            margin-bottom: 0.5rem;
+        }
+        
+        .common-issues {
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-top: 1rem;
+        }
+        
+        .issue-item {
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .issue-item:last-child {
+            margin-bottom: 0;
+            border-bottom: none;
+        }
+        
+        .issue-title {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+        
+        .issue-desc {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+        
+        .code-block {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 1rem;
+            font-family: monospace;
+            font-size: 0.85rem;
+            overflow-x: auto;
+            margin-top: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="test-header">
+            <h1>🎙️ 錄音筆 MP3 診斷工具</h1>
+            <p>專門診斷錄音筆產生的 MP3 檔案問題</p>
+        </div>
+
+        <!-- 常見錄音筆問題 -->
+        <div class="test-section">
+            <h3>常見錄音筆 MP3 問題</h3>
+            <div class="common-issues">
+                <div class="issue-item">
+                    <div class="issue-title">1. 特殊取樣率</div>
+                    <div class="issue-desc">
+                        錄音筆可能使用 8kHz、11.025kHz、22.05kHz 等非標準取樣率，
+                        某些瀏覽器可能無法正確解碼。
+                    </div>
+                </div>
+                <div class="issue-item">
+                    <div class="issue-title">2. 低位元率編碼</div>
+                    <div class="issue-desc">
+                        為節省空間，錄音筆常用 32kbps、48kbps 等極低位元率，
+                        可能導致解碼器無法識別。
+                    </div>
+                </div>
+                <div class="issue-item">
+                    <div class="issue-title">3. 單聲道格式</div>
+                    <div class="issue-desc">
+                        錄音筆通常錄製單聲道音訊，某些處理器預期立體聲輸入。
+                    </div>
+                </div>
+                <div class="issue-item">
+                    <div class="issue-title">4. VBR 編碼問題</div>
+                    <div class="issue-desc">
+                        變動位元率（VBR）編碼可能導致時長計算錯誤或解碼失敗。
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 檔案上傳 -->
+        <div class="test-section">
+            <h3>上傳錄音筆 MP3 檔案</h3>
+            <div class="upload-area" id="uploadArea">
+                <p>🎵 拖放您的錄音筆 MP3 檔案到此處</p>
+                <p>或點擊選擇檔案</p>
+                <input type="file" id="fileInput" accept=".mp3,audio/mp3,audio/mpeg">
+            </div>
+        </div>
+
+        <!-- 診斷結果 -->
+        <div class="diagnostic-results" id="diagnosticResults">
+            <!-- 基本資訊 -->
+            <div class="result-card">
+                <h4>📋 檔案基本資訊</h4>
+                <div class="info-grid" id="basicInfo">
+                    <span class="info-label">檔案名稱：</span>
+                    <span class="info-value" id="fileName">-</span>
+                    <span class="info-label">檔案大小：</span>
+                    <span class="info-value" id="fileSize">-</span>
+                    <span class="info-label">MIME 類型：</span>
+                    <span class="info-value" id="mimeType">-</span>
+                    <span class="info-label">最後修改：</span>
+                    <span class="info-value" id="lastModified">-</span>
+                </div>
+            </div>
+
+            <!-- 音訊屬性 -->
+            <div class="result-card">
+                <h4>🎵 音訊屬性分析</h4>
+                <div class="info-grid" id="audioInfo">
+                    <span class="info-label">時長：</span>
+                    <span class="info-value" id="duration">檢測中...</span>
+                    <span class="info-label">取樣率：</span>
+                    <span class="info-value" id="sampleRate">檢測中...</span>
+                    <span class="info-label">聲道數：</span>
+                    <span class="info-value" id="channels">檢測中...</span>
+                    <span class="info-label">位元率：</span>
+                    <span class="info-value" id="bitrate">檢測中...</span>
+                </div>
+            </div>
+
+            <!-- 相容性測試 -->
+            <div class="result-card">
+                <h4>🔍 相容性測試</h4>
+                <div id="compatTests">
+                    <div class="test-item">
+                        <span class="test-name">HTML Audio 元素載入</span>
+                        <span class="test-status" id="audioElementTest">
+                            <span class="spinner"></span>
+                        </span>
+                    </div>
+                    <div class="test-item">
+                        <span class="test-name">Web Audio API 解碼</span>
+                        <span class="test-status" id="webAudioTest">
+                            <span class="spinner"></span>
+                        </span>
+                    </div>
+                    <div class="test-item">
+                        <span class="test-name">MediaSource API 支援</span>
+                        <span class="test-status" id="mediaSourceTest">
+                            <span class="spinner"></span>
+                        </span>
+                    </div>
+                    <div class="test-item">
+                        <span class="test-name">檔案頭驗證</span>
+                        <span class="test-status" id="headerTest">
+                            <span class="spinner"></span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 解決方案 -->
+            <div class="solutions" id="solutionsSection" style="display: none;">
+                <h4>💡 建議解決方案</h4>
+                <ol class="solution-list" id="solutionList">
+                </ol>
+            </div>
+        </div>
+
+        <!-- 通知容器 -->
+        <div id="notification-container"></div>
+    </div>
+
+    <script type="module">
+        import { notify } from './js/notification.js';
+        
+        let currentFile = null;
+        
+        // 格式化檔案大小
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        // 格式化時間
+        function formatDuration(seconds) {
+            if (!seconds || isNaN(seconds)) return '無法讀取';
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+        
+        // 初始化
+        function init() {
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInput = document.getElementById('fileInput');
+            
+            // 綁定檔案上傳
+            uploadArea.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', handleFileSelect);
+            
+            // 拖放支援
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
+            
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.classList.remove('dragover');
+            });
+            
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files.length > 0 && files[0].type.includes('mp3') || files[0].type.includes('mpeg')) {
+                    diagnoseFile(files[0]);
+                } else {
+                    notify.error('請上傳 MP3 檔案');
+                }
+            });
+        }
+        
+        // 處理檔案選擇
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                diagnoseFile(file);
+            }
+        }
+        
+        // 診斷檔案
+        async function diagnoseFile(file) {
+            currentFile = file;
+            notify.info(`開始診斷: ${file.name}`);
+            
+            // 顯示結果區域
+            document.getElementById('diagnosticResults').style.display = 'block';
+            
+            // 基本資訊
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('fileSize').textContent = formatFileSize(file.size);
+            document.getElementById('mimeType').textContent = file.type || 'application/octet-stream';
+            document.getElementById('lastModified').textContent = new Date(file.lastModified).toLocaleString();
+            
+            // 重置測試狀態
+            resetTestStatus();
+            
+            // 執行各項測試
+            const results = {
+                audioElement: await testAudioElement(file),
+                webAudio: await testWebAudio(file),
+                mediaSource: testMediaSource(),
+                header: await testFileHeader(file)
+            };
+            
+            // 顯示解決方案
+            showSolutions(results);
+        }
+        
+        // 重置測試狀態
+        function resetTestStatus() {
+            const tests = ['audioElementTest', 'webAudioTest', 'mediaSourceTest', 'headerTest'];
+            tests.forEach(testId => {
+                document.getElementById(testId).innerHTML = '<span class="spinner"></span>';
+            });
+        }
+        
+        // 測試 HTML Audio 元素
+        async function testAudioElement(file) {
+            const testId = 'audioElementTest';
+            const audio = new Audio();
+            const url = URL.createObjectURL(file);
+            
+            try {
+                audio.src = url;
+                
+                const result = await new Promise((resolve) => {
+                    let timeout;
+                    
+                    audio.addEventListener('loadedmetadata', () => {
+                        clearTimeout(timeout);
+                        
+                        // 更新音訊資訊
+                        document.getElementById('duration').textContent = formatDuration(audio.duration);
+                        
+                        // 估算位元率
+                        const bitrate = Math.round((file.size * 8) / audio.duration / 1000);
+                        document.getElementById('bitrate').textContent = `~${bitrate} kbps`;
+                        
+                        updateTestStatus(testId, 'pass', '✓ 成功');
+                        resolve({
+                            success: true,
+                            duration: audio.duration,
+                            bitrate: bitrate
+                        });
+                    });
+                    
+                    audio.addEventListener('error', (e) => {
+                        clearTimeout(timeout);
+                        updateTestStatus(testId, 'fail', `✗ 失敗: ${getAudioErrorMessage(audio.error)}`);
+                        resolve({
+                            success: false,
+                            error: audio.error
+                        });
+                    });
+                    
+                    timeout = setTimeout(() => {
+                        updateTestStatus(testId, 'fail', '✗ 超時');
+                        resolve({
+                            success: false,
+                            error: 'timeout'
+                        });
+                    }, 5000);
+                });
+                
+                URL.revokeObjectURL(url);
+                return result;
+                
+            } catch (error) {
+                updateTestStatus(testId, 'fail', `✗ 錯誤: ${error.message}`);
+                URL.revokeObjectURL(url);
+                return { success: false, error: error };
+            }
+        }
+        
+        // 測試 Web Audio API
+        async function testWebAudio(file) {
+            const testId = 'webAudioTest';
+            
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const arrayBuffer = await file.arrayBuffer();
+                
+                try {
+                    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
+                    
+                    // 更新音訊資訊
+                    document.getElementById('sampleRate').textContent = `${audioBuffer.sampleRate} Hz`;
+                    document.getElementById('channels').textContent = audioBuffer.numberOfChannels === 1 ? '單聲道' : '立體聲';
+                    
+                    updateTestStatus(testId, 'pass', '✓ 成功');
+                    audioContext.close();
+                    
+                    return {
+                        success: true,
+                        sampleRate: audioBuffer.sampleRate,
+                        channels: audioBuffer.numberOfChannels
+                    };
+                    
+                } catch (decodeError) {
+                    updateTestStatus(testId, 'fail', `✗ 解碼失敗: ${decodeError.message}`);
+                    audioContext.close();
+                    
+                    return {
+                        success: false,
+                        error: decodeError
+                    };
+                }
+                
+            } catch (error) {
+                updateTestStatus(testId, 'fail', `✗ 錯誤: ${error.message}`);
+                return { success: false, error: error };
+            }
+        }
+        
+        // 測試 MediaSource API
+        function testMediaSource() {
+            const testId = 'mediaSourceTest';
+            
+            if ('MediaSource' in window) {
+                const isSupported = MediaSource.isTypeSupported('audio/mpeg');
+                if (isSupported) {
+                    updateTestStatus(testId, 'pass', '✓ 支援');
+                } else {
+                    updateTestStatus(testId, 'warning', '⚠️ 不支援 MP3');
+                }
+                return { success: isSupported };
+            } else {
+                updateTestStatus(testId, 'fail', '✗ API 不可用');
+                return { success: false };
+            }
+        }
+        
+        // 測試檔案頭
+        async function testFileHeader(file) {
+            const testId = 'headerTest';
+            
+            try {
+                // 讀取前 4 個位元組
+                const buffer = await file.slice(0, 4).arrayBuffer();
+                const view = new DataView(buffer);
+                
+                // 檢查 MP3 標識
+                const byte1 = view.getUint8(0);
+                const byte2 = view.getUint8(1);
+                
+                // ID3v2 標籤
+                if (byte1 === 0x49 && byte2 === 0x44) { // 'ID'
+                    updateTestStatus(testId, 'pass', '✓ ID3v2 標籤');
+                    return { success: true, type: 'ID3v2' };
+                }
+                // MP3 同步頭
+                else if (byte1 === 0xFF && (byte2 & 0xE0) === 0xE0) {
+                    updateTestStatus(testId, 'pass', '✓ MP3 同步頭');
+                    return { success: true, type: 'MP3' };
+                }
+                else {
+                    updateTestStatus(testId, 'fail', '✗ 非標準 MP3 格式');
+                    return { success: false };
+                }
+                
+            } catch (error) {
+                updateTestStatus(testId, 'fail', `✗ 讀取錯誤: ${error.message}`);
+                return { success: false, error: error };
+            }
+        }
+        
+        // 更新測試狀態
+        function updateTestStatus(testId, status, message) {
+            const element = document.getElementById(testId);
+            const statusClass = status === 'pass' ? 'status-pass' : 
+                               status === 'fail' ? 'status-fail' : 'status-warning';
+            element.innerHTML = `<span class="${statusClass}">${message}</span>`;
+        }
+        
+        // 取得音訊錯誤訊息
+        function getAudioErrorMessage(error) {
+            if (!error) return '未知錯誤';
+            
+            switch (error.code) {
+                case 1: return 'MEDIA_ERR_ABORTED';
+                case 2: return 'MEDIA_ERR_NETWORK';
+                case 3: return 'MEDIA_ERR_DECODE';
+                case 4: return 'MEDIA_ERR_SRC_NOT_SUPPORTED';
+                default: return `錯誤代碼: ${error.code}`;
+            }
+        }
+        
+        // 顯示解決方案
+        function showSolutions(results) {
+            const solutionsSection = document.getElementById('solutionsSection');
+            const solutionList = document.getElementById('solutionList');
+            solutionList.innerHTML = '';
+            
+            const solutions = [];
+            
+            // 根據測試結果生成解決方案
+            if (!results.audioElement.success && !results.webAudio.success) {
+                solutions.push({
+                    title: '轉換音訊格式',
+                    desc: '使用 Audacity 或 VLC 重新編碼為標準 MP3 格式：<br>' +
+                          '<div class="code-block">格式：MP3<br>位元率：128-192 kbps<br>取樣率：44100 Hz<br>聲道：立體聲</div>'
+                });
+            }
+            
+            if (results.webAudio.success && results.webAudio.sampleRate < 22050) {
+                solutions.push({
+                    title: '提高取樣率',
+                    desc: '錄音筆使用的取樣率太低，建議重新取樣至 44100 Hz 或 48000 Hz'
+                });
+            }
+            
+            if (results.audioElement.success && results.audioElement.bitrate < 64) {
+                solutions.push({
+                    title: '提高位元率',
+                    desc: '位元率過低可能導致相容性問題，建議使用至少 128 kbps'
+                });
+            }
+            
+            if (!results.header.success) {
+                solutions.push({
+                    title: '修復檔案格式',
+                    desc: '檔案可能不是標準 MP3 格式，請確認錄音筆設定或使用音訊編輯軟體修復'
+                });
+            }
+            
+            // 通用解決方案
+            solutions.push({
+                title: '使用線上轉換工具',
+                desc: '快速解決：上傳到 CloudConvert 或 Online-Convert，選擇輸出為標準 MP3'
+            });
+            
+            solutions.push({
+                title: '調整錄音筆設定',
+                desc: '未來錄音時，請在錄音筆設定中選擇：<br>' +
+                      '<div class="code-block">格式：MP3<br>品質：中或高<br>取樣率：44.1 kHz（如果有此選項）</div>'
+            });
+            
+            // 顯示解決方案
+            if (solutions.length > 0) {
+                solutions.forEach(solution => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<strong>${solution.title}</strong><br>${solution.desc}`;
+                    solutionList.appendChild(li);
+                });
+                solutionsSection.style.display = 'block';
+            }
+        }
+        
+        // 啟動
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
