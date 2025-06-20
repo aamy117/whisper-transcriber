@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>自動化測試 - 大檔案處理</title>
+  <link rel="stylesheet" href="css/shared.css">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    body {
+      padding: 20px;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    
+    .test-suite {
+      background: var(--surface-color);
+      padding: 20px;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+    
+    .test-item {
+      margin: 10px 0;
+      padding: 10px;
+      border-left: 4px solid #ddd;
+      background: var(--bg-secondary);
+    }
+    
+    .test-item.running {
+      border-color: #ffc107;
+      background: #fff8e1;
+    }
+    
+    .test-item.passed {
+      border-color: #4caf50;
+      background: #e8f5e9;
+    }
+    
+    .test-item.failed {
+      border-color: #f44336;
+      background: #ffebee;
+    }
+    
+    .test-log {
+      font-family: monospace;
+      font-size: 12px;
+      margin-top: 10px;
+      padding: 10px;
+      background: #f5f5f5;
+      border-radius: 4px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    
+    .summary {
+      margin-top: 20px;
+      padding: 20px;
+      background: var(--bg-tertiary);
+      border-radius: 8px;
+    }
+    
+    .progress-bar {
+      width: 100%;
+      height: 20px;
+      background: #e0e0e0;
+      border-radius: 10px;
+      overflow: hidden;
+      margin: 20px 0;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: var(--primary-color);
+      transition: width 0.3s;
+    }
+  </style>
+</head>
+<body>
+  <h1>🤖 自動化測試套件</h1>
+  
+  <div class="test-suite">
+    <h2>測試進度</h2>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progressBar" style="width: 0%"></div>
+    </div>
+    <p id="progressText">準備開始測試...</p>
+    
+    <button id="startTest" class="btn btn-primary">開始自動測試</button>
+    <button id="stopTest" class="btn btn-secondary" disabled>停止測試</button>
+  </div>
+  
+  <div class="test-suite">
+    <h2>測試項目</h2>
+    <div id="testResults"></div>
+  </div>
+  
+  <div class="summary" id="summary" style="display: none;">
+    <h2>測試總結</h2>
+    <div id="summaryContent"></div>
+  </div>
+
+  <script type="module">
+    // 測試套件
+    class AutomatedTestSuite {
+      constructor() {
+        this.tests = [];
+        this.currentTestIndex = 0;
+        this.results = [];
+        this.isRunning = false;
+        
+        this.setupTests();
+        this.bindEvents();
+      }
+      
+      setupTests() {
+        this.tests = [
+          {
+            name: '檢查瀏覽器相容性',
+            async run() {
+              const checks = {
+                'Web Audio API': !!(window.AudioContext || window.webkitAudioContext),
+                'File API': !!window.File && !!window.FileReader,
+                'Blob API': !!window.Blob,
+                'Promise': !!window.Promise,
+                'ES6 Modules': true // 如果能執行到這裡就支援
+              };
+              
+              const failed = Object.entries(checks).filter(([k, v]) => !v);
+              if (failed.length > 0) {
+                throw new Error(`不支援: ${failed.map(f => f[0]).join(', ')}`);
+              }
+              
+              return {
+                success: true,
+                details: checks
+              };
+            }
+          },
+          
+          {
+            name: '載入必要模組',
+            async run() {
+              const modules = [];
+              
+              try {
+                const { transcriptionPreprocessor } = await import('./js/transcription-preprocessor.js');
+                modules.push('transcription-preprocessor.js ✓');
+              } catch (e) {
+                throw new Error('無法載入 transcription-preprocessor.js: ' + e.message);
+              }
+              
+              try {
+                const { audioSplitter } = await import('./js/audio-splitter.js');
+                modules.push('audio-splitter.js ✓');
+              } catch (e) {
+                throw new Error('無法載入 audio-splitter.js: ' + e.message);
+              }
+              
+              try {
+                const { audioCompressor } = await import('./js/audio-compressor.js');
+                modules.push('audio-compressor.js ✓');
+              } catch (e) {
+                throw new Error('無法載入 audio-compressor.js: ' + e.message);
+              }
+              
+              return {
+                success: true,
+                modules: modules
+              };
+            }
+          },
+          
+          {
+            name: '生成測試音訊檔案',
+            async run() {
+              // 生成 5MB 測試檔案（小檔案）
+              const small = await this.generateTestAudio(5);
+              
+              // 生成 30MB 測試檔案（大檔案）
+              const large = await this.generateTestAudio(30);
+              
+              // 儲存供後續測試使用
+              window.testFiles = { small, large };
+              
+              return {
+                success: true,
+                files: {
+                  small: `${(small.size / 1024 / 1024).toFixed(2)} MB`,
+                  large: `${(large.size / 1024 / 1024).toFixed(2)} MB`
+                }
+              };
+            },
+            
+            generateTestAudio(sizeMB) {
+              const sampleRate = 44100;
+              const duration = (sizeMB * 1024 * 1024) / (sampleRate * 2);
+              const numSamples = Math.floor(sampleRate * duration);
+              
+              const buffer = new ArrayBuffer(44 + numSamples * 2);
+              const view = new DataView(buffer);
+              
+              // WAV header
+              const writeString = (offset, string) => {
+                for (let i = 0; i < string.length; i++) {
+                  view.setUint8(offset + i, string.charCodeAt(i));
+                }
+              };
+              
+              writeString(0, 'RIFF');
+              view.setUint32(4, 36 + numSamples * 2, true);
+              writeString(8, 'WAVE');
+              writeString(12, 'fmt ');
+              view.setUint32(16, 16, true);
+              view.setUint16(20, 1, true);
+              view.setUint16(22, 1, true);
+              view.setUint32(24, sampleRate, true);
+              view.setUint32(28, sampleRate * 2, true);
+              view.setUint16(32, 2, true);
+              view.setUint16(34, 16, true);
+              writeString(36, 'data');
+              view.setUint32(40, numSamples * 2, true);
+              
+              // 生成靜音
+              for (let i = 44; i < buffer.byteLength; i += 2) {
+                view.setInt16(i, 0, true);
+              }
+              
+              return new File([buffer], `test_${sizeMB}MB.wav`, { type: 'audio/wav' });
+            }
+          },
+          
+          {
+            name: '測試小檔案處理（應直接通過）',
+            async run() {
+              const { transcriptionPreprocessor } = await import('./js/transcription-preprocessor.js');
+              const result = await transcriptionPreprocessor.prepareForTranscription(window.testFiles.small);
+              
+              if (result.strategy !== 'direct') {
+                throw new Error(`預期 strategy='direct'，實際為 '${result.strategy}'`);
+              }
+              
+              if (result.files.length !== 1) {
+                throw new Error(`預期 1 個檔案，實際為 ${result.files.length} 個`);
+              }
+              
+              return {
+                success: true,
+                strategy: result.strategy,
+                fileCount: result.files.length
+              };
+            }
+          },
+          
+          {
+            name: '測試音訊壓縮功能',
+            async run() {
+              const { audioCompressor } = await import('./js/audio-compressor.js');
+              
+              const testFile = window.testFiles.small;
+              const result = await audioCompressor.compressAudioFile(testFile, {
+                profile: 'moderate'
+              });
+              
+              if (!result.success) {
+                throw new Error('壓縮失敗');
+              }
+              
+              const compressionRatio = result.compressedSize / testFile.size;
+              
+              audioCompressor.cleanup();
+              
+              return {
+                success: true,
+                originalSize: `${(testFile.size / 1024 / 1024).toFixed(2)} MB`,
+                compressedSize: `${(result.compressedSize / 1024 / 1024).toFixed(2)} MB`,
+                ratio: `${(compressionRatio * 100).toFixed(1)}%`
+              };
+            }
+          },
+          
+          {
+            name: '測試音訊分割功能',
+            async run() {
+              const { audioSplitter } = await import('./js/audio-splitter.js');
+              
+              const testFile = window.testFiles.large;
+              const result = await audioSplitter.splitAudioFile(testFile, {
+                maxSize: 10 * 1024 * 1024 // 10MB per segment
+              });
+              
+              if (!result.success) {
+                throw new Error('分割失敗');
+              }
+              
+              audioSplitter.cleanup();
+              
+              return {
+                success: true,
+                originalFile: testFile.name,
+                segments: result.totalSegments,
+                duration: `${result.originalDuration.toFixed(2)} 秒`
+              };
+            }
+          },
+          
+          {
+            name: '測試 UI 元素',
+            async run() {
+              // 測試對話框樣式
+              const testDiv = document.createElement('div');
+              testDiv.className = 'dialog-overlay';
+              document.body.appendChild(testDiv);
+              
+              const hasOverlayStyle = window.getComputedStyle(testDiv).position === 'fixed';
+              document.body.removeChild(testDiv);
+              
+              if (!hasOverlayStyle) {
+                throw new Error('對話框樣式未正確載入');
+              }
+              
+              // 測試進度條樣式
+              const progressTest = document.createElement('div');
+              progressTest.className = 'progress-bar';
+              document.body.appendChild(progressTest);
+              
+              const hasProgressStyle = window.getComputedStyle(progressTest).overflow === 'hidden';
+              document.body.removeChild(progressTest);
+              
+              if (!hasProgressStyle) {
+                throw new Error('進度條樣式未正確載入');
+              }
+              
+              return {
+                success: true,
+                dialogStyle: hasOverlayStyle ? '✓' : '✗',
+                progressStyle: hasProgressStyle ? '✓' : '✗'
+              };
+            }
+          },
+          
+          {
+            name: '測試錯誤處理',
+            async run() {
+              const { audioCompressor } = await import('./js/audio-compressor.js');
+              
+              // 測試無效檔案
+              const invalidFile = new File(['invalid'], 'test.txt', { type: 'text/plain' });
+              
+              try {
+                await audioCompressor.compressAudioFile(invalidFile);
+                throw new Error('應該要拋出錯誤');
+              } catch (error) {
+                if (!error.message.includes('音訊')) {
+                  throw new Error('錯誤訊息不正確');
+                }
+              }
+              
+              audioCompressor.cleanup();
+              
+              return {
+                success: true,
+                errorHandling: '正確處理無效檔案'
+              };
+            }
+          }
+        ];
+      }
+      
+      bindEvents() {
+        document.getElementById('startTest').addEventListener('click', () => this.start());
+        document.getElementById('stopTest').addEventListener('click', () => this.stop());
+      }
+      
+      async start() {
+        if (this.isRunning) return;
+        
+        this.isRunning = true;
+        this.currentTestIndex = 0;
+        this.results = [];
+        
+        document.getElementById('startTest').disabled = true;
+        document.getElementById('stopTest').disabled = false;
+        document.getElementById('testResults').innerHTML = '';
+        document.getElementById('summary').style.display = 'none';
+        
+        // 建立所有測試項目的 UI
+        this.tests.forEach((test, index) => {
+          const testDiv = document.createElement('div');
+          testDiv.className = 'test-item';
+          testDiv.id = `test-${index}`;
+          testDiv.innerHTML = `
+            <h3>${test.name}</h3>
+            <div class="status">等待中...</div>
+            <div class="test-log" style="display: none;"></div>
+          `;
+          document.getElementById('testResults').appendChild(testDiv);
+        });
+        
+        // 開始執行測試
+        await this.runTests();
+      }
+      
+      async runTests() {
+        for (let i = 0; i < this.tests.length && this.isRunning; i++) {
+          this.currentTestIndex = i;
+          await this.runTest(i);
+          this.updateProgress();
+        }
+        
+        this.finish();
+      }
+      
+      async runTest(index) {
+        const test = this.tests[index];
+        const testDiv = document.getElementById(`test-${index}`);
+        
+        testDiv.className = 'test-item running';
+        testDiv.querySelector('.status').textContent = '執行中...';
+        
+        const startTime = performance.now();
+        
+        try {
+          const result = await test.run.call(this);
+          const duration = performance.now() - startTime;
+          
+          testDiv.className = 'test-item passed';
+          testDiv.querySelector('.status').textContent = `✓ 通過 (${duration.toFixed(0)}ms)`;
+          
+          if (result && typeof result === 'object') {
+            const logDiv = testDiv.querySelector('.test-log');
+            logDiv.style.display = 'block';
+            logDiv.textContent = JSON.stringify(result, null, 2);
+          }
+          
+          this.results.push({
+            name: test.name,
+            passed: true,
+            duration: duration,
+            details: result
+          });
+          
+        } catch (error) {
+          testDiv.className = 'test-item failed';
+          testDiv.querySelector('.status').textContent = `✗ 失敗: ${error.message}`;
+          
+          const logDiv = testDiv.querySelector('.test-log');
+          logDiv.style.display = 'block';
+          logDiv.textContent = error.stack || error.message;
+          
+          this.results.push({
+            name: test.name,
+            passed: false,
+            error: error.message
+          });
+        }
+      }
+      
+      updateProgress() {
+        const progress = ((this.currentTestIndex + 1) / this.tests.length) * 100;
+        document.getElementById('progressBar').style.width = `${progress}%`;
+        document.getElementById('progressText').textContent = 
+          `完成 ${this.currentTestIndex + 1} / ${this.tests.length} 項測試`;
+      }
+      
+      stop() {
+        this.isRunning = false;
+        document.getElementById('startTest').disabled = false;
+        document.getElementById('stopTest').disabled = true;
+      }
+      
+      finish() {
+        this.isRunning = false;
+        document.getElementById('startTest').disabled = false;
+        document.getElementById('stopTest').disabled = true;
+        
+        // 顯示總結
+        const passed = this.results.filter(r => r.passed).length;
+        const failed = this.results.filter(r => !r.passed).length;
+        const total = this.results.length;
+        
+        document.getElementById('summary').style.display = 'block';
+        document.getElementById('summaryContent').innerHTML = `
+          <h3>${passed === total ? '✅ 所有測試通過！' : '⚠️ 部分測試失敗'}</h3>
+          <p>總共: ${total} 項</p>
+          <p>通過: ${passed} 項</p>
+          <p>失敗: ${failed} 項</p>
+          ${failed > 0 ? '<p>請檢查上方的錯誤訊息</p>' : '<p>大檔案處理功能運作正常！</p>'}
+        `;
+      }
+    }
+    
+    // 初始化測試套件
+    const testSuite = new AutomatedTestSuite();
+  </script>
+</body>
+</html>

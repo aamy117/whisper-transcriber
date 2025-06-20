@@ -32,20 +32,22 @@ class WhisperAPI {
   }
   
   // 驗證檔案
-  validateFile(file) {
+  validateFile(file, skipSizeCheck = false) {
     if (!file) {
       throw new Error('請選擇檔案');
     }
     
-    // 檢查檔案大小（API 限制）
-    if (file.size > Config.api.maxFileSize) {
+    // 檔案大小檢查可選（因為預處理器會處理大檔案）
+    if (!skipSizeCheck && file.size > Config.api.maxFileSize) {
       const maxSizeMB = Config.api.maxFileSize / 1024 / 1024;
       throw new Error(`檔案大小超過 OpenAI API 限制（最大 ${maxSizeMB}MB）。請使用較小的檔案進行轉譯。`);
     }
     
     // 檢查檔案格式
     const extension = file.name.split('.').pop().toLowerCase();
-    if (!Config.supportedFormats.includes(extension)) {
+    // 允許 WAV 格式（壓縮和分割後的格式）
+    const supportedFormats = [...Config.supportedFormats, 'wav'];
+    if (!supportedFormats.includes(extension)) {
       throw new Error(`不支援的檔案格式：${extension}`);
     }
     
@@ -57,7 +59,7 @@ class WhisperAPI {
     try {
       // 驗證
       this.validateApiKey();
-      this.validateFile(audioFile);
+      this.validateFile(audioFile, options.skipSizeCheck);
       
       // 建立 FormData
       const formData = new FormData();

@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>批次轉譯 - Whisper 工具</title>
+    <link rel="stylesheet" href="css/shared.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        /* 批次處理專用樣式 */
+        .batch-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: var(--spacing-lg);
+        }
+        
+        .batch-header {
+            background: var(--bg-secondary);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-lg);
+            margin-bottom: var(--spacing-lg);
+        }
+        
+        .batch-controls {
+            display: flex;
+            gap: var(--spacing-md);
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .file-drop-zone {
+            border: 2px dashed var(--border-color);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-xl);
+            text-align: center;
+            background: var(--bg-tertiary);
+            transition: all 0.3s;
+            cursor: pointer;
+            margin-bottom: var(--spacing-lg);
+        }
+        
+        .file-drop-zone:hover,
+        .file-drop-zone.dragover {
+            border-color: var(--primary-color);
+            background: rgba(37, 99, 235, 0.1);
+        }
+        
+        .file-queue {
+            background: var(--bg-secondary);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-lg);
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .queue-item {
+            display: flex;
+            align-items: center;
+            padding: var(--spacing-md);
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            margin-bottom: var(--spacing-sm);
+            transition: all 0.2s;
+        }
+        
+        .queue-item.processing {
+            border-color: var(--primary-color);
+            background: rgba(37, 99, 235, 0.05);
+        }
+        
+        .queue-item.completed {
+            border-color: var(--success-color);
+            background: rgba(16, 185, 129, 0.05);
+        }
+        
+        .queue-item.error {
+            border-color: var(--danger-color);
+            background: rgba(239, 68, 68, 0.05);
+        }
+        
+        .queue-item-info {
+            flex: 1;
+            margin-right: var(--spacing-md);
+        }
+        
+        .queue-item-name {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+        
+        .queue-item-size {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+        
+        .queue-item-status {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+        }
+        
+        .status-icon {
+            width: 20px;
+            height: 20px;
+        }
+        
+        .progress-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-lg);
+        }
+        
+        .stat-card {
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-sm);
+            padding: var(--spacing-md);
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+        
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-top: var(--spacing-xs);
+        }
+        
+        .batch-progress {
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-full);
+            height: 8px;
+            overflow: hidden;
+            margin-bottom: var(--spacing-md);
+        }
+        
+        .batch-progress-fill {
+            height: 100%;
+            background: var(--primary-color);
+            transition: width 0.3s ease;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: var(--spacing-xl);
+            color: var(--text-tertiary);
+        }
+        
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: var(--spacing-md);
+        }
+    </style>
+</head>
+<body>
+    <!-- 導航列 -->
+    <nav class="app-navigation">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <h1 class="nav-title">Whisper 工具</h1>
+            </div>
+            <div class="nav-links">
+                <a href="index.html" class="nav-link">
+                    <span class="nav-icon">🎵</span>
+                    <span>音訊工具</span>
+                </a>
+                <a href="batch.html" class="nav-link active">
+                    <span class="nav-icon">📁</span>
+                    <span>批次轉譯</span>
+                </a>
+                <a href="video.html" class="nav-link">
+                    <span class="nav-icon">🎬</span>
+                    <span>視訊工具</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="batch-container">
+        <div class="batch-header">
+            <h2>批次轉譯</h2>
+            <p>一次處理多個音訊檔案，支援大檔案自動分割和壓縮</p>
+        </div>
+        
+        <!-- 檔案選擇區 -->
+        <div class="file-drop-zone" id="dropZone">
+            <div class="empty-state-icon">📁</div>
+            <p>拖放音訊檔案到這裡，或點擊選擇檔案</p>
+            <p class="text-secondary">支援 MP3、M4A、WAV、MP4、MOV 等格式</p>
+            <input type="file" id="fileInput" multiple accept="audio/*,video/*" style="display: none;">
+        </div>
+        
+        <!-- 進度統計 -->
+        <div class="progress-stats" id="progressStats" style="display: none;">
+            <div class="stat-card">
+                <div class="stat-value" id="statTotal">0</div>
+                <div class="stat-label">總計</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statCompleted">0</div>
+                <div class="stat-label">已完成</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statProcessing">0</div>
+                <div class="stat-label">處理中</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statPending">0</div>
+                <div class="stat-label">等待中</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statFailed">0</div>
+                <div class="stat-label">失敗</div>
+            </div>
+        </div>
+        
+        <!-- 總進度條 -->
+        <div class="batch-progress" id="batchProgress" style="display: none;">
+            <div class="batch-progress-fill" id="batchProgressFill" style="width: 0%"></div>
+        </div>
+        
+        <!-- 控制按鈕 -->
+        <div class="batch-controls" id="batchControls" style="display: none;">
+            <button class="btn btn-primary" id="startBtn">開始處理</button>
+            <button class="btn btn-secondary" id="pauseBtn" disabled>暫停</button>
+            <button class="btn btn-secondary" id="stopBtn" disabled>停止</button>
+            <button class="btn btn-secondary" id="clearBtn">清空列表</button>
+            <button class="btn btn-secondary" id="exportBtn" disabled>匯出結果</button>
+            
+            <div style="margin-left: auto;">
+                <label>
+                    <input type="checkbox" id="continueOnError" checked>
+                    遇到錯誤時繼續
+                </label>
+            </div>
+        </div>
+        
+        <!-- 檔案佇列 -->
+        <div class="file-queue" id="fileQueue">
+            <div class="empty-state">
+                <p>尚未添加任何檔案</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 設定模態框 -->
+    <div class="modal" id="settingsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>設定</h2>
+                <button class="close-btn" id="settingsCloseBtn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="apiKeyInput">OpenAI API Key</label>
+                    <input type="password" id="apiKeyInput" placeholder="sk-..." class="form-control">
+                    <small class="form-hint">您的 API Key 將安全地儲存在本地</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="saveSettingsBtn">儲存</button>
+            </div>
+        </div>
+    </div>
+    
+    <script type="module">
+        import Config from './js/config.js';
+        import { WhisperAPI } from './js/api.js';
+        import { createBatchProcessor } from './js/batch-processor.js';
+        import { notify } from './js/notification.js';
+        import { dialog } from './js/dialog.js';
+        
+        // 初始化
+        let whisperAPI = null;
+        let batchProcessor = null;
+        
+        // DOM 元素
+        const elements = {
+            dropZone: document.getElementById('dropZone'),
+            fileInput: document.getElementById('fileInput'),
+            fileQueue: document.getElementById('fileQueue'),
+            progressStats: document.getElementById('progressStats'),
+            batchProgress: document.getElementById('batchProgress'),
+            batchProgressFill: document.getElementById('batchProgressFill'),
+            batchControls: document.getElementById('batchControls'),
+            startBtn: document.getElementById('startBtn'),
+            pauseBtn: document.getElementById('pauseBtn'),
+            stopBtn: document.getElementById('stopBtn'),
+            clearBtn: document.getElementById('clearBtn'),
+            exportBtn: document.getElementById('exportBtn'),
+            continueOnError: document.getElementById('continueOnError'),
+            settingsModal: document.getElementById('settingsModal'),
+            apiKeyInput: document.getElementById('apiKeyInput'),
+            saveSettingsBtn: document.getElementById('saveSettingsBtn'),
+            settingsCloseBtn: document.getElementById('settingsCloseBtn')
+        };
+        
+        // 初始化 API
+        function initAPI() {
+            const apiKey = localStorage.getItem(Config.storage.prefix + 'apiKey');
+            if (apiKey) {
+                whisperAPI = new WhisperAPI();
+                batchProcessor = createBatchProcessor(whisperAPI);
+                
+                // 綁定事件
+                batchProcessor.on('progress', updateProgress);
+                batchProcessor.on('itemComplete', updateQueueItem);
+                batchProcessor.on('error', handleError);
+                batchProcessor.on('complete', handleComplete);
+                
+                elements.apiKeyInput.value = apiKey;
+                return true;
+            }
+            return false;
+        }
+        
+        // 檢查 API Key
+        if (!initAPI()) {
+            notify.warning('請先設定 API Key');
+            showModal(elements.settingsModal);
+        }
+        
+        // 檔案選擇
+        elements.dropZone.addEventListener('click', () => {
+            elements.fileInput.click();
+        });
+        
+        elements.fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+        
+        // 拖放處理
+        elements.dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            elements.dropZone.classList.add('dragover');
+        });
+        
+        elements.dropZone.addEventListener('dragleave', () => {
+            elements.dropZone.classList.remove('dragover');
+        });
+        
+        elements.dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            elements.dropZone.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+        
+        // 控制按鈕
+        elements.startBtn.addEventListener('click', () => {
+            batchProcessor.options.continueOnError = elements.continueOnError.checked;
+            batchProcessor.start();
+            updateControlButtons('processing');
+        });
+        
+        elements.pauseBtn.addEventListener('click', () => {
+            if (batchProcessor.isPaused) {
+                batchProcessor.resume();
+                elements.pauseBtn.textContent = '暫停';
+            } else {
+                batchProcessor.pause();
+                elements.pauseBtn.textContent = '繼續';
+            }
+        });
+        
+        elements.stopBtn.addEventListener('click', () => {
+            batchProcessor.stop();
+            updateControlButtons('stopped');
+        });
+        
+        elements.clearBtn.addEventListener('click', async () => {
+            const confirmed = await dialog.confirm({
+                title: '清空列表',
+                message: '確定要清空所有檔案嗎？',
+                type: 'warning'
+            });
+            
+            if (confirmed) {
+                batchProcessor.clear();
+                renderQueue();
+                hideProgressUI();
+            }
+        });
+        
+        elements.exportBtn.addEventListener('click', () => {
+            const format = 'json'; // 可以讓使用者選擇
+            batchProcessor.exportResults(format);
+        });
+        
+        // 設定相關
+        elements.saveSettingsBtn.addEventListener('click', () => {
+            const apiKey = elements.apiKeyInput.value.trim();
+            if (apiKey) {
+                localStorage.setItem(Config.storage.prefix + 'apiKey', apiKey);
+                if (!whisperAPI) {
+                    initAPI();
+                }
+                hideModal(elements.settingsModal);
+                notify.success('設定已儲存');
+            } else {
+                notify.error('請輸入有效的 API Key');
+            }
+        });
+        
+        elements.settingsCloseBtn.addEventListener('click', () => {
+            hideModal(elements.settingsModal);
+        });
+        
+        // 處理檔案
+        function handleFiles(files) {
+            if (!batchProcessor) {
+                notify.error('請先設定 API Key');
+                showModal(elements.settingsModal);
+                return;
+            }
+            
+            const count = batchProcessor.addFiles(files);
+            if (count > 0) {
+                notify.success(`已添加 ${count} 個檔案到佇列`);
+                renderQueue();
+                showProgressUI();
+            }
+        }
+        
+        // 渲染佇列
+        function renderQueue() {
+            const queue = batchProcessor.queue;
+            
+            if (queue.length === 0) {
+                elements.fileQueue.innerHTML = `
+                    <div class="empty-state">
+                        <p>尚未添加任何檔案</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            elements.fileQueue.innerHTML = queue.map(item => `
+                <div class="queue-item ${item.status}" data-id="${item.id}">
+                    <div class="queue-item-info">
+                        <div class="queue-item-name">${item.file.name}</div>
+                        <div class="queue-item-size">${formatFileSize(item.file.size)}</div>
+                    </div>
+                    <div class="queue-item-status">
+                        ${getStatusIcon(item.status)}
+                        ${getStatusText(item.status)}
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // 更新進度
+        function updateProgress(progress) {
+            elements.statTotal.textContent = progress.total;
+            elements.statCompleted.textContent = progress.completed;
+            elements.statProcessing.textContent = progress.processing;
+            elements.statPending.textContent = progress.pending;
+            elements.statFailed.textContent = progress.failed;
+            
+            elements.batchProgressFill.style.width = `${progress.percentage}%`;
+            
+            renderQueue();
+        }
+        
+        // 更新佇列項目
+        function updateQueueItem(item) {
+            const itemEl = elements.fileQueue.querySelector(`[data-id="${item.id}"]`);
+            if (itemEl) {
+                itemEl.className = `queue-item ${item.status}`;
+                itemEl.querySelector('.queue-item-status').innerHTML = `
+                    ${getStatusIcon(item.status)}
+                    ${getStatusText(item.status)}
+                `;
+            }
+        }
+        
+        // 處理錯誤
+        function handleError({ item, error }) {
+            notify.error(`檔案 ${item.file.name} 處理失敗：${error.message}`);
+        }
+        
+        // 處理完成
+        function handleComplete(results) {
+            notify.success(`批次處理完成！共處理 ${results.length} 個檔案`);
+            updateControlButtons('completed');
+            elements.exportBtn.disabled = false;
+        }
+        
+        // 更新控制按鈕狀態
+        function updateControlButtons(state) {
+            switch (state) {
+                case 'processing':
+                    elements.startBtn.disabled = true;
+                    elements.pauseBtn.disabled = false;
+                    elements.stopBtn.disabled = false;
+                    break;
+                case 'stopped':
+                case 'completed':
+                    elements.startBtn.disabled = false;
+                    elements.pauseBtn.disabled = true;
+                    elements.stopBtn.disabled = true;
+                    elements.pauseBtn.textContent = '暫停';
+                    break;
+            }
+        }
+        
+        // 顯示/隱藏進度 UI
+        function showProgressUI() {
+            elements.progressStats.style.display = 'grid';
+            elements.batchProgress.style.display = 'block';
+            elements.batchControls.style.display = 'flex';
+        }
+        
+        function hideProgressUI() {
+            elements.progressStats.style.display = 'none';
+            elements.batchProgress.style.display = 'none';
+            elements.batchControls.style.display = 'none';
+        }
+        
+        // 工具函數
+        function getStatusIcon(status) {
+            const icons = {
+                pending: '⏳',
+                processing: '🔄',
+                completed: '✅',
+                error: '❌'
+            };
+            return `<span class="status-icon">${icons[status] || ''}</span>`;
+        }
+        
+        function getStatusText(status) {
+            const texts = {
+                pending: '等待中',
+                processing: '處理中...',
+                completed: '已完成',
+                error: '失敗'
+            };
+            return texts[status] || status;
+        }
+        
+        function formatFileSize(bytes) {
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(1024));
+            return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`;
+        }
+        
+        function showModal(modal) {
+            modal.classList.add('show');
+            document.body.style.overflow = 'hidden';
+        }
+        
+        function hideModal(modal) {
+            modal.classList.remove('show');
+            document.body.style.overflow = '';
+        }
+    </script>
+</body>
+</html>

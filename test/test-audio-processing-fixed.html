@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>音訊處理測試 (修正版)</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+    }
+    
+    .test {
+      border: 1px solid #ddd;
+      padding: 20px;
+      margin: 20px 0;
+      border-radius: 5px;
+    }
+    
+    .success {
+      background-color: #d4edda;
+      border-color: #c3e6cb;
+    }
+    
+    .error {
+      background-color: #f8d7da;
+      border-color: #f5c6cb;
+    }
+    
+    .warning {
+      background-color: #fff3cd;
+      border-color: #ffeaa7;
+    }
+    
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      cursor: pointer;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+    }
+    
+    button:hover {
+      background: #0056b3;
+    }
+    
+    button:disabled {
+      background: #6c757d;
+      cursor: not-allowed;
+    }
+    
+    pre {
+      background: #f5f5f5;
+      padding: 10px;
+      overflow: auto;
+      font-size: 12px;
+    }
+    
+    .log-entry {
+      margin: 5px 0;
+      padding: 5px;
+      background: #f8f9fa;
+      border-left: 3px solid #007bff;
+    }
+    
+    .file-size-warning {
+      color: #e74c3c;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>音訊處理測試 (修正版)</h1>
+  
+  <div class="test">
+    <h2>環境檢查</h2>
+    <button onclick="checkEnvironment()">檢查環境</button>
+    <div id="env-result"></div>
+  </div>
+  
+  <div class="test">
+    <h2>測試 1: 生成測試音訊</h2>
+    <button onclick="generateSmallTestAudio()">生成 5MB WAV</button>
+    <button onclick="generateLargeTestAudio()">生成 30MB WAV</button>
+    <div id="test1-result"></div>
+  </div>
+  
+  <div class="test">
+    <h2>測試 2: 音訊壓縮</h2>
+    <input type="file" id="compress-file" accept="audio/*">
+    <br><br>
+    <label>
+      壓縮配置：
+      <select id="compression-profile">
+        <option value="light">輕度壓縮</option>
+        <option value="moderate" selected>中度壓縮</option>
+        <option value="aggressive">高度壓縮</option>
+      </select>
+    </label>
+    <br><br>
+    <button onclick="testCompress()">測試壓縮</button>
+    <div id="test2-result"></div>
+  </div>
+  
+  <div class="test">
+    <h2>測試 3: 音訊分割</h2>
+    <input type="file" id="split-file" accept="audio/*">
+    <br><br>
+    <label>
+      每段大小：
+      <select id="segment-size">
+        <option value="5">5 MB</option>
+        <option value="10" selected>10 MB</option>
+        <option value="20">20 MB</option>
+      </select>
+    </label>
+    <br><br>
+    <button onclick="testSplit()">測試分割</button>
+    <div id="test3-result"></div>
+  </div>
+
+  <div class="test">
+    <h2>測試 4: 完整預處理流程</h2>
+    <input type="file" id="preprocess-file" accept="audio/*">
+    <br><br>
+    <button onclick="testPreprocess()">測試預處理</button>
+    <div id="test4-result"></div>
+  </div>
+
+  <div class="test">
+    <h2>日誌</h2>
+    <button onclick="clearLog()">清除日誌</button>
+    <div id="log-container" style="max-height: 300px; overflow-y: auto;"></div>
+  </div>
+
+  <script type="module">
+    // 全域變數
+    window.testModules = {};
+    window.generatedFiles = {};
+    
+    // 日誌功能
+    window.log = function(message, type = 'info') {
+      const logContainer = document.getElementById('log-container');
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      entry.style.borderColor = type === 'error' ? '#dc3545' : type === 'warning' ? '#ffc107' : '#007bff';
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      logContainer.appendChild(entry);
+      logContainer.scrollTop = logContainer.scrollHeight;
+      console.log(message);
+    };
+    
+    window.clearLog = function() {
+      document.getElementById('log-container').innerHTML = '';
+    };
+    
+    // 環境檢查
+    window.checkEnvironment = async function() {
+      const resultDiv = document.getElementById('env-result');
+      resultDiv.innerHTML = '<p>檢查中...</p>';
+      
+      try {
+        const checks = [];
+        
+        // 檢查 Web Audio API
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        checks.push({
+          name: 'Web Audio API',
+          status: !!AudioContext,
+          details: AudioContext ? '支援' : '不支援'
+        });
+        
+        // 檢查 File API
+        checks.push({
+          name: 'File API',
+          status: !!(window.File && window.FileReader && window.Blob),
+          details: '支援'
+        });
+        
+        // 嘗試載入模組
+        try {
+          const { audioCompressor } = await import('./js/audio-compressor.js');
+          window.testModules.audioCompressor = audioCompressor;
+          checks.push({
+            name: 'audio-compressor.js',
+            status: true,
+            details: '載入成功'
+          });
+        } catch (e) {
+          checks.push({
+            name: 'audio-compressor.js',
+            status: false,
+            details: e.message
+          });
+        }
+        
+        try {
+          const { audioSplitter } = await import('./js/audio-splitter.js');
+          window.testModules.audioSplitter = audioSplitter;
+          checks.push({
+            name: 'audio-splitter.js',
+            status: true,
+            details: '載入成功'
+          });
+        } catch (e) {
+          checks.push({
+            name: 'audio-splitter.js',
+            status: false,
+            details: e.message
+          });
+        }
+        
+        try {
+          const { transcriptionPreprocessor } = await import('./js/transcription-preprocessor.js');
+          window.testModules.transcriptionPreprocessor = transcriptionPreprocessor;
+          checks.push({
+            name: 'transcription-preprocessor.js',
+            status: true,
+            details: '載入成功'
+          });
+        } catch (e) {
+          checks.push({
+            name: 'transcription-preprocessor.js',
+            status: false,
+            details: e.message
+          });
+        }
+        
+        // 顯示結果
+        const allPassed = checks.every(c => c.status);
+        resultDiv.innerHTML = `
+          <div class="${allPassed ? 'success' : 'error'}">
+            <h3>${allPassed ? '✓ 環境檢查通過' : '✗ 環境檢查失敗'}</h3>
+            <ul>
+              ${checks.map(c => `
+                <li>${c.status ? '✓' : '✗'} ${c.name}: ${c.details}</li>
+              `).join('')}
+            </ul>
+          </div>
+        `;
+        
+        log(`環境檢查完成，${allPassed ? '全部通過' : '存在問題'}`);
+        
+      } catch (error) {
+        resultDiv.innerHTML = `<div class="error">✗ 檢查失敗: ${error.message}</div>`;
+        log(`環境檢查錯誤: ${error.message}`, 'error');
+      }
+    };
+    
+    // 生成測試音訊
+    window.generateTestAudio = async function(sizeMB) {
+      log(`開始生成 ${sizeMB}MB 測試音訊...`);
+      
+      const sampleRate = 44100;
+      const duration = (sizeMB * 1024 * 1024) / (sampleRate * 2 * 2); // 立體聲
+      const numChannels = 2;
+      const numSamples = Math.floor(sampleRate * duration);
+      
+      // 建立 WAV 檔案
+      const buffer = new ArrayBuffer(44 + numSamples * numChannels * 2);
+      const view = new DataView(buffer);
+      
+      // WAV 檔頭
+      const writeString = (offset, string) => {
+        for (let i = 0; i < string.length; i++) {
+          view.setUint8(offset + i, string.charCodeAt(i));
+        }
+      };
+      
+      writeString(0, 'RIFF');
+      view.setUint32(4, 36 + numSamples * numChannels * 2, true);
+      writeString(8, 'WAVE');
+      writeString(12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, numChannels, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * numChannels * 2, true);
+      view.setUint16(32, numChannels * 2, true);
+      view.setUint16(34, 16, true);
+      writeString(36, 'data');
+      view.setUint32(40, numSamples * numChannels * 2, true);
+      
+      // 生成測試音訊數據（簡單的正弦波）
+      let offset = 44;
+      const frequency = 440; // A4 音符
+      for (let i = 0; i < numSamples; i++) {
+        for (let channel = 0; channel < numChannels; channel++) {
+          const sample = Math.sin(2 * Math.PI * frequency * i / sampleRate) * 0.1;
+          const value = Math.floor(sample * 32767);
+          view.setInt16(offset, value, true);
+          offset += 2;
+        }
+      }
+      
+      const blob = new Blob([buffer], { type: 'audio/wav' });
+      const file = new File([blob], `test_${sizeMB}MB.wav`, { type: 'audio/wav' });
+      
+      log(`成功生成 ${sizeMB}MB 測試音訊，實際大小: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
+      
+      return file;
+    };
+    
+    window.generateSmallTestAudio = async function() {
+      const resultDiv = document.getElementById('test1-result');
+      try {
+        resultDiv.innerHTML = '<p>生成中...</p>';
+        const file = await generateTestAudio(5);
+        window.generatedFiles.small = file;
+        
+        const url = URL.createObjectURL(file);
+        resultDiv.innerHTML = `
+          <div class="success">
+            <p>✓ 成功生成 5MB 測試音訊</p>
+            <p>檔案名稱: ${file.name}</p>
+            <p>實際大小: ${(file.size / 1024 / 1024).toFixed(2)} MB</p>
+            <audio controls src="${url}"></audio>
+            <br>
+            <a href="${url}" download="${file.name}">下載檔案</a>
+          </div>
+        `;
+      } catch (error) {
+        resultDiv.innerHTML = `<div class="error">✗ 生成失敗: ${error.message}</div>`;
+        log(`生成失敗: ${error.message}`, 'error');
+      }
+    };
+    
+    window.generateLargeTestAudio = async function() {
+      const resultDiv = document.getElementById('test1-result');
+      try {
+        resultDiv.innerHTML = '<p>生成中（可能需要幾秒鐘）...</p>';
+        const file = await generateTestAudio(30);
+        window.generatedFiles.large = file;
+        
+        const url = URL.createObjectURL(file);
+        resultDiv.innerHTML = `
+          <div class="success">
+            <p>✓ 成功生成 30MB 測試音訊</p>
+            <p>檔案名稱: ${file.name}</p>
+            <p>實際大小: ${(file.size / 1024 / 1024).toFixed(2)} MB</p>
+            <p class="file-size-warning">⚠️ 此檔案超過 25MB 限制，需要預處理</p>
+            <audio controls src="${url}"></audio>
+            <br>
+            <a href="${url}" download="${file.name}">下載檔案</a>
+          </div>
+        `;
+      } catch (error) {
+        resultDiv.innerHTML = `<div class="error">✗ 生成失敗: ${error.message}</div>`;
+        log(`生成失敗: ${error.message}`, 'error');
+      }
+    };
+    
+    // 測試壓縮
+    window.testCompress = async function() {
+      const resultDiv = document.getElementById('test2-result');
+      const fileInput = document.getElementById('compress-file');
+      const profile = document.getElementById('compression-profile').value;
+      
+      if (!fileInput.files[0] && !window.generatedFiles.small) {
+        resultDiv.innerHTML = '<div class="error">請選擇檔案或先生成測試檔案</div>';
+        return;
+      }
+      
+      const file = fileInput.files[0] || window.generatedFiles.small;
+      
+      try {
+        log(`開始壓縮 ${file.name} (配置: ${profile})`);
+        resultDiv.innerHTML = '<p>壓縮中...</p>';
+        
+        if (!window.testModules.audioCompressor) {
+          await checkEnvironment();
+        }
+        
+        const { audioCompressor } = window.testModules;
+        
+        const result = await audioCompressor.compressAudioFile(file, {
+          profile: profile,
+          onProgress: (progress) => {
+            if (progress.stage) {
+              resultDiv.innerHTML = `<p>壓縮中... ${progress.stage} (${Math.round(progress.percentage || 0)}%)</p>`;
+            }
+          }
+        });
+        
+        const compressionRatio = (result.compressedSize / file.size * 100).toFixed(1);
+        
+        resultDiv.innerHTML = `
+          <div class="success">
+            <p>✓ 壓縮成功</p>
+            <p>原始大小: ${(file.size / 1024 / 1024).toFixed(2)} MB</p>
+            <p>壓縮後大小: ${(result.compressedSize / 1024 / 1024).toFixed(2)} MB</p>
+            <p>壓縮率: ${compressionRatio}%</p>
+            <p>壓縮配置: ${result.profile.description}</p>
+            <p>輸出取樣率: ${result.profile.sampleRate} Hz</p>
+            ${result.warning ? `<p class="warning">⚠️ ${result.warning}</p>` : ''}
+          </div>
+        `;
+        
+        log(`壓縮完成，壓縮率: ${compressionRatio}%`);
+        
+        audioCompressor.cleanup();
+      } catch (error) {
+        console.error('壓縮錯誤:', error);
+        resultDiv.innerHTML = `
+          <div class="error">
+            <p>✗ 壓縮失敗</p>
+            <p>${error.message}</p>
+            <pre>${error.stack}</pre>
+          </div>
+        `;
+        log(`壓縮失敗: ${error.message}`, 'error');
+      }
+    };
+    
+    // 測試分割
+    window.testSplit = async function() {
+      const resultDiv = document.getElementById('test3-result');
+      const fileInput = document.getElementById('split-file');
+      const segmentSize = parseInt(document.getElementById('segment-size').value) * 1024 * 1024;
+      
+      if (!fileInput.files[0] && !window.generatedFiles.large) {
+        resultDiv.innerHTML = '<div class="error">請選擇檔案或先生成測試檔案</div>';
+        return;
+      }
+      
+      const file = fileInput.files[0] || window.generatedFiles.large;
+      
+      try {
+        log(`開始分割 ${file.name} (每段大小: ${segmentSize / 1024 / 1024}MB)`);
+        resultDiv.innerHTML = '<p>分割中...</p>';
+        
+        if (!window.testModules.audioSplitter) {
+          await checkEnvironment();
+        }
+        
+        const { audioSplitter } = window.testModules;
+        
+        const result = await audioSplitter.splitAudioFile(file, {
+          maxSize: segmentSize,
+          onProgress: (progress) => {
+            resultDiv.innerHTML = `<p>分割進度: ${Math.round(progress.percentage || 0)}%</p>`;
+          }
+        });
+        
+        resultDiv.innerHTML = `
+          <div class="success">
+            <p>✓ 分割成功</p>
+            <p>原始檔案: ${file.name}</p>
+            <p>原始大小: ${(file.size / 1024 / 1024).toFixed(2)} MB</p>
+            <p>分割數量: ${result.totalSegments} 個片段</p>
+            <p>原始時長: ${result.originalDuration.toFixed(2)} 秒</p>
+            <details>
+              <summary>片段詳情</summary>
+              <pre>${JSON.stringify(result.segments.map(s => ({
+                name: s.file.name,
+                size: (s.file.size / 1024 / 1024).toFixed(2) + ' MB',
+                startTime: s.startTime.toFixed(2) + 's',
+                endTime: s.endTime.toFixed(2) + 's',
+                duration: s.duration.toFixed(2) + 's'
+              })), null, 2)}</pre>
+            </details>
+          </div>
+        `;
+        
+        log(`分割完成，生成 ${result.totalSegments} 個片段`);
+        
+        audioSplitter.cleanup();
+      } catch (error) {
+        console.error('分割錯誤:', error);
+        resultDiv.innerHTML = `
+          <div class="error">
+            <p>✗ 分割失敗</p>
+            <p>${error.message}</p>
+            <pre>${error.stack}</pre>
+          </div>
+        `;
+        log(`分割失敗: ${error.message}`, 'error');
+      }
+    };
+    
+    // 測試預處理
+    window.testPreprocess = async function() {
+      const resultDiv = document.getElementById('test4-result');
+      const fileInput = document.getElementById('preprocess-file');
+      
+      if (!fileInput.files[0] && !window.generatedFiles.large) {
+        resultDiv.innerHTML = '<div class="error">請選擇檔案或先生成測試檔案</div>';
+        return;
+      }
+      
+      const file = fileInput.files[0] || window.generatedFiles.large;
+      
+      try {
+        log(`開始預處理 ${file.name}`);
+        resultDiv.innerHTML = '<p>檢查檔案大小...</p>';
+        
+        if (!window.testModules.transcriptionPreprocessor) {
+          await checkEnvironment();
+        }
+        
+        const { transcriptionPreprocessor } = window.testModules;
+        
+        // 覆寫 showProcessingOptions 以自動選擇策略
+        transcriptionPreprocessor.showProcessingOptions = async function(fileInfo) {
+          log('檔案超過 25MB，自動選擇壓縮策略進行測試');
+          return 'compress';
+        };
+        
+        const result = await transcriptionPreprocessor.prepareForTranscription(file);
+        
+        resultDiv.innerHTML = `
+          <div class="success">
+            <h3>✓ 預處理完成</h3>
+            <p><strong>策略：</strong>${result.strategy}</p>
+            <p><strong>輸出檔案數：</strong>${result.files.length}</p>
+            <p><strong>總大小：</strong>${(result.totalSize / 1024 / 1024).toFixed(2)} MB</p>
+            <p><strong>預估成本：</strong>$${result.estimatedCost.toFixed(4)} USD</p>
+            ${result.warning ? `<p class="warning">⚠️ ${result.warning}</p>` : ''}
+            <details>
+              <summary>詳細資訊</summary>
+              <pre>${JSON.stringify({
+                strategy: result.strategy,
+                files: result.files.map(f => ({
+                  name: f.name,
+                  size: (f.size / 1024 / 1024).toFixed(2) + ' MB',
+                  type: f.type
+                })),
+                metadata: result.metadata
+              }, null, 2)}</pre>
+            </details>
+          </div>
+        `;
+        
+        log(`預處理完成，策略: ${result.strategy}`);
+        
+      } catch (error) {
+        console.error('預處理錯誤:', error);
+        resultDiv.innerHTML = `
+          <div class="error">
+            <p>✗ 預處理失敗</p>
+            <p>${error.message}</p>
+            <pre>${error.stack}</pre>
+          </div>
+        `;
+        log(`預處理失敗: ${error.message}`, 'error');
+      }
+    };
+    
+    // 初始化時檢查環境
+    window.addEventListener('load', () => {
+      checkEnvironment();
+    });
+  </script>
+</body>
+</html>

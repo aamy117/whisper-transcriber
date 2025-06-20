@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>整合測試 - Whisper 轉譯器</title>
+    <link rel="stylesheet" href="css/shared.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/preprocessing.css">
+    <style>
+        .test-suite {
+            max-width: 1000px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        
+        .test-group {
+            background: var(--bg-secondary);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-lg);
+            margin-bottom: var(--spacing-lg);
+        }
+        
+        .test-group h2 {
+            color: var(--text-primary);
+            margin-bottom: var(--spacing-md);
+        }
+        
+        .test-item {
+            display: flex;
+            align-items: center;
+            padding: var(--spacing-sm) 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .test-item:last-child {
+            border-bottom: none;
+        }
+        
+        .test-name {
+            flex: 1;
+            color: var(--text-primary);
+        }
+        
+        .test-status {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+        }
+        
+        .status-badge {
+            padding: 2px 8px;
+            border-radius: var(--radius-sm);
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .status-badge.pending {
+            background: var(--text-tertiary);
+            color: white;
+        }
+        
+        .status-badge.running {
+            background: var(--warning-color);
+            color: white;
+        }
+        
+        .status-badge.passed {
+            background: var(--success-color);
+            color: white;
+        }
+        
+        .status-badge.failed {
+            background: var(--danger-color);
+            color: white;
+        }
+        
+        .test-console {
+            background: #1a1a1a;
+            color: #f0f0f0;
+            border-radius: var(--radius-sm);
+            padding: var(--spacing-md);
+            margin-top: var(--spacing-md);
+            font-family: monospace;
+            font-size: 0.875rem;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        
+        .test-controls {
+            display: flex;
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-lg);
+        }
+        
+        .summary {
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-lg);
+            text-align: center;
+        }
+        
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: var(--spacing-md);
+            margin-top: var(--spacing-md);
+        }
+        
+        .stat {
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 600;
+        }
+        
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <div class="test-suite">
+        <h1>Whisper 轉譯器整合測試</h1>
+        
+        <div class="test-controls">
+            <button class="btn btn-primary" id="runAllTests">執行所有測試</button>
+            <button class="btn btn-secondary" id="clearConsole">清除控制台</button>
+            <label>
+                <input type="checkbox" id="verboseMode"> 詳細模式
+            </label>
+        </div>
+        
+        <!-- 測試群組 -->
+        <div class="test-group">
+            <h2>1. 基礎模組測試</h2>
+            <div class="test-item" data-test="config">
+                <span class="test-name">設定模組 (config.js)</span>
+                <div class="test-status">
+                    <span class="status-badge pending">待測</span>
+                </div>
+            </div>
+            <div class="test-item" data-test="notification">
+                <span class="test-name">通知系統 (notification.js)</span>
+                <div class="test-status">
+                    <span class="status-badge pending">待測</span>
+                </div>
+            </div>
+            <div class="test-item" data-test="dialog">
+                <span class="test-name">對話框系統 (dialog.js)</span>
+                <div class="test-status">
+                    <span class="status-badge pending">待測</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-group">
+            <h2>2. 音訊處理測試</h2>
+            <div class="test-item" data-test="preprocessor">
+                <span class="test-name">預處理器 (transcription-preprocessor.js)</span>
+                <div class="test-status">
+                    <span class="status-badge pending">待測</span>
+                </div>
+            </div>
+            <div class="test-item" data-test="compressor">
+                <span class="test-name">音訊壓縮器 (audio-compressor.js)</span>
+                <div class="test-status">
+                    <span class="status-badge pending">待測</span>
+                </div>
+            </div>
+            <div class="test-item" data-test="splitter">
+                <span class="test-name">音訊分割器 (audio-splitter.js)</span>
+                <div class="test-status">
+                    <span class="status-badge pending">待測</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-group">
+            <h2>3. 批次處理測試</h2>
+            <div class="test-item" data-test="batch-processor">
+                <span class="test-name">批次處理器 (batch-processor.js)</span>
+                <div class="test-status">
+                    <span class="status-badge pending">待測</span>
+                </div>
+            </div>
+            <div class="test-item" data-test="batch-queue">
+                <span class="test-name">佇列管理</span>
+                <div class="test-status">
+                    <span class="status-badge pending">待測</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-group">
+            <h2>4. API 整合測試</h2>
+            <div class="test-item" data-test="api-validation">
+                <span class="test-name">API 驗證</span>
+                <div class="test-status">
+                    <span class="status-badge pending">待測</span>
+                </div>
+            </div>
+            <div class="test-item" data-test="large-file-handling">
+                <span class="test-name">大檔案處理流程</span>
+                <div class="test-status">
+                    <span class="status-badge pending">待測</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 測試控制台 -->
+        <div class="test-console" id="testConsole">測試控制台準備就緒...</div>
+        
+        <!-- 測試總結 -->
+        <div class="summary" id="summary" style="display: none;">
+            <h3>測試總結</h3>
+            <div class="summary-stats">
+                <div class="stat">
+                    <div class="stat-value" id="totalTests">0</div>
+                    <div class="stat-label">總計</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="passedTests" style="color: var(--success-color)">0</div>
+                    <div class="stat-label">通過</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="failedTests" style="color: var(--danger-color)">0</div>
+                    <div class="stat-label">失敗</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="testDuration">0s</div>
+                    <div class="stat-label">耗時</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script type="module">
+        // 測試框架
+        class TestRunner {
+            constructor() {
+                this.tests = new Map();
+                this.console = document.getElementById('testConsole');
+                this.verbose = false;
+                this.startTime = null;
+                this.results = {
+                    total: 0,
+                    passed: 0,
+                    failed: 0
+                };
+                
+                this.registerTests();
+            }
+            
+            log(message, type = 'info') {
+                const timestamp = new Date().toISOString().substr(11, 8);
+                const prefix = {
+                    info: '[INFO]',
+                    success: '[PASS]',
+                    error: '[FAIL]',
+                    warning: '[WARN]',
+                    debug: '[DEBUG]'
+                }[type] || '[LOG]';
+                
+                const color = {
+                    info: '#3b82f6',
+                    success: '#10b981',
+                    error: '#ef4444',
+                    warning: '#f59e0b',
+                    debug: '#6b7280'
+                }[type] || '#ffffff';
+                
+                if (type !== 'debug' || this.verbose) {
+                    this.console.innerHTML += `<span style="color: ${color}">${timestamp} ${prefix}</span> ${message}\n`;
+                    this.console.scrollTop = this.console.scrollHeight;
+                }
+            }
+            
+            async runTest(name, testFn) {
+                const testItem = document.querySelector(`[data-test="${name}"]`);
+                const statusBadge = testItem.querySelector('.status-badge');
+                
+                statusBadge.textContent = '執行中';
+                statusBadge.className = 'status-badge running';
+                
+                try {
+                    this.log(`開始測試: ${name}`, 'info');
+                    await testFn();
+                    
+                    statusBadge.textContent = '通過';
+                    statusBadge.className = 'status-badge passed';
+                    this.results.passed++;
+                    this.log(`測試通過: ${name}`, 'success');
+                    
+                } catch (error) {
+                    statusBadge.textContent = '失敗';
+                    statusBadge.className = 'status-badge failed';
+                    this.results.failed++;
+                    this.log(`測試失敗: ${name} - ${error.message}`, 'error');
+                    
+                    if (this.verbose) {
+                        this.log(error.stack, 'debug');
+                    }
+                }
+                
+                this.results.total++;
+            }
+            
+            registerTests() {
+                // 基礎模組測試
+                this.tests.set('config', async () => {
+                    const Config = (await import('./js/config.js')).default;
+                    if (!Config.api || !Config.storage) {
+                        throw new Error('設定物件結構不正確');
+                    }
+                    this.log('設定載入成功', 'debug');
+                });
+                
+                this.tests.set('notification', async () => {
+                    const { notify } = await import('./js/notification.js');
+                    notify.success('測試通知');
+                    this.log('通知系統正常', 'debug');
+                });
+                
+                this.tests.set('dialog', async () => {
+                    const { dialogSystem } = await import('./js/dialog.js');
+                    if (!dialogSystem) {
+                        throw new Error('對話框系統未初始化');
+                    }
+                    this.log('對話框系統正常', 'debug');
+                });
+                
+                // 音訊處理測試
+                this.tests.set('preprocessor', async () => {
+                    const { transcriptionPreprocessor } = await import('./js/transcription-preprocessor.js');
+                    if (!transcriptionPreprocessor.prepareForTranscription) {
+                        throw new Error('預處理器方法缺失');
+                    }
+                    this.log('預處理器載入成功', 'debug');
+                });
+                
+                this.tests.set('compressor', async () => {
+                    const { audioCompressor } = await import('./js/audio-compressor.js');
+                    if (!audioCompressor.compressAudioFile) {
+                        throw new Error('壓縮器方法缺失');
+                    }
+                    this.log('壓縮器載入成功', 'debug');
+                });
+                
+                this.tests.set('splitter', async () => {
+                    const { audioSplitter } = await import('./js/audio-splitter.js');
+                    if (!audioSplitter.splitAudioFile) {
+                        throw new Error('分割器方法缺失');
+                    }
+                    this.log('分割器載入成功', 'debug');
+                });
+                
+                // 批次處理測試
+                this.tests.set('batch-processor', async () => {
+                    const { createBatchProcessor } = await import('./js/batch-processor.js');
+                    const mockAPI = { transcribe: async () => ({ text: 'test' }) };
+                    const processor = createBatchProcessor(mockAPI);
+                    
+                    if (!processor.addFiles || !processor.start) {
+                        throw new Error('批次處理器方法缺失');
+                    }
+                    this.log('批次處理器載入成功', 'debug');
+                });
+                
+                this.tests.set('batch-queue', async () => {
+                    const { createBatchProcessor } = await import('./js/batch-processor.js');
+                    const mockAPI = { transcribe: async () => ({ text: 'test' }) };
+                    const processor = createBatchProcessor(mockAPI);
+                    
+                    // 測試佇列操作
+                    const mockFile = new File(['test'], 'test.mp3', { type: 'audio/mp3' });
+                    const count = processor.addFiles([mockFile]);
+                    
+                    if (count !== 1 || processor.queue.length !== 1) {
+                        throw new Error('佇列操作失敗');
+                    }
+                    
+                    processor.clear();
+                    if (processor.queue.length !== 0) {
+                        throw new Error('清空佇列失敗');
+                    }
+                    
+                    this.log('佇列管理正常', 'debug');
+                });
+                
+                // API 整合測試
+                this.tests.set('api-validation', async () => {
+                    const { WhisperAPI } = await import('./js/api.js');
+                    const api = new WhisperAPI();
+                    
+                    // 測試檔案驗證
+                    const validFile = new File(['test'], 'test.mp3', { type: 'audio/mp3' });
+                    api.validateFile(validFile, true); // 跳過大小檢查
+                    
+                    this.log('API 驗證正常', 'debug');
+                });
+                
+                this.tests.set('large-file-handling', async () => {
+                    const { transcriptionPreprocessor } = await import('./js/transcription-preprocessor.js');
+                    
+                    // 創建模擬大檔案
+                    const largeFile = new File([new ArrayBuffer(30 * 1024 * 1024)], 'large.mp3', { type: 'audio/mp3' });
+                    
+                    // 測試檔案大小檢測
+                    if (largeFile.size <= transcriptionPreprocessor.maxFileSize) {
+                        throw new Error('大檔案檢測失敗');
+                    }
+                    
+                    this.log('大檔案處理邏輯正常', 'debug');
+                });
+            }
+            
+            async runAll() {
+                this.startTime = Date.now();
+                this.results = { total: 0, passed: 0, failed: 0 };
+                
+                this.log('開始執行整合測試...', 'info');
+                
+                for (const [name, testFn] of this.tests) {
+                    await this.runTest(name, testFn);
+                    await new Promise(resolve => setTimeout(resolve, 100)); // 避免過快
+                }
+                
+                const duration = ((Date.now() - this.startTime) / 1000).toFixed(1);
+                this.showSummary(duration);
+            }
+            
+            showSummary(duration) {
+                document.getElementById('summary').style.display = 'block';
+                document.getElementById('totalTests').textContent = this.results.total;
+                document.getElementById('passedTests').textContent = this.results.passed;
+                document.getElementById('failedTests').textContent = this.results.failed;
+                document.getElementById('testDuration').textContent = `${duration}s`;
+                
+                const passRate = (this.results.passed / this.results.total * 100).toFixed(1);
+                this.log(`\n測試完成！通過率: ${passRate}%`, 'info');
+            }
+            
+            clearConsole() {
+                this.console.innerHTML = '測試控制台已清除...\n';
+            }
+        }
+        
+        // 初始化測試
+        const runner = new TestRunner();
+        
+        // 綁定事件
+        document.getElementById('runAllTests').addEventListener('click', () => {
+            runner.runAll();
+        });
+        
+        document.getElementById('clearConsole').addEventListener('click', () => {
+            runner.clearConsole();
+        });
+        
+        document.getElementById('verboseMode').addEventListener('change', (e) => {
+            runner.verbose = e.target.checked;
+            runner.log(`詳細模式: ${runner.verbose ? '開啟' : '關閉'}`, 'info');
+        });
+        
+        // 自動執行測試（可選）
+        // runner.runAll();
+    </script>
+</body>
+</html>

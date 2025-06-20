@@ -5,6 +5,7 @@ import { TranscriptionEditor } from './editor.js';
 import { exportManager } from './export.js';
 import { notify } from './notification.js';
 import { dialog } from './dialog.js';
+import { transcriptionPreprocessor } from './transcription-preprocessor.js';
 
 // 主應用程式類別
 class WhisperApp {
@@ -516,15 +517,14 @@ class WhisperApp {
       const transcribeBtn = document.getElementById('transcribeBtn');
       if (transcribeBtn) {
         transcribeBtn.disabled = true;
-        transcribeBtn.textContent = '轉譯中...';
+        transcribeBtn.textContent = '處理中...';
       }
       
       // 顯示進度
-      this.showTranscriptionStatus('準備轉譯...');
+      this.showTranscriptionStatus('準備處理音訊檔案...');
       
-      // 估算時間
-      const estimate = this.whisperAPI.estimateTranscriptionTime(file.size);
-      this.showTranscriptionStatus(`正在轉譯... (預估 ${estimate.average} 秒)`);
+      // 使用預處理器準備檔案
+      const preprocessResult = await transcriptionPreprocessor.prepareForTranscription(file);
       
       // 建立專案（如果還沒有）
       if (!this.currentProject) {
@@ -537,19 +537,90 @@ class WhisperApp {
         };
       }
       
-      // 呼叫 API
-      const result = await this.whisperAPI.transcribe(file, {
-        language: 'zh', // 預設中文，後續可以讓使用者選擇
-        prompt: '以下是普通話的對話內容。' // 幫助提高中文識別準確度
-      });
+      // 根據預處理結果處理
+      let finalResult = null;
+      
+      if (preprocessResult.strategy === 'direct') {
+        // 直接轉譯
+        this.showTranscriptionStatus('正在轉譯...');
+        finalResult = await this.whisperAPI.transcribe(file, {
+          language: 'zh',
+          prompt: '以下是普通話的對話內容。',
+          skipSizeCheck: false  // 原始檔案需要檢查大小
+        });
+      } else {
+        // 需要分段或壓縮處理
+        this.showTranscriptionStatus(`使用${preprocessResult.strategy}策略處理...`);
+        
+        const allSegments = [];
+        let allText = '';
+        const totalFiles = preprocessResult.files.length;
+        
+        // 處理每個分段
+        for (let i = 0; i < totalFiles; i++) {
+          const segmentFile = preprocessResult.files[i];
+          const segmentInfo = preprocessResult.segments ? preprocessResult.segments[i] : null;
+          
+          this.showTranscriptionStatus(
+            `正在轉譯第 ${i + 1}/${totalFiles} 段...`, 
+            true
+          );
+          
+          try {
+            const segmentResult = await this.whisperAPI.transcribe(segmentFile, {
+              language: 'zh',
+              prompt: '以下是普通話的對話內容。',
+              skipSizeCheck: true  // 已處理的檔案跳過大小檢查
+            });
+            
+            // 如果有分段資訊，調整時間戳
+            if (segmentInfo && segmentResult.segments) {
+              const timeOffset = segmentInfo.startTime;
+              segmentResult.segments.forEach(seg => {
+                seg.start += timeOffset;
+                seg.end += timeOffset;
+              });
+            }
+            
+            allSegments.push(...(segmentResult.segments || []));
+            allText += (allText ? ' ' : '') + segmentResult.text;
+            
+          } catch (error) {
+            console.error(`分段 ${i + 1} 轉譯失敗:`, error);
+            throw new Error(`分段 ${i + 1} 轉譯失敗: ${error.message}`);
+          }
+        }
+        
+        // 合併結果
+        finalResult = {
+          text: allText,
+          segments: allSegments,
+          language: 'zh',
+          duration: preprocessResult.totalDuration || 0
+        };
+        
+        // 顯示處理資訊
+        if (preprocessResult.compressionRatio) {
+          this.showNotification(
+            `檔案已壓縮至 ${(preprocessResult.compressionRatio * 100).toFixed(0)}% 大小`,
+            'info'
+          );
+        }
+      }
       
       // 儲存結果
       this.currentProject.transcription = {
-        text: result.text,
-        segments: result.segments,
-        language: result.language,
-        duration: result.duration,
-        createdAt: new Date().toISOString()
+        text: finalResult.text,
+        segments: finalResult.segments,
+        language: finalResult.language,
+        duration: finalResult.duration,
+        createdAt: new Date().toISOString(),
+        processingStrategy: preprocessResult.strategy,
+        processingInfo: {
+          originalSize: file.size,
+          processedFiles: preprocessResult.files.length,
+          compressionRatio: preprocessResult.compressionRatio
+        }
       };
       
       // 顯示結果
@@ -575,6 +646,9 @@ class WhisperApp {
       
       // 隱藏狀態
       this.hideTranscriptionStatus();
+      
+      // 清理預處理器資源
+      transcriptionPreprocessor.cleanup();
     }
   }
   
