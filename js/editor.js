@@ -47,7 +47,7 @@ export class TranscriptionEditor {
 
     // 初始化虛擬滾動管理器
     this.virtualScrollManager = new VirtualScrollManager({
-      containerHeight: 600, // 編輯器預設高度
+      containerHeight: this.container.clientHeight || 600, // 使用實際容器高度，否則預設600
       itemHeight: 80,       // 預估每個段落高度
       bufferSize: 5,        // 緩衝區大小
       threshold: this.virtualScrollThreshold
@@ -125,12 +125,11 @@ export class TranscriptionEditor {
 
   // 使用虛擬滾動渲染
   renderWithVirtualScroll() {
-    // 初始化虛擬滾動（如果還沒有初始化到容器）
-    if (!this.virtualScrollManager.container) {
-      this.virtualScrollManager.init(this.container, (segment, index) => {
-        return this.createSegmentElement(segment, index);
-      });
-    }
+    // 確保虛擬滾動已經初始化到容器
+    // 每次都重新初始化，確保容器正確設置
+    this.virtualScrollManager.init(this.container, (segment, index) => {
+      return this.createSegmentElement(segment, index);
+    });
 
     // 設置段落數據
     this.virtualScrollManager.setItems(this.segments);

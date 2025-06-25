@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>虛擬滾動修復測試</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    .test-container {
+      margin-bottom: 20px;
+      padding: 20px;
+      border: 1px solid #ddd;
+      background: #f5f5f5;
+    }
+    
+    .scroll-container {
+      height: 500px;
+      border: 2px solid #333;
+      background: white;
+      margin: 20px 0;
+      position: relative;
+    }
+    
+    .segment {
+      padding: 15px;
+      border-bottom: 1px solid #eee;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    
+    .segment:hover {
+      background-color: #f0f0f0;
+    }
+    
+    .segment-active {
+      background-color: #e3f2fd !important;
+    }
+    
+    .segment-time {
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 5px;
+    }
+    
+    .segment-text {
+      color: #333;
+      line-height: 1.5;
+    }
+    
+    .controls {
+      margin: 20px 0;
+    }
+    
+    .controls button {
+      margin: 0 5px;
+      padding: 8px 16px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    
+    .controls button:hover {
+      background: #0056b3;
+    }
+    
+    .stats {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 14px;
+    }
+    
+    .stats div {
+      margin: 5px 0;
+    }
+    
+    .debug-info {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 10px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 12px;
+      max-width: 300px;
+    }
+    
+    .error {
+      color: #dc3545;
+      background: #f8d7da;
+      padding: 10px;
+      border: 1px solid #f5c6cb;
+      border-radius: 4px;
+      margin: 10px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>虛擬滾動修復測試</h1>
+  
+  <div class="test-container">
+    <h2>測試說明</h2>
+    <p>此測試頁面用於驗證虛擬滾動的修復，特別是滾動時出現空白視窗的問題。</p>
+    <p>修復內容：</p>
+    <ul>
+      <li>修正視口 transform 和項目絕對定位的雙重偏移問題</li>
+      <li>改進項目相對於視口的定位計算</li>
+      <li>優化高度測量後的重新渲染邏輯</li>
+      <li>改進滾動到指定索引的功能</li>
+    </ul>
+  </div>
+  
+  <div class="controls">
+    <button onclick="generateSegments(50)">生成 50 個段落</button>
+    <button onclick="generateSegments(100)">生成 100 個段落</button>
+    <button onclick="generateSegments(500)">生成 500 個段落</button>
+    <button onclick="generateSegments(1000)">生成 1000 個段落</button>
+    <button onclick="clearSegments()">清空</button>
+    <button onclick="scrollToRandom()">滾動到隨機位置</button>
+    <button onclick="toggleVirtualScroll()">切換虛擬滾動</button>
+  </div>
+  
+  <div class="stats" id="stats">
+    <div>狀態：等待初始化...</div>
+  </div>
+  
+  <div class="scroll-container" id="scrollContainer"></div>
+  
+  <div class="debug-info" id="debugInfo">
+    調試信息將顯示在這裡
+  </div>
+  
+  <script type="module">
+    import VirtualScrollManager from '../js/virtual-scroll-manager.js';
+    
+    let virtualScrollManager;
+    let segments = [];
+    let useVirtualScroll = true;
+    
+    // 初始化
+    function init() {
+      const container = document.getElementById('scrollContainer');
+      
+      virtualScrollManager = new VirtualScrollManager({
+        containerHeight: 500,
+        itemHeight: 80,
+        bufferSize: 5,
+        threshold: 50
+      });
+      
+      virtualScrollManager.init(container, (segment, index) => {
+        const div = document.createElement('div');
+        div.className = 'segment';
+        div.dataset.index = index;
+        
+        const timeEl = document.createElement('div');
+        timeEl.className = 'segment-time';
+        timeEl.textContent = formatTime(segment.start);
+        
+        const textEl = document.createElement('div');
+        textEl.className = 'segment-text';
+        textEl.textContent = segment.text;
+        
+        div.appendChild(timeEl);
+        div.appendChild(textEl);
+        
+        // 點擊事件
+        div.addEventListener('click', () => {
+          highlightSegment(index);
+        });
+        
+        return div;
+      });
+      
+      // 監聽滾動事件以更新調試信息
+      container.addEventListener('scroll', updateDebugInfo);
+      
+      updateStats();
+      console.log('虛擬滾動管理器初始化完成');
+    }
+    
+    // 生成測試段落
+    function generateSegments(count) {
+      segments = [];
+      let currentTime = 0;
+      
+      for (let i = 0; i < count; i++) {
+        const duration = Math.random() * 5 + 2; // 2-7 秒
+        segments.push({
+          id: `seg_${i}`,
+          start: currentTime,
+          end: currentTime + duration,
+          text: `這是第 ${i + 1} 個段落的測試文字。這段文字包含了一些隨機生成的內容，用於測試虛擬滾動的效果。段落長度可能會有所不同，以測試不同高度的項目。${Math.random() > 0.5 ? '這是額外的文字，使段落更長一些。' : ''}`
+        });
+        currentTime += duration;
+      }
+      
+      virtualScrollManager.setItems(segments);
+      updateStats();
+      updateDebugInfo();
+    }
+    
+    // 清空段落
+    function clearSegments() {
+      segments = [];
+      virtualScrollManager.setItems(segments);
+      updateStats();
+      updateDebugInfo();
+    }
+    
+    // 滾動到隨機位置
+    function scrollToRandom() {
+      if (segments.length === 0) return;
+      
+      const randomIndex = Math.floor(Math.random() * segments.length);
+      const positions = ['start', 'center', 'end'];
+      const randomPosition = positions[Math.floor(Math.random() * positions.length)];
+      
+      console.log(`滾動到索引 ${randomIndex}，位置：${randomPosition}`);
+      virtualScrollManager.scrollToIndex(randomIndex, randomPosition);
+      highlightSegment(randomIndex);
+    }
+    
+    // 高亮段落
+    function highlightSegment(index) {
+      // 移除所有高亮
+      document.querySelectorAll('.segment-active').forEach(el => {
+        el.classList.remove('segment-active');
+      });
+      
+      // 添加新高亮
+      setTimeout(() => {
+        const segmentEl = document.querySelector(`[data-index="${index}"]`);
+        if (segmentEl) {
+          segmentEl.classList.add('segment-active');
+        }
+      }, 100);
+    }
+    
+    // 切換虛擬滾動
+    function toggleVirtualScroll() {
+      useVirtualScroll = !useVirtualScroll;
+      virtualScrollManager.options.enableVirtualScroll = useVirtualScroll;
+      if (segments.length > 0) {
+        virtualScrollManager.setItems(segments);
+      }
+      updateStats();
+    }
+    
+    // 格式化時間
+    function formatTime(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    
+    // 更新統計信息
+    function updateStats() {
+      const stats = virtualScrollManager.getStats();
+      const statsEl = document.getElementById('stats');
+      
+      statsEl.innerHTML = `
+        <div>模式：${stats.isVirtualMode ? '虛擬滾動' : '普通渲染'}</div>
+        <div>總段落數：${stats.itemCount}</div>
+        <div>可見段落數：${stats.visibleCount}</div>
+        <div>渲染次數：${stats.renderCount}</div>
+        <div>平均渲染時間：${stats.averageRenderTime.toFixed(2)}ms</div>
+        <div>最後渲染時間：${stats.lastRenderTime.toFixed(2)}ms</div>
+      `;
+    }
+    
+    // 更新調試信息
+    function updateDebugInfo() {
+      const container = document.getElementById('scrollContainer');
+      const debugEl = document.getElementById('debugInfo');
+      const visibleRange = virtualScrollManager.visibleRange;
+      
+      debugEl.innerHTML = `
+        <div>滾動位置：${container.scrollTop.toFixed(0)}px</div>
+        <div>容器高度：${container.clientHeight}px</div>
+        <div>總高度：${virtualScrollManager.totalHeight.toFixed(0)}px</div>
+        <div>可見範圍：${visibleRange.start} - ${visibleRange.end}</div>
+        <div>視口 Transform：${virtualScrollManager.viewport ? virtualScrollManager.viewport.style.transform : 'N/A'}</div>
+      `;
+    }
+    
+    // 暴露函數到全局
+    window.generateSegments = generateSegments;
+    window.clearSegments = clearSegments;
+    window.scrollToRandom = scrollToRandom;
+    window.toggleVirtualScroll = toggleVirtualScroll;
+    
+    // 初始化
+    init();
+    
+    // 生成初始數據
+    generateSegments(200);
+  </script>
+</body>
+</html>

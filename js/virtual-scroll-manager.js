@@ -79,6 +79,8 @@ export class VirtualScrollManager {
     this.viewport = document.createElement('div');
     this.viewport.style.position = 'relative';
     this.viewport.style.willChange = 'transform'; // 優化渲染性能
+    this.viewport.style.width = '100%'; // 確保視口寬度正確
+    this.viewport.style.minHeight = '100%'; // 確保視口有最小高度
     
     // 創建佔位元素（用於維持滾動條高度）
     this.spacer = document.createElement('div');
@@ -88,6 +90,7 @@ export class VirtualScrollManager {
     this.spacer.style.width = '1px';
     this.spacer.style.visibility = 'hidden';
     this.spacer.style.pointerEvents = 'none';
+    this.spacer.style.zIndex = '-1'; // 確保佔位元素在最底層
     
     // 清空容器並添加新結構
     this.container.innerHTML = '';
@@ -228,6 +231,9 @@ export class VirtualScrollManager {
     // 創建文檔片段以提高性能
     const fragment = document.createDocumentFragment();
     
+    // 計算第一個可見項目的偏移量
+    const firstItemOffset = this.getItemOffset(start);
+    
     // 渲染可見項目
     for (let i = start; i <= end; i++) {
       const item = this.items[i];
@@ -237,7 +243,8 @@ export class VirtualScrollManager {
       const itemElement = document.createElement('div');
       itemElement.dataset.index = i;
       itemElement.style.position = 'absolute';
-      itemElement.style.top = this.getItemOffset(i) + 'px';
+      // 計算相對於視口的位置（減去第一個項目的偏移量）
+      itemElement.style.top = (this.getItemOffset(i) - firstItemOffset) + 'px';
       itemElement.style.left = '0';
       itemElement.style.right = '0';
       
@@ -261,8 +268,7 @@ export class VirtualScrollManager {
     this.viewport.appendChild(fragment);
     
     // 設置視口的 transform 以正確定位
-    const viewportOffset = this.getItemOffset(start);
-    this.viewport.style.transform = `translateY(${viewportOffset}px)`;
+    this.viewport.style.transform = `translateY(${firstItemOffset}px)`;
     
     // 異步測量新項目的高度
     if (this.measurementQueue.length > 0) {
@@ -316,9 +322,13 @@ export class VirtualScrollManager {
     
     this.measurementQueue = [];
     
-    // 如果高度有變化，重新計算總高度
+    // 如果高度有變化，需要重新渲染以更新位置
     if (heightChanged) {
       this.recalculateTotalHeight();
+      // 如果變化的項目在當前可見範圍內，需要重新渲染
+      requestAnimationFrame(() => {
+        this.render();
+      });
     }
   }
 
@@ -406,6 +416,12 @@ export class VirtualScrollManager {
     }
     
     this.container.scrollTop = Math.max(0, scrollTop);
+    
+    // 確保滾動後立即更新可見範圍並渲染
+    requestAnimationFrame(() => {
+      this.calculateVisibleRange();
+      this.render();
+    });
   }
 
   /**
