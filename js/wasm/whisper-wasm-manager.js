@@ -54,6 +54,9 @@ class WhisperWASMManager {
 
     // 真實 WASM 實現
     this.realWASM = null;
+    
+    // 進度回調
+    this.progressCallback = null;
   }
 
   /**
@@ -65,127 +68,67 @@ class WhisperWASMManager {
       return; // 已經初始化相同模型
     }
 
-    // 檢查是否有預載入的模型
-    const preloadedModel = modelPreloader.loadedModels.get(modelName);
-    if (preloadedModel) {
-      DEBUG && console.log(`使用預載入的模型: ${modelName}`);
-    }
+    try {
+      // 檢查是否有預載入的模型
+      const preloadedModel = modelPreloader.loadedModels.get(modelName);
+      if (preloadedModel) {
+        DEBUG && console.log(`使用預載入的模型: ${modelName}`);
+      }
 
-    // 使用優化版引擎
-    if (this.useOptimized) {
-      try {
-        DEBUG && console.log('初始化優化版 WASM 引擎...');
-        
-        if (!this.optimizedEngine) {
-          this.optimizedEngine = optimizedWhisperWASM;
-        }
-        
-        await this.optimizedEngine.initialize(modelName);
-        this.isInitialized = true;
-        this.currentModel = modelName;
-        
-        DEBUG && console.log('優化版 WASM 引擎初始化完成');
-        
-        // 顯示優化資訊
-        const perfEstimate = WASMConfig.getPerformanceEstimate(25);
-        DEBUG && console.log('效能預估:', perfEstimate);
-        
-        return;
-        
-      } catch (error) {
-        if (typeof DEBUG !== 'undefined' && DEBUG) {
-          console.error('優化版引擎初始化失敗，嘗試混合式架構:', error);
-          console.log('提示：優化版需要特殊的伺服器設定。詳見 docs/wasm-optimization-guide.md');
-        }
-        
-        // 嘗試使用混合式 Worker 架構
+      // 優先使用 Transformers.js（穩定可靠）
+      DEBUG && console.log('初始化 WASM (Transformers.js)...');
+
+      if (!this.realWASM) {
+        this.realWASM = new WhisperTransformers();
+
+        // 設定進度回調
+        this.realWASM.setProgressCallback((progress) => {
+          DEBUG && console.log('WASM 進度:', progress);
+          // 可以轉發給 UI
+          if (this.progressCallback) {
+            this.progressCallback(progress);
+          }
+        });
+      }
+
+      await this.realWASM.initialize(modelName);
+      this.isInitialized = true;
+      this.currentModel = modelName;
+      this.ENABLE_REAL_WASM = true; // 確保標記為啟用
+
+      DEBUG && console.log('WASM 初始化完成 (Transformers.js)');
+      return;
+
+    } catch (error) {
+      if (typeof DEBUG !== 'undefined' && DEBUG) {
+        console.error('WASM 初始化失敗:', error);
+      }
+      
+      // 如果 Transformers.js 失敗，嘗試混合式架構作為備份
+      if (this.useOptimized) {
         try {
-          DEBUG && console.log('初始化混合式 Worker 架構...');
+          DEBUG && console.log('嘗試混合式 Worker 架構作為備份...');
           
           // 獲取 Worker 路徑
           const workerPath = this.getWorkerPath();
           this.hybridWorkerPool = await createOptimizedWorkerPool(workerPath);
           
-          // 如果返回的是 Promise（完整優化版），等待它
-          if (this.hybridWorkerPool instanceof Promise) {
-            this.hybridWorkerPool = await this.hybridWorkerPool;
-            this.useOptimized = true;
-          } else {
-            // 使用混合式版本，需要初始化
-            this.useOptimized = false;
+          if (this.hybridWorkerPool && !(this.hybridWorkerPool instanceof Promise)) {
             await this.hybridWorkerPool.initialize(modelName);
-            DEBUG && console.log('使用混合式 Worker 池，預期 2-3x 效能提升');
+            this.isInitialized = true;
+            this.currentModel = modelName;
+            DEBUG && console.log('使用混合式 Worker 池');
+            return;
           }
-          
-          this.isInitialized = true;
-          this.currentModel = modelName;
-          return;
-          
         } catch (hybridError) {
-          if (typeof DEBUG !== 'undefined' && DEBUG) {
-            console.error('混合式架構也失敗，降級到標準版:', hybridError);
-          }
-          this.useOptimized = false;
-          this.hybridWorkerPool = null;
+          DEBUG && console.error('混合式架構也失敗:', hybridError);
         }
       }
+      
+      // 所有方案都失敗，拋出錯誤
+      throw new Error(`無法初始化 WASM: ${error.message}`);
     }
 
-    // 如果優化版失敗或未啟用，使用標準版
-    if (this.ENABLE_REAL_WASM) {
-      try {
-        DEBUG && console.log('初始化標準版 WASM (Transformers.js)...');
-
-        if (!this.realWASM) {
-          this.realWASM = new WhisperTransformers();
-
-          // 設定進度回調
-          this.realWASM.setProgressCallback((progress) => {
-            DEBUG && console.log('WASM 進度:', progress);
-            // 可以轉發給 UI
-          });
-        }
-
-        await this.realWASM.initialize(modelName);
-        this.isInitialized = true;
-        this.currentModel = modelName;
-
-        DEBUG && console.log('標準版 WASM 初始化完成');
-        return;
-
-      } catch (error) {
-        if (typeof DEBUG !== 'undefined' && DEBUG) console.error('標準版 WASM 初始化失敗:', error);
-        // 可以選擇回退到模擬模式
-        this.ENABLE_REAL_WASM = false;
-      }
-    }
-
-    try {
-      // 檢查瀏覽器支援
-      if (!this.checkWASMSupport()) {
-        throw new Error('您的瀏覽器不支援 WebAssembly，請使用較新版本的 Chrome、Firefox 或 Safari');
-      }
-
-      // 檢查記憶體需求
-      this.checkMemoryRequirements(modelName);
-
-      if (this.ENABLE_REAL_WASM) {
-        // 載入真實 WASM 模組
-        await this.loadWASMModule();
-        await this.loadModel(modelName);
-      } else {
-        // 開發模式：模擬載入
-        DEBUG && console.log(`[開發模式] 模擬載入 ${modelName} 模型`);
-        await this.simulateLoading(2000); // 模擬 2 秒載入時間
-      }
-
-      this.isInitialized = true;
-      this.currentModel = modelName;
-
-    } catch (error) {
-      if (typeof DEBUG !== 'undefined' && DEBUG) console.error('WASM 初始化失敗:', error);
-      throw error;
-    }
   }
 
   /**
@@ -235,25 +178,9 @@ class WhisperWASMManager {
    * 載入 WASM 模組（真實實作）
    */
   async loadWASMModule() {
-    // 真實 WASM 尚未實現，優雅降級到 Transformers.js
-    if (typeof DEBUG !== 'undefined' && DEBUG) {
-      console.warn('真實 WASM (whisper.cpp) 尚未實現，使用 Transformers.js 作為替代方案');
-      console.log('如需真實 WASM 支援，請參考 docs/wasm-implementation-technical-plan.md');
-    }
-    
-    // 降級到 Transformers.js 實現
-    this.ENABLE_REAL_WASM = false;
-    
-    if (!this.realWASM) {
-      this.realWASM = new WhisperTransformers();
-      
-      // 設定進度回調
-      this.realWASM.setProgressCallback((progress) => {
-        DEBUG && console.log('Transformers.js 進度:', progress);
-      });
-    }
-    
-    return; // 成功降級
+    // 這個方法現在已經不需要，因為我們直接使用 Transformers.js
+    DEBUG && console.log('loadWASMModule 方法已棄用');
+    return;
   }
 
   /**
@@ -296,21 +223,22 @@ class WhisperWASMManager {
       options.cancellationToken.throwIfCancelled();
     }
 
-    // 使用優化版引擎
-    if (this.useOptimized && this.optimizedEngine) {
-      try {
-        DEBUG && console.log('使用優化版引擎進行轉譯...');
-        const result = await this.optimizedEngine.transcribe(audioFile, options);
-        return result;
-      } catch (error) {
-        if (typeof DEBUG !== 'undefined' && DEBUG) console.error('優化版轉譯失敗，降級到混合式:', error);
-        this.useOptimized = false;
+    // 保存進度回調
+    this.progressCallback = options.onProgress;
+
+    try {
+      // 優先使用 Transformers.js
+      if (this.realWASM) {
+        DEBUG && console.log('使用 Transformers.js 進行轉譯...');
+        const result = await this.realWASM.transcribe(audioFile, options);
+        return {
+          ...result,
+          method: 'local-wasm-transformers'
+        };
       }
-    }
-    
-    // 使用混合式 Worker 池
-    if (this.hybridWorkerPool && !this.useOptimized) {
-      try {
+      
+      // 備用：混合式 Worker 池
+      if (this.hybridWorkerPool) {
         DEBUG && console.log('使用混合式 Worker 池進行轉譯...');
         
         // 準備音訊資料
@@ -333,20 +261,20 @@ class WhisperWASMManager {
           duration: audioBuffer.duration,
           method: 'local-wasm-hybrid'
         };
-        
-      } catch (error) {
-        if (typeof DEBUG !== 'undefined' && DEBUG) console.error('混合式轉譯失敗，降級到標準版:', error);
-        this.hybridWorkerPool = null;
       }
-    }
 
-    // 使用標準版
-    if (this.ENABLE_REAL_WASM) {
-      // 真實 WASM 轉譯
-      return await this.transcribeWithWASM(audioFile, options);
-    } else {
-      // 開發模式：模擬轉譯
-      return await this.simulateTranscription(audioFile, options);
+      // 如果都不可用，使用模擬模式（僅限開發）
+      if (DEBUG) {
+        return await this.simulateTranscription(audioFile, options);
+      }
+
+      throw new Error('沒有可用的轉譯引擎');
+
+    } catch (error) {
+      if (options.cancellationToken && options.cancellationToken.isCancelled) {
+        throw new Error('操作已取消');
+      }
+      throw error;
     }
   }
 
@@ -726,20 +654,40 @@ class WhisperWASMManager {
   }
 
   /**
+   * 設定進度回調
+   */
+  setProgressCallback(callback) {
+    this.progressCallback = callback;
+    if (this.realWASM) {
+      this.realWASM.setProgressCallback(callback);
+    }
+  }
+
+  /**
    * 取得 Worker 的正確路徑
    */
   getWorkerPath() {
-    // 取得當前頁面的路徑
-    const currentPath = window.location.pathname;
-    const pathSegments = currentPath.split('/').filter(Boolean);
-
-    // 如果在 test 目錄或其他子目錄中
-    if (pathSegments.length > 1 || (pathSegments.length === 1 && pathSegments[0].includes('test'))) {
-      return '../js/workers/whisper-worker.js';
+    // 使用絕對路徑，避免相對路徑問題
+    const origin = window.location.origin;
+    const pathname = window.location.pathname;
+    
+    // 找到專案根目錄
+    let basePath = pathname;
+    if (pathname.includes('/test/')) {
+      basePath = pathname.substring(0, pathname.indexOf('/test/'));
+    } else if (pathname.includes('.html')) {
+      basePath = pathname.substring(0, pathname.lastIndexOf('/'));
     }
-
-    // 如果在根目錄
-    return 'js/workers/whisper-worker.js';
+    
+    // 確保路徑以 / 結尾
+    if (!basePath.endsWith('/')) {
+      basePath += '/';
+    }
+    
+    const workerPath = `${origin}${basePath}js/workers/whisper-worker.js`;
+    DEBUG && console.log('Worker 路徑:', workerPath);
+    
+    return workerPath;
   }
 }
 

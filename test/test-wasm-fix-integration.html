@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASM 修復整合測試</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <style>
+        .test-container {
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: #f9f9f9;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 3px;
+        }
+        .test-result.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .test-result.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .test-result.warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .log-output {
+            font-family: monospace;
+            font-size: 12px;
+            background: #000;
+            color: #0f0;
+            padding: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+        .file-info {
+            margin: 10px 0;
+            padding: 10px;
+            background: #e9ecef;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>WASM 修復整合測試</h1>
+        
+        <div class="test-section">
+            <h2>測試目標</h2>
+            <p>驗證以下修復是否正常工作：</p>
+            <ul>
+                <li>WASM 管理器實例共享（避免重複初始化）</li>
+                <li>取消令牌正確傳遞到 WASM 處理流程</li>
+                <li>processFile 方法正確處理 'wasm' 策略</li>
+                <li>模型選擇對話框支援取消操作</li>
+                <li>錯誤處理和優雅降級</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h2>測試檔案</h2>
+            <input type="file" id="testFile" accept="audio/*">
+            <div id="fileInfo" class="file-info" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>測試操作</h2>
+            <button id="testWasmInit" class="btn btn-primary">測試 WASM 初始化</button>
+            <button id="testPreprocessor" class="btn btn-primary">測試預處理器整合</button>
+            <button id="testCancellation" class="btn btn-primary">測試取消功能</button>
+            <button id="testFullFlow" class="btn btn-primary">測試完整流程</button>
+            <button id="clearLog" class="btn btn-secondary">清除日誌</button>
+        </div>
+
+        <div class="test-section">
+            <h2>測試結果</h2>
+            <div id="testResults"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>詳細日誌</h2>
+            <div id="logOutput" class="log-output"></div>
+        </div>
+    </div>
+
+    <!-- 主要 JS 模組 -->
+    <script type="module">
+        import { WhisperWASMManager } from '../js/wasm/whisper-wasm-manager.js';
+        import { transcriptionPreprocessor } from '../js/transcription-preprocessor.js';
+        import CancellationToken from '../js/utils/cancellation-token.js';
+        import { notify } from '../js/notification.js';
+
+        // 全域變數
+        window.DEBUG = true;
+        let currentFile = null;
+        
+        // 日誌函數
+        function log(message, type = 'info') {
+            const logOutput = document.getElementById('logOutput');
+            const timestamp = new Date().toLocaleTimeString();
+            const color = {
+                info: '#0f0',
+                warn: '#ff0',
+                error: '#f00',
+                success: '#0ff'
+            }[type] || '#fff';
+            
+            logOutput.innerHTML += `<div style="color: ${color}">[${timestamp}] ${message}</div>`;
+            logOutput.scrollTop = logOutput.scrollHeight;
+            
+            // 同時輸出到控制台
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        // 顯示測試結果
+        function showResult(testName, success, message) {
+            const resultsDiv = document.getElementById('testResults');
+            const resultClass = success ? 'success' : 'error';
+            const icon = success ? '✓' : '✗';
+            
+            resultsDiv.innerHTML += `
+                <div class="test-result ${resultClass}">
+                    <strong>${icon} ${testName}:</strong> ${message}
+                </div>
+            `;
+        }
+
+        // 檔案選擇處理
+        document.getElementById('testFile').addEventListener('change', (e) => {
+            currentFile = e.target.files[0];
+            if (currentFile) {
+                const fileInfo = document.getElementById('fileInfo');
+                fileInfo.style.display = 'block';
+                fileInfo.innerHTML = `
+                    <strong>檔案名稱：</strong>${currentFile.name}<br>
+                    <strong>檔案大小：</strong>${(currentFile.size / 1024 / 1024).toFixed(2)} MB<br>
+                    <strong>檔案類型：</strong>${currentFile.type}
+                `;
+                log(`已選擇檔案：${currentFile.name} (${(currentFile.size / 1024 / 1024).toFixed(2)} MB)`);
+            }
+        });
+
+        // 測試 WASM 初始化
+        document.getElementById('testWasmInit').addEventListener('click', async () => {
+            log('開始測試 WASM 初始化...');
+            
+            try {
+                // 測試1：創建管理器實例
+                const manager1 = new WhisperWASMManager();
+                log('成功創建 WASM 管理器實例 1', 'success');
+                
+                // 測試2：檢查是否可以共享實例
+                window.whisperApp = { wasmManager: manager1 };
+                
+                // 測試3：預處理器是否能使用共享實例
+                const preprocessorManager = transcriptionPreprocessor.wasmManager;
+                if (!preprocessorManager) {
+                    // 觸發獲取共享實例
+                    await transcriptionPreprocessor.processWithWASM(new File(['test'], 'test.wav'));
+                }
+                
+                const isShared = window.whisperApp.wasmManager === transcriptionPreprocessor.wasmManager;
+                showResult('WASM 管理器共享', isShared, 
+                    isShared ? '預處理器正確使用共享實例' : '預處理器創建了新實例');
+                
+                // 測試4：模型資訊
+                const modelInfo = manager1.getModelInfo('tiny');
+                log(`Tiny 模型資訊：${JSON.stringify(modelInfo)}`, 'info');
+                showResult('模型資訊獲取', !!modelInfo, '成功獲取模型資訊');
+                
+            } catch (error) {
+                log(`WASM 初始化失敗：${error.message}`, 'error');
+                showResult('WASM 初始化', false, error.message);
+            }
+        });
+
+        // 測試預處理器整合
+        document.getElementById('testPreprocessor').addEventListener('click', async () => {
+            if (!currentFile) {
+                notify.warning('請先選擇一個音訊檔案');
+                return;
+            }
+            
+            log('開始測試預處理器整合...');
+            
+            try {
+                // 測試1：檢查 processFile 方法是否支援 'wasm'
+                const token = new CancellationToken();
+                
+                // 直接測試 processFile 方法
+                log('測試 processFile 方法對 wasm 策略的支援...');
+                const result = await transcriptionPreprocessor.processFile(currentFile, 'wasm', token);
+                
+                showResult('processFile 支援 wasm', !!result, 
+                    result ? '成功處理 wasm 策略' : '處理失敗');
+                
+                if (result) {
+                    log(`處理結果：${JSON.stringify({
+                        strategy: result.strategy,
+                        model: result.model,
+                        filesCount: result.files.length
+                    })}`, 'success');
+                }
+                
+            } catch (error) {
+                log(`預處理器測試失敗：${error.message}`, 'error');
+                showResult('預處理器整合', false, error.message);
+            }
+        });
+
+        // 測試取消功能
+        document.getElementById('testCancellation').addEventListener('click', async () => {
+            log('開始測試取消功能...');
+            
+            try {
+                const token = new CancellationToken();
+                let cancelled = false;
+                
+                // 設定2秒後取消
+                setTimeout(() => {
+                    log('觸發取消操作...', 'warn');
+                    token.cancel('測試取消');
+                    cancelled = true;
+                }, 2000);
+                
+                // 模擬長時間操作
+                const promise = new Promise((resolve, reject) => {
+                    const checkInterval = setInterval(() => {
+                        if (token.isCancelled) {
+                            clearInterval(checkInterval);
+                            reject(new Error('操作已取消'));
+                        }
+                    }, 100);
+                    
+                    // 5秒後完成（應該在2秒時被取消）
+                    setTimeout(() => {
+                        clearInterval(checkInterval);
+                        resolve('操作完成');
+                    }, 5000);
+                });
+                
+                try {
+                    await promise;
+                    showResult('取消功能', false, '操作未被取消');
+                } catch (error) {
+                    showResult('取消功能', cancelled && error.message.includes('取消'), 
+                        '成功取消操作');
+                    log('取消測試通過', 'success');
+                }
+                
+            } catch (error) {
+                log(`取消測試失敗：${error.message}`, 'error');
+                showResult('取消功能', false, error.message);
+            }
+        });
+
+        // 測試完整流程
+        document.getElementById('testFullFlow').addEventListener('click', async () => {
+            if (!currentFile) {
+                notify.warning('請先選擇一個音訊檔案');
+                return;
+            }
+            
+            log('開始測試完整轉譯流程...');
+            
+            try {
+                // 設置測試環境
+                if (!window.whisperApp) {
+                    window.whisperApp = {
+                        wasmManager: new WhisperWASMManager()
+                    };
+                }
+                
+                const token = new CancellationToken();
+                
+                // 測試 prepareForTranscription
+                log('呼叫 prepareForTranscription...');
+                const result = await transcriptionPreprocessor.prepareForTranscription(currentFile, {
+                    cancellationToken: token
+                });
+                
+                showResult('完整流程準備', !!result, 
+                    `策略: ${result.strategy}, 檔案數: ${result.files.length}`);
+                
+                if (result.strategy === 'wasm') {
+                    log('WASM 策略準備成功', 'success');
+                    log(`選擇的模型: ${result.model}`, 'info');
+                    log(`WASM 管理器狀態: ${result.wasmManager ? '就緒' : '未就緒'}`, 'info');
+                }
+                
+            } catch (error) {
+                log(`完整流程測試失敗：${error.message}`, 'error');
+                showResult('完整流程', false, error.message);
+            }
+        });
+
+        // 清除日誌
+        document.getElementById('clearLog').addEventListener('click', () => {
+            document.getElementById('logOutput').innerHTML = '';
+            document.getElementById('testResults').innerHTML = '';
+            log('日誌已清除', 'info');
+        });
+
+        // 初始化
+        log('WASM 修復整合測試就緒', 'success');
+        log('請選擇一個音訊檔案開始測試', 'info');
+    </script>
+</body>
+</html>

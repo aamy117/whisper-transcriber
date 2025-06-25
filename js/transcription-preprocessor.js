@@ -531,6 +531,9 @@ export class TranscriptionPreprocessor {
       case 'hybrid':
         return await this.hybridProcess(file, cancellationToken);
 
+      case 'wasm':
+        return await this.processWithWASM(file, cancellationToken);
+
       default:
         throw new Error(`未知的處理策略：${strategy}`);
     }
@@ -757,16 +760,26 @@ export class TranscriptionPreprocessor {
 
   /**
    * 使用 WASM 本地處理
+   * @param {File} file - 要處理的檔案
+   * @param {CancellationToken} cancellationToken - 取消令牌
    */
-  async processWithWASM(file) {
+  async processWithWASM(file, cancellationToken) {
     try {
-      // 初始化 WASM 管理器
+      // 使用全域的 WASM 管理器（如果存在）
       if (!this.wasmManager) {
-        this.wasmManager = new WhisperWASMManager();
+        // 嘗試使用主程式的 WASM 管理器
+        if (window.whisperApp && window.whisperApp.wasmManager) {
+          this.wasmManager = window.whisperApp.wasmManager;
+          DEBUG && console.log('使用主程式的 WASM 管理器');
+        } else {
+          // 如果沒有，才創建新的
+          this.wasmManager = new WhisperWASMManager();
+          DEBUG && console.log('創建新的 WASM 管理器');
+        }
       }
 
       // 顯示模型選擇對話框
-      const modelChoice = await this.showModelSelectionDialog();
+      const modelChoice = await this.showModelSelectionDialog(cancellationToken);
       if (!modelChoice) {
         throw new Error('使用者取消選擇模型');
       }
@@ -783,7 +796,12 @@ export class TranscriptionPreprocessor {
         title: '本地轉譯準備',
         message: '正在準備本地轉譯環境...',
         stages: stages,
-        cancellable: false,
+        cancellable: true,
+        onCancel: () => {
+          if (cancellationToken) {
+            cancellationToken.cancel('使用者取消 WASM 準備');
+          }
+        },
         showDetails: true,
         icon: '🖥️'
       });
@@ -805,6 +823,11 @@ export class TranscriptionPreprocessor {
         
         await this.wasmManager.initialize(modelChoice, {
           onProgress: (progress) => {
+            // 檢查是否已取消
+            if (cancellationToken && cancellationToken.isCancelled) {
+              throw new Error('操作已取消');
+            }
+            
             if (progress.stage === 'download') {
               progressControl.update(10 + progress.percentage * 0.3, progress.message);
               progressControl.addDetail('下載進度', `${progress.percentage}%`);
@@ -812,7 +835,8 @@ export class TranscriptionPreprocessor {
               progressControl.setStage(currentStage); // 載入模型
               progressControl.update(50 + progress.percentage * 0.3, progress.message);
             }
-          }
+          },
+          cancellationToken: cancellationToken
         });
         
         progressControl.setStage(currentStage++); // 準備轉譯
@@ -843,8 +867,9 @@ export class TranscriptionPreprocessor {
 
   /**
    * 顯示模型選擇對話框
+   * @param {CancellationToken} cancellationToken - 取消令牌
    */
-  async showModelSelectionDialog() {
+  async showModelSelectionDialog(cancellationToken) {
     const models = [
       { id: 'tiny', name: 'Tiny', size: '75MB', speed: '快', accuracy: '基本', description: '最快速度，適合快速預覽' },
       { id: 'base', name: 'Base', size: '142MB', speed: '中', accuracy: '良好', description: '平衡速度與品質（推薦）' },
@@ -875,7 +900,7 @@ export class TranscriptionPreprocessor {
       </div>
     `;
 
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const overlay = document.createElement('div');
       overlay.className = 'dialog-overlay';
       // 設定更高的 z-index 以確保顯示在進度模態框之上
@@ -905,9 +930,21 @@ export class TranscriptionPreprocessor {
       const closeModal = () => {
         overlay.classList.remove('show');
         setTimeout(() => {
-          document.body.removeChild(overlay);
+          if (overlay.parentNode) {
+            document.body.removeChild(overlay);
+          }
         }, 300);
       };
+
+      // 如果有取消令牌，監聽取消事件
+      let cancelHandler = null;
+      if (cancellationToken) {
+        cancelHandler = () => {
+          closeModal();
+          reject(new Error('操作已取消'));
+        };
+        cancellationToken.onCancelled(cancelHandler);
+      }
 
       let selectedModel = null;
       const confirmBtn = overlay.querySelector('#confirmBtn');
@@ -926,11 +963,19 @@ export class TranscriptionPreprocessor {
 
       // 綁定按鈕事件
       overlay.querySelector('#cancelBtn').addEventListener('click', () => {
+        // 移除取消處理器
+        if (cancelHandler && cancellationToken) {
+          cancellationToken.offCancelled(cancelHandler);
+        }
         closeModal();
         resolve(null);
       });
 
       confirmBtn.addEventListener('click', () => {
+        // 移除取消處理器
+        if (cancelHandler && cancellationToken) {
+          cancellationToken.offCancelled(cancelHandler);
+        }
         closeModal();
         resolve(selectedModel);
       });
