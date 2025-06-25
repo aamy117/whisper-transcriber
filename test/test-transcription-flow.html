@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>轉譯流程測試</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/preprocessing.css">
+  <link rel="stylesheet" href="../css/progress.css">
+  <style>
+    body {
+      padding: 20px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    
+    .test-section {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    
+    .test-button {
+      padding: 10px 20px;
+      background: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    
+    .test-button:hover {
+      opacity: 0.8;
+    }
+    
+    .log {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      padding: 15px;
+      margin-top: 20px;
+      min-height: 200px;
+      font-family: monospace;
+      font-size: 0.9rem;
+      white-space: pre-wrap;
+      overflow-y: auto;
+      max-height: 400px;
+    }
+    
+    .file-info {
+      background: var(--bg-tertiary);
+      padding: 10px;
+      border-radius: 4px;
+      margin: 10px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>轉譯流程測試</h1>
+  
+  <div class="test-section">
+    <h2>測試完整轉譯流程</h2>
+    <p>此測試頁面驗證修復後的轉譯流程，確保對話框能正確顯示。</p>
+    
+    <input type="file" id="fileInput" accept="audio/*,video/*">
+    
+    <div class="file-info" id="fileInfo" style="display: none;">
+      <strong>檔案名稱：</strong><span id="fileName"></span><br>
+      <strong>檔案大小：</strong><span id="fileSize"></span>
+    </div>
+    
+    <button class="test-button" onclick="testTranscriptionFlow()">測試轉譯流程</button>
+    <button class="test-button" onclick="clearLog()">清除日誌</button>
+    
+    <div class="log" id="log"></div>
+  </div>
+  
+  <script type="module">
+    import { transcriptionPreprocessor } from '../js/transcription-preprocessor.js';
+    import CancellationToken from '../js/utils/cancellation-token.js';
+    import { progressManager, showProcessingProgress } from '../js/progress-manager.js';
+    
+    function log(message, type = 'info') {
+      const logEl = document.getElementById('log');
+      const timestamp = new Date().toLocaleTimeString('zh-TW');
+      const typeIcon = {
+        info: 'ℹ️',
+        success: '✅',
+        warning: '⚠️',
+        error: '❌'
+      }[type] || 'ℹ️';
+      
+      logEl.innerHTML += `[${timestamp}] ${typeIcon} ${message}\n`;
+      logEl.scrollTop = logEl.scrollHeight;
+      console.log(`[${type}]`, message);
+    }
+    
+    window.log = log;
+    
+    // 檔案選擇事件
+    document.getElementById('fileInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        document.getElementById('fileInfo').style.display = 'block';
+        document.getElementById('fileName').textContent = file.name;
+        document.getElementById('fileSize').textContent = `${(file.size / 1024 / 1024).toFixed(2)} MB`;
+        
+        log(`已選擇檔案：${file.name}`, 'success');
+        if (file.size > 25 * 1024 * 1024) {
+          log('檔案大於 25MB，將顯示處理選項', 'warning');
+        }
+      }
+    });
+    
+    // 測試轉譯流程
+    window.testTranscriptionFlow = async function() {
+      const fileInput = document.getElementById('fileInput');
+      const file = fileInput.files[0];
+      
+      if (!file) {
+        log('請先選擇檔案', 'error');
+        return;
+      }
+      
+      log('開始測試轉譯流程...', 'info');
+      
+      const cancellationToken = new CancellationToken();
+      let progressControl = null;
+      
+      try {
+        // 步驟 1：調用預處理器（這會顯示選擇對話框）
+        log('步驟 1：調用預處理器準備檔案...', 'info');
+        const preprocessResult = await transcriptionPreprocessor.prepareForTranscription(file, {
+          cancellationToken: cancellationToken
+        });
+        
+        log(`預處理完成，策略：${preprocessResult.strategy}`, 'success');
+        log(`預處理結果：${JSON.stringify(preprocessResult, null, 2)}`, 'info');
+        
+        // 步驟 2：顯示進度管理器（在選擇後）
+        log('步驟 2：顯示進度管理器...', 'info');
+        
+        let stages = [];
+        if (preprocessResult.strategy === 'wasm') {
+          stages = ['準備環境', '載入模型', '執行轉譯', '處理結果'];
+        } else if (preprocessResult.strategy === 'split') {
+          stages = ['準備檔案', '分割音訊', '執行轉譯', '合併結果'];
+        } else {
+          stages = ['準備檔案', '執行轉譯', '處理結果'];
+        }
+        
+        progressControl = showProcessingProgress(
+          '音訊轉譯處理',
+          stages,
+          () => {
+            log('使用者點擊取消', 'warning');
+            cancellationToken.cancel('使用者取消');
+          }
+        );
+        
+        // 模擬進度更新
+        for (let i = 0; i < stages.length; i++) {
+          progressControl.setStage(i);
+          progressControl.update((i + 1) * 25, `處理階段：${stages[i]}`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+        progressControl.complete();
+        log('轉譯流程測試完成！', 'success');
+        
+      } catch (error) {
+        log(`錯誤：${error.message}`, 'error');
+        console.error(error);
+        if (progressControl) {
+          progressControl.error(error.message);
+        }
+      }
+    };
+    
+    // 清除日誌
+    window.clearLog = function() {
+      document.getElementById('log').innerHTML = '';
+      log('日誌已清除', 'info');
+    };
+    
+    // 頁面載入完成
+    document.addEventListener('DOMContentLoaded', () => {
+      log('測試頁面載入完成', 'success');
+      log('請選擇音訊檔案開始測試', 'info');
+    });
+  </script>
+</body>
+</html>

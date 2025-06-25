@@ -4,12 +4,16 @@
  * 不影響純播放功能
  */
 
+// 調試模式開關
+const DEBUG = typeof process !== 'undefined' ? process.env.NODE_ENV !== 'production' : location.hostname === 'localhost';
+
 import Config from './config.js';
 import { dialog } from './dialog.js';
 import { notify } from './notification.js';
 import { audioSplitter } from './audio-splitter.js';
 import { audioCompressor } from './audio-compressor.js';
 import { WhisperWASMManager } from './wasm/whisper-wasm-manager.js';
+import { progressManager } from './progress-manager.js';
 
 export class TranscriptionPreprocessor {
   constructor() {
@@ -17,7 +21,7 @@ export class TranscriptionPreprocessor {
     this.audioContext = null;
     // 功能開關：是否啟用 WASM 本地轉譯
     this.ENABLE_WASM = true; // 設為 true 以啟用 WASM 選項
-    
+
     this.processingOptions = {
       split: {
         name: '智能分割',
@@ -35,35 +39,49 @@ export class TranscriptionPreprocessor {
         icon: '🔄'
       }
     };
-    
+
     // 不再將 WASM 作為處理選項，而是作為獨立的轉譯方式
-    
+
     // WASM 管理器實例
     this.wasmManager = null;
   }
-  
+
   /**
    * 準備檔案進行轉譯
    * 這是主要入口，只在使用者要求轉譯時調用
+   * @param {File} file - 要處理的音訊檔案
+   * @param {Object} options - 選項
+   * @param {CancellationToken} options.cancellationToken - 取消令牌
    */
-  async prepareForTranscription(file) {
-    // 第一步：讓使用者選擇轉譯方式（本地 or API）
-    const transcriptionMethod = await this.showTranscriptionMethodChoice(file);
+  async prepareForTranscription(file, options = {}) {
+    const { cancellationToken } = options;
     
+    DEBUG && console.log('prepareForTranscription 開始, 檔案:', file.name, '大小:', file.size);
+    
+    // 檢查是否已取消
+    if (cancellationToken) {
+      cancellationToken.throwIfCancelled();
+    }
+    
+    // 第一步：讓使用者選擇轉譯方式（本地 or API）
+    DEBUG && console.log('顯示轉譯方式選擇對話框...');
+    const transcriptionMethod = await this.showTranscriptionMethodChoice(file, cancellationToken);
+    DEBUG && console.log('使用者選擇:', transcriptionMethod);
+
     if (!transcriptionMethod) {
       // 使用者取消
       throw new Error('使用者取消選擇');
     }
-    
+
     // 根據選擇的方式處理
     if (transcriptionMethod === 'local') {
       // 本地轉譯流程
       notify.info('準備使用本地轉譯...');
       return await this.processWithWASM(file);
-      
+
     } else if (transcriptionMethod === 'api') {
       // API 轉譯流程
-      
+
       // 檢查檔案大小
       if (file.size <= this.maxFileSize) {
         // 檔案大小符合限制，直接使用 API
@@ -74,7 +92,7 @@ export class TranscriptionPreprocessor {
           estimatedCost: this.estimateCost(file.size, 1)
         };
       }
-      
+
       // 檔案超過限制，顯示處理選項（分割/壓縮/混合）
       const fileInfo = {
         name: file.name,
@@ -82,36 +100,41 @@ export class TranscriptionPreprocessor {
         sizeMB: (file.size / 1024 / 1024).toFixed(2),
         exceedBy: ((file.size - this.maxFileSize) / 1024 / 1024).toFixed(2)
       };
-      
+
       // 讓使用者選擇處理策略
-      const strategy = await this.showProcessingOptions(fileInfo);
-      
+      const strategy = await this.showProcessingOptions(fileInfo, cancellationToken);
+
       if (!strategy) {
         // 使用者取消
         throw new Error('使用者取消處理');
       }
-      
+
       // 根據選擇的策略處理檔案
       notify.info(`正在使用${this.processingOptions[strategy].name}處理檔案...`);
-      
+
       try {
-        const result = await this.processFile(file, strategy);
+        const result = await this.processFile(file, strategy, cancellationToken);
         return result;
       } catch (error) {
+        if (error.name === 'CancellationError') {
+          throw error;  // 重新拋出取消錯誤
+        }
         notify.error(`檔案處理失敗：${error.message}`);
         throw error;
       }
     }
   }
-  
+
   /**
    * 顯示轉譯方式選擇對話框（第一層選擇）
+   * @param {File} file - 音訊檔案
+   * @param {CancellationToken} cancellationToken - 取消令牌
    */
-  async showTranscriptionMethodChoice(file) {
+  async showTranscriptionMethodChoice(file, cancellationToken) {
     const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
     const estimatedDuration = this.estimateAudioDuration(file.size);
     const apiCost = this.estimateCost(file.size, 1);
-    
+
     const content = `
       <div class="method-choice-container">
         <div class="file-summary">
@@ -121,9 +144,9 @@ export class TranscriptionPreprocessor {
             <p>大小：${fileSizeMB} MB | 預估長度：${Math.round(estimatedDuration)} 分鐘</p>
           </div>
         </div>
-        
+
         <p class="choice-prompt">請選擇轉譯方式：</p>
-        
+
         <div class="method-options">
           <div class="method-card" data-method="local">
             <div class="method-header">
@@ -145,7 +168,7 @@ export class TranscriptionPreprocessor {
               <span class="time">預估：${Math.round(estimatedDuration * 2)}-${Math.round(estimatedDuration * 3)} 分鐘</span>
             </div>
           </div>
-          
+
           <div class="method-card" data-method="api">
             <div class="method-header">
               <div class="method-icon">☁️</div>
@@ -167,7 +190,7 @@ export class TranscriptionPreprocessor {
             </div>
           </div>
         </div>
-        
+
         <div class="remember-choice">
           <label>
             <input type="checkbox" id="rememberChoice">
@@ -176,10 +199,12 @@ export class TranscriptionPreprocessor {
         </div>
       </div>
     `;
-    
-    return new Promise((resolve) => {
+
+    return new Promise((resolve, reject) => {
       const overlay = document.createElement('div');
       overlay.className = 'dialog-overlay';
+      // 設定更高的 z-index 以確保顯示在進度模態框之上
+      overlay.style.zIndex = '10010';
       overlay.innerHTML = `
         <div class="dialog method-choice-dialog">
           <div class="dialog-header">
@@ -194,24 +219,36 @@ export class TranscriptionPreprocessor {
           </div>
         </div>
       `;
-      
+
       document.body.appendChild(overlay);
-      
+
       // 添加顯示動畫
       requestAnimationFrame(() => {
         overlay.classList.add('show');
       });
-      
+
       const closeModal = () => {
         overlay.classList.remove('show');
         setTimeout(() => {
-          document.body.removeChild(overlay);
+          if (overlay.parentNode) {
+            document.body.removeChild(overlay);
+          }
         }, 300);
       };
-      
+
+      // 如果有取消令牌，監聽取消事件
+      let cancelHandler = null;
+      if (cancellationToken) {
+        cancelHandler = () => {
+          closeModal();
+          reject(new Error('操作已取消'));
+        };
+        cancellationToken.onCancelled(cancelHandler);
+      }
+
       let selectedMethod = null;
       const confirmBtn = overlay.querySelector('#confirmBtn');
-      
+
       // 檢查是否有記住的選擇
       const savedChoice = localStorage.getItem('preferredTranscriptionMethod');
       if (savedChoice && this.ENABLE_WASM) {
@@ -223,7 +260,7 @@ export class TranscriptionPreprocessor {
           // setTimeout(() => confirmBtn.click(), 500);
         }
       }
-      
+
       // 綁定選項點擊事件
       overlay.querySelectorAll('.method-card').forEach(card => {
         // 如果是本地轉譯但 WASM 未啟用，則禁用
@@ -232,52 +269,54 @@ export class TranscriptionPreprocessor {
           card.innerHTML += '<div class="disabled-notice">⚠️ 本地轉譯功能未啟用</div>';
           return;
         }
-        
+
         card.addEventListener('click', () => {
           // 移除其他選中狀態
           overlay.querySelectorAll('.method-card').forEach(c => {
             c.classList.remove('selected');
           });
-          
+
           // 設定選中狀態
           card.classList.add('selected');
           selectedMethod = card.dataset.method;
           confirmBtn.disabled = false;
         });
       });
-      
+
       // 綁定按鈕事件
       overlay.querySelector('#cancelBtn').addEventListener('click', () => {
         closeModal();
         resolve(null);
       });
-      
+
       confirmBtn.addEventListener('click', () => {
         // 檢查是否要記住選擇
         const rememberCheckbox = overlay.querySelector('#rememberChoice');
         if (rememberCheckbox && rememberCheckbox.checked && selectedMethod) {
           localStorage.setItem('preferredTranscriptionMethod', selectedMethod);
         }
-        
+
         closeModal();
         resolve(selectedMethod);
       });
     });
   }
-  
+
   /**
    * 顯示處理選項對話框（第二層選擇 - 僅限 API 大檔案）
+   * @param {Object} fileInfo - 檔案資訊
+   * @param {CancellationToken} cancellationToken - 取消令牌
    */
-  async showProcessingOptions(fileInfo) {
+  async showProcessingOptions(fileInfo, cancellationToken) {
     const content = `
       <div class="processing-options">
         <p class="warning-message">
           檔案 <strong>${fileInfo.name}</strong> 大小為 ${fileInfo.sizeMB} MB，
           超過 API 限制 ${fileInfo.exceedBy} MB。
         </p>
-        
+
         <p>請選擇處理方式：</p>
-        
+
         <div class="option-list">
           ${Object.entries(this.processingOptions).map(([key, option]) => `
             <div class="option-item" data-strategy="${key}">
@@ -290,17 +329,19 @@ export class TranscriptionPreprocessor {
             </div>
           `).join('')}
         </div>
-        
+
         <div class="option-details" id="strategy-details">
           <p class="hint">點擊選項查看詳細說明</p>
         </div>
       </div>
     `;
-    
-    return new Promise((resolve) => {
+
+    return new Promise((resolve, reject) => {
       // 建立自訂對話框
       const overlay = document.createElement('div');
       overlay.className = 'dialog-overlay';
+      // 設定更高的 z-index 以確保顯示在進度模態框之上
+      overlay.style.zIndex = '10010';
       overlay.innerHTML = `
         <div class="dialog" style="max-width: 600px;">
           <div class="dialog-header">
@@ -315,27 +356,39 @@ export class TranscriptionPreprocessor {
           </div>
         </div>
       `;
-      
+
       document.body.appendChild(overlay);
-      
+
       // 添加顯示動畫
       requestAnimationFrame(() => {
         overlay.classList.add('show');
       });
-      
+
       const closeModal = () => {
         overlay.classList.remove('show');
         setTimeout(() => {
-          document.body.removeChild(overlay);
+          if (overlay.parentNode) {
+            document.body.removeChild(overlay);
+          }
         }, 300);
       };
-      
+
+      // 如果有取消令牌，監聽取消事件
+      let cancelHandler = null;
+      if (cancellationToken) {
+        cancelHandler = () => {
+          closeModal();
+          reject(new Error('操作已取消'));
+        };
+        cancellationToken.onCancelled(cancelHandler);
+      }
+
       // 綁定按鈕事件
       overlay.querySelector('#cancelBtn').addEventListener('click', () => {
         closeModal();
         resolve(null);
       });
-      
+
       overlay.querySelector('#confirmBtn').addEventListener('click', () => {
         const selected = overlay.querySelector('.option-item.selected');
         if (selected) {
@@ -346,7 +399,7 @@ export class TranscriptionPreprocessor {
           notify.warning('請選擇一個處理方式');
         }
       });
-      
+
       // 綁定選項點擊事件
       overlay.querySelectorAll('.option-item').forEach(item => {
         item.addEventListener('click', () => {
@@ -354,10 +407,10 @@ export class TranscriptionPreprocessor {
           overlay.querySelectorAll('.option-item').forEach(i => {
             i.classList.remove('selected');
           });
-          
+
           // 設定選中狀態
           item.classList.add('selected');
-          
+
           // 顯示詳細說明
           const strategy = item.dataset.strategy;
           const detailsEl = overlay.querySelector('#strategy-details');
@@ -366,12 +419,12 @@ export class TranscriptionPreprocessor {
           }
         });
       });
-      
+
       // 計算並顯示預估費用
       this.updateCostEstimatesInModal(overlay, fileInfo);
     });
   }
-  
+
   /**
    * 取得策略詳細說明 HTML
    */
@@ -420,10 +473,10 @@ export class TranscriptionPreprocessor {
         <p class="warning-note">⚠️ 首次使用需要下載模型檔案（75-466MB）</p>
       `
     };
-    
+
     return details[strategy] || '<p class="hint">點擊選項查看詳細說明</p>';
   }
-  
+
   /**
    * 更新成本預估
    */
@@ -431,18 +484,18 @@ export class TranscriptionPreprocessor {
     // Whisper API 費用：$0.006 per minute
     const costPerMinute = 0.006;
     const estimatedDuration = this.estimateAudioDuration(fileInfo.size);
-    
+
     const estimates = {
       split: Math.ceil(fileInfo.size / (20 * 1024 * 1024)) * estimatedDuration * costPerMinute,
       compress: estimatedDuration * costPerMinute,
       hybrid: this.estimateHybridSegments(fileInfo.size) * estimatedDuration * costPerMinute
     };
-    
+
     // 如果啟用了 WASM，添加其成本（免費）
     if (this.ENABLE_WASM) {
       estimates.wasm = 0;
     }
-    
+
     // 更新顯示
     Object.entries(estimates).forEach(([strategy, cost]) => {
       const el = overlay.querySelector(`.option-item[data-strategy="${strategy}"] .cost-estimate`);
@@ -455,45 +508,92 @@ export class TranscriptionPreprocessor {
       }
     });
   }
-  
+
   /**
    * 根據策略處理檔案
+   * @param {File} file - 要處理的檔案
+   * @param {string} strategy - 處理策略
+   * @param {CancellationToken} cancellationToken - 取消令牌
    */
-  async processFile(file, strategy) {
+  async processFile(file, strategy, cancellationToken) {
+    // 檢查是否已取消
+    if (cancellationToken) {
+      cancellationToken.throwIfCancelled();
+    }
+    
     switch (strategy) {
       case 'split':
-        return await this.splitAudio(file);
-      
+        return await this.splitAudio(file, cancellationToken);
+
       case 'compress':
-        return await this.compressAudio(file);
-      
+        return await this.compressAudio(file, cancellationToken);
+
       case 'hybrid':
-        return await this.hybridProcess(file);
-      
+        return await this.hybridProcess(file, cancellationToken);
+
       default:
         throw new Error(`未知的處理策略：${strategy}`);
     }
   }
-  
+
   /**
    * 分割音訊
+   * @param {File} file - 要分割的檔案
+   * @param {CancellationToken} cancellationToken - 取消令牌
    */
-  async splitAudio(file) {
+  async splitAudio(file, cancellationToken) {
+    let progressControl = null;
+    
     try {
-      // 顯示進度
-      const progressModal = this.showProgressModal('正在分割音訊檔案...');
-      
+      // 使用增強版進度管理器
+      progressControl = progressManager.showProgress({
+        title: '音訊分割處理',
+        message: '正在智能分割音訊檔案...',
+        stages: ['分析音訊', '尋找分割點', '分割檔案', '驗證結果'],
+        cancellable: true,
+        onCancel: () => {
+          if (cancellationToken) {
+            cancellationToken.cancel('使用者取消分割操作');
+          }
+        },
+        showDetails: true,
+        icon: '✂️'
+      });
+
+      // 設定初始階段
+      progressControl.setStage(0); // 分析音訊
+      progressControl.addDetail('檔案大小', `${(file.size / 1024 / 1024).toFixed(2)} MB`);
+      progressControl.addDetail('目標段落大小', '20 MB');
+
       // 調用音訊分割模組
       const result = await audioSplitter.splitAudioFile(file, {
         maxSize: 20 * 1024 * 1024, // 20MB per segment
         overlap: 5, // 5秒重疊
+        cancellationToken: cancellationToken,
         onProgress: (progress) => {
-          progressModal.updateProgress(progress);
+          // 根據進度更新階段
+          if (progress.percentage < 30) {
+            progressControl.setStage(0); // 分析音訊
+          } else if (progress.percentage < 60) {
+            progressControl.setStage(1); // 尋找分割點
+          } else if (progress.percentage < 90) {
+            progressControl.setStage(2); // 分割檔案
+          } else {
+            progressControl.setStage(3); // 驗證結果
+          }
+          
+          progressControl.update(progress.percentage, progress.stage || '處理中...');
+          
+          if (progress.current && progress.total) {
+            progressControl.addDetail('處理進度', `${progress.current}/${progress.total} 段`);
+          }
         }
       });
-      
-      progressModal.close();
-      
+
+      progressControl.addDetail('分割段數', result.totalSegments);
+      progressControl.addDetail('總時長', `${Math.round(result.originalDuration / 60)} 分鐘`);
+      progressControl.complete();
+
       // 返回分割結果
       return {
         strategy: 'split',
@@ -502,34 +602,85 @@ export class TranscriptionPreprocessor {
         totalDuration: result.originalDuration,
         estimatedCost: this.estimateCost(file.size, result.totalSegments)
       };
-      
+
     } catch (error) {
+      if (progressControl) {
+        if (error.name === 'CancellationError') {
+          progressControl.close();
+        } else {
+          progressControl.error(`分割失敗：${error.message}`);
+        }
+      }
+      
+      if (error.name === 'CancellationError') {
+        throw error;  // 重新拋出取消錯誤
+      }
+      
       notify.error(`音訊分割失敗：${error.message}`);
       throw error;
     } finally {
       audioSplitter.cleanup();
     }
   }
-  
+
   /**
    * 壓縮音訊
+   * @param {File} file - 要壓縮的檔案
+   * @param {CancellationToken} cancellationToken - 取消令牌
    */
-  async compressAudio(file) {
+  async compressAudio(file, cancellationToken) {
+    let progressControl = null;
+    
     try {
-      // 顯示進度
-      const progressModal = this.showProgressModal('正在壓縮音訊檔案...');
-      
+      // 使用增強版進度管理器
+      progressControl = progressManager.showProgress({
+        title: '音訊壓縮處理',
+        message: '正在智能壓縮音訊檔案...',
+        stages: ['分析音訊品質', '計算壓縮參數', '執行壓縮', '驗證品質'],
+        cancellable: true,
+        onCancel: () => {
+          if (cancellationToken) {
+            cancellationToken.cancel('使用者取消壓縮操作');
+          }
+        },
+        showDetails: true,
+        icon: '🗜️'
+      });
+
+      // 設定初始階段
+      progressControl.setStage(0); // 分析音訊品質
+      progressControl.addDetail('原始大小', `${(file.size / 1024 / 1024).toFixed(2)} MB`);
+      progressControl.addDetail('目標大小', `${(this.maxFileSize / 1024 / 1024).toFixed(2)} MB`);
+
       // 調用音訊壓縮模組
       const result = await audioCompressor.compressAudioFile(file, {
         targetSize: this.maxFileSize,
         profile: 'auto',
+        cancellationToken: cancellationToken,
         onProgress: (progress) => {
-          progressModal.updateProgress(progress);
+          // 根據進度更新階段
+          if (progress.percentage < 25) {
+            progressControl.setStage(0); // 分析音訊品質
+          } else if (progress.percentage < 50) {
+            progressControl.setStage(1); // 計算壓縮參數
+          } else if (progress.percentage < 85) {
+            progressControl.setStage(2); // 執行壓縮
+          } else {
+            progressControl.setStage(3); // 驗證品質
+          }
+          
+          progressControl.update(progress.percentage, progress.stage || '處理中...');
+          
+          if (progress.compressionRatio) {
+            progressControl.addDetail('壓縮比', `${(progress.compressionRatio * 100).toFixed(0)}%`);
+          }
         }
       });
-      
-      progressModal.close();
-      
+
+      progressControl.addDetail('壓縮後大小', `${(result.compressedSize / 1024 / 1024).toFixed(2)} MB`);
+      progressControl.addDetail('壓縮比率', `${(result.compressionRatio * 100).toFixed(0)}%`);
+      progressControl.complete();
+
       // 返回壓縮結果
       return {
         strategy: 'compress',
@@ -539,35 +690,54 @@ export class TranscriptionPreprocessor {
         estimatedCost: this.estimateCost(result.compressedSize, 1),
         warning: result.warning
       };
-      
+
     } catch (error) {
+      if (progressControl) {
+        if (error.name === 'CancellationError') {
+          progressControl.close();
+        } else {
+          progressControl.error(`壓縮失敗：${error.message}`);
+        }
+      }
+      
+      if (error.name === 'CancellationError') {
+        throw error;  // 重新拋出取消錯誤
+      }
+      
       notify.error(`音訊壓縮失敗：${error.message}`);
       throw error;
     } finally {
       audioCompressor.cleanup();
     }
   }
-  
+
   /**
    * 混合處理
+   * @param {File} file - 要處理的檔案
+   * @param {CancellationToken} cancellationToken - 取消令牌
    */
-  async hybridProcess(file) {
+  async hybridProcess(file, cancellationToken) {
     try {
       notify.info('正在執行混合處理策略...');
       
+      // 檢查是否已取消
+      if (cancellationToken) {
+        cancellationToken.throwIfCancelled();
+      }
+
       // 先嘗試壓縮
-      const compressed = await this.compressAudio(file);
-      
+      const compressed = await this.compressAudio(file, cancellationToken);
+
       // 檢查壓縮後的大小
       if (compressed.files[0].size <= this.maxFileSize) {
         notify.success('壓縮成功，檔案符合大小限制');
         return compressed;
       }
-      
+
       // 如果還是太大，再分割
       notify.info('壓縮後仍超過限制，正在分割檔案...');
-      const splitResult = await this.splitAudio(compressed.files[0]);
-      
+      const splitResult = await this.splitAudio(compressed.files[0], cancellationToken);
+
       // 合併結果
       return {
         strategy: 'hybrid',
@@ -578,13 +748,13 @@ export class TranscriptionPreprocessor {
         compressionRatio: compressed.compressionRatio,
         note: '先壓縮後分割'
       };
-      
+
     } catch (error) {
       notify.error(`混合處理失敗：${error.message}`);
       throw error;
     }
   }
-  
+
   /**
    * 使用 WASM 本地處理
    */
@@ -594,31 +764,62 @@ export class TranscriptionPreprocessor {
       if (!this.wasmManager) {
         this.wasmManager = new WhisperWASMManager();
       }
-      
+
       // 顯示模型選擇對話框
       const modelChoice = await this.showModelSelectionDialog();
       if (!modelChoice) {
         throw new Error('使用者取消選擇模型');
       }
+
+      // 使用增強版進度管理器
+      const modelInfo = this.wasmManager.getModelInfo(modelChoice);
+      const isCached = await this.wasmManager.isModelCached(modelChoice);
       
-      // 顯示進度
-      const progressModal = this.showProgressModal('準備本地轉譯...');
+      const stages = isCached 
+        ? ['初始化引擎', '載入模型', '準備轉譯']
+        : ['下載模型', '初始化引擎', '載入模型', '準備轉譯'];
       
+      const progressControl = progressManager.showProgress({
+        title: '本地轉譯準備',
+        message: '正在準備本地轉譯環境...',
+        stages: stages,
+        cancellable: false,
+        showDetails: true,
+        icon: '🖥️'
+      });
+
       try {
+        let currentStage = 0;
+        
         // 檢查模型是否已快取
-        const isCached = await this.wasmManager.isModelCached(modelChoice);
         if (!isCached) {
-          const modelInfo = this.wasmManager.getModelInfo(modelChoice);
-          progressModal.updateMessage(`正在下載 ${modelChoice} 模型 (${Math.round(modelInfo.size / 1024 / 1024)}MB)...`);
+          progressControl.setStage(currentStage++); // 下載模型
+          progressControl.update(10, `正在下載 ${modelChoice} 模型...`);
+          progressControl.addDetail('模型名稱', modelChoice);
+          progressControl.addDetail('模型大小', `${Math.round(modelInfo.size / 1024 / 1024)} MB`);
         }
-        
+
         // 初始化 WASM 和載入模型
-        progressModal.updateMessage('正在初始化轉譯引擎...');
-        await this.wasmManager.initialize(modelChoice);
+        progressControl.setStage(currentStage++); // 初始化引擎
+        progressControl.update(40, '正在初始化 WebAssembly 引擎...');
         
-        // 返回結果（實際轉譯將在主程式中執行）
-        progressModal.close();
+        await this.wasmManager.initialize(modelChoice, {
+          onProgress: (progress) => {
+            if (progress.stage === 'download') {
+              progressControl.update(10 + progress.percentage * 0.3, progress.message);
+              progressControl.addDetail('下載進度', `${progress.percentage}%`);
+            } else if (progress.stage === 'load') {
+              progressControl.setStage(currentStage); // 載入模型
+              progressControl.update(50 + progress.percentage * 0.3, progress.message);
+            }
+          }
+        });
         
+        progressControl.setStage(currentStage++); // 準備轉譯
+        progressControl.update(90, '轉譯環境準備完成');
+        progressControl.addDetail('狀態', '就緒');
+        progressControl.complete();
+
         return {
           strategy: 'wasm',
           files: [file], // WASM 不需要分割檔案
@@ -628,18 +829,18 @@ export class TranscriptionPreprocessor {
           estimatedCost: 0, // 本地處理無費用
           note: '使用本地 WASM 處理，無需上傳檔案'
         };
-        
+
       } catch (error) {
-        progressModal.close();
+        progressControl.error(`準備失敗：${error.message}`);
         throw error;
       }
-      
+
     } catch (error) {
       notify.error(`本地處理失敗：${error.message}`);
       throw error;
     }
   }
-  
+
   /**
    * 顯示模型選擇對話框
    */
@@ -649,7 +850,7 @@ export class TranscriptionPreprocessor {
       { id: 'base', name: 'Base', size: '142MB', speed: '中', accuracy: '良好', description: '平衡速度與品質（推薦）' },
       { id: 'small', name: 'Small', size: '466MB', speed: '慢', accuracy: '高', description: '最佳品質，速度較慢' }
     ];
-    
+
     const content = `
       <div class="model-selection">
         <p>請選擇轉譯模型：</p>
@@ -673,10 +874,12 @@ export class TranscriptionPreprocessor {
         </p>
       </div>
     `;
-    
+
     return new Promise((resolve) => {
       const overlay = document.createElement('div');
       overlay.className = 'dialog-overlay';
+      // 設定更高的 z-index 以確保顯示在進度模態框之上
+      overlay.style.zIndex = '10010';
       overlay.innerHTML = `
         <div class="dialog" style="max-width: 500px;">
           <div class="dialog-header">
@@ -691,24 +894,24 @@ export class TranscriptionPreprocessor {
           </div>
         </div>
       `;
-      
+
       document.body.appendChild(overlay);
-      
+
       // 添加顯示動畫
       requestAnimationFrame(() => {
         overlay.classList.add('show');
       });
-      
+
       const closeModal = () => {
         overlay.classList.remove('show');
         setTimeout(() => {
           document.body.removeChild(overlay);
         }, 300);
       };
-      
+
       let selectedModel = null;
       const confirmBtn = overlay.querySelector('#confirmBtn');
-      
+
       // 綁定模型選擇事件
       overlay.querySelectorAll('.model-item').forEach(item => {
         item.addEventListener('click', () => {
@@ -720,18 +923,18 @@ export class TranscriptionPreprocessor {
           confirmBtn.disabled = false;
         });
       });
-      
+
       // 綁定按鈕事件
       overlay.querySelector('#cancelBtn').addEventListener('click', () => {
         closeModal();
         resolve(null);
       });
-      
+
       confirmBtn.addEventListener('click', () => {
         closeModal();
         resolve(selectedModel);
       });
-      
+
       // 預設選擇 base 模型
       const baseModel = overlay.querySelector('[data-model="base"]');
       if (baseModel) {
@@ -739,7 +942,7 @@ export class TranscriptionPreprocessor {
       }
     });
   }
-  
+
   /**
    * 估算音訊時長（基於檔案大小）
    */
@@ -749,7 +952,7 @@ export class TranscriptionPreprocessor {
     const bytesPerMinute = 960 * 1024;
     return fileSize / bytesPerMinute;
   }
-  
+
   /**
    * 估算混合模式需要的片段數
    */
@@ -760,7 +963,7 @@ export class TranscriptionPreprocessor {
     }
     return Math.ceil(compressedSize / (20 * 1024 * 1024));
   }
-  
+
   /**
    * 估算成本
    */
@@ -769,7 +972,7 @@ export class TranscriptionPreprocessor {
     const costPerMinute = 0.006;
     return duration * costPerMinute * segments;
   }
-  
+
   /**
    * 初始化 Audio Context（需要時才建立）
    */
@@ -779,11 +982,17 @@ export class TranscriptionPreprocessor {
     }
     return this.audioContext;
   }
-  
+
   /**
    * 顯示進度對話框
+   * @param {string} title - 對話框標題
+   * @param {Object} options - 選項
+   * @param {boolean} options.cancellable - 是否可取消
+   * @param {Function} options.onCancel - 取消回調
    */
-  showProgressModal(title) {
+  showProgressModal(title, options = {}) {
+    const { cancellable = false, onCancel = null } = options;
+    
     const overlay = document.createElement('div');
     overlay.className = 'dialog-overlay';
     overlay.innerHTML = `
@@ -802,32 +1011,48 @@ export class TranscriptionPreprocessor {
             </div>
           </div>
         </div>
+        ${cancellable ? `
+          <div class="dialog-footer">
+            <button class="btn btn-secondary cancel-progress-btn">取消</button>
+          </div>
+        ` : ''}
       </div>
     `;
-    
+
     document.body.appendChild(overlay);
-    
+
     // 添加顯示動畫
     requestAnimationFrame(() => {
       overlay.classList.add('show');
     });
     
-    return {
+    // 綁定取消按鈕事件
+    if (cancellable && onCancel) {
+      const cancelBtn = overlay.querySelector('.cancel-progress-btn');
+      if (cancelBtn) {
+        cancelBtn.addEventListener('click', () => {
+          onCancel();
+          modalInstance.close();
+        });
+      }
+    }
+
+    const modalInstance = {
       updateProgress: (progress) => {
         const stageEl = overlay.querySelector('.progress-stage');
         const percentageEl = overlay.querySelector('.progress-percentage');
         const fillEl = overlay.querySelector('.progress-fill');
-        
+
         if (progress.stage) {
           stageEl.textContent = progress.stage;
         }
-        
+
         if (progress.percentage !== undefined) {
           const percentage = Math.round(progress.percentage);
           percentageEl.textContent = `${percentage}%`;
           fillEl.style.width = `${percentage}%`;
         }
-        
+
         if (progress.current && progress.total) {
           stageEl.textContent = `處理中 (${progress.current}/${progress.total})`;
         }
@@ -845,8 +1070,10 @@ export class TranscriptionPreprocessor {
         }, 300);
       }
     };
+    
+    return modalInstance;
   }
-  
+
   /**
    * 清理資源
    */

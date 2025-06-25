@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>生產環境 WASM 測試 - Whisper Transcriber</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <style>
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .test-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .test-section {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .test-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .test-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .test-card {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 20px;
+            transition: transform 0.2s;
+        }
+
+        .test-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .test-card h3 {
+            color: #495057;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+        }
+
+        .test-button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        .test-button:hover {
+            background: #5a67d8;
+        }
+
+        .test-button:disabled {
+            background: #cbd5e0;
+            cursor: not-allowed;
+        }
+
+        .test-button.success {
+            background: #48bb78;
+        }
+
+        .test-button.error {
+            background: #f56565;
+        }
+
+        .test-result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .test-result.success {
+            background: #e6fffa;
+            border: 1px solid #81e6d9;
+            color: #234e52;
+        }
+
+        .test-result.error {
+            background: #fff5f5;
+            border: 1px solid #feb2b2;
+            color: #742a2a;
+        }
+
+        .test-result.info {
+            background: #e6f7ff;
+            border: 1px solid #91d5ff;
+            color: #003a8c;
+        }
+
+        .progress-container {
+            margin-top: 15px;
+        }
+
+        .progress-bar {
+            background: #e2e8f0;
+            height: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-fill {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            height: 100%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .model-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: #f7fafc;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+
+        .model-size {
+            color: #718096;
+            font-size: 14px;
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-indicator.ready {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+
+        .status-indicator.loading {
+            background: #fefcbf;
+            color: #744210;
+        }
+
+        .status-indicator.error {
+            background: #fed7d7;
+            color: #742a2a;
+        }
+
+        .file-upload-area {
+            border: 2px dashed #cbd5e0;
+            border-radius: 8px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 20px;
+            transition: border-color 0.3s;
+        }
+
+        .file-upload-area:hover {
+            border-color: #667eea;
+        }
+
+        .file-upload-area.drag-over {
+            background: #edf2f7;
+            border-color: #667eea;
+        }
+
+        .test-summary {
+            background: #f7fafc;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin-top: 30px;
+        }
+
+        .test-summary h3 {
+            margin-bottom: 15px;
+            color: #2d3748;
+        }
+
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .summary-item:last-child {
+            border-bottom: none;
+        }
+
+        .metric-value {
+            font-weight: bold;
+            color: #4a5568;
+        }
+
+        @media (max-width: 768px) {
+            .test-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="test-header">
+            <h1>🚀 生產環境 WASM 測試</h1>
+            <p>測試 Whisper 本地轉譯功能的完整流程</p>
+        </div>
+
+        <!-- 環境檢查 -->
+        <div class="test-section">
+            <h2>🔍 環境檢查</h2>
+            <div class="test-grid">
+                <div class="test-card">
+                    <h3>瀏覽器相容性</h3>
+                    <div id="browser-check" class="test-result info">檢查中...</div>
+                </div>
+                <div class="test-card">
+                    <h3>WebAssembly 支援</h3>
+                    <div id="wasm-check" class="test-result info">檢查中...</div>
+                </div>
+                <div class="test-card">
+                    <h3>記憶體狀況</h3>
+                    <div id="memory-check" class="test-result info">檢查中...</div>
+                </div>
+                <div class="test-card">
+                    <h3>網路連接</h3>
+                    <div id="network-check" class="test-result info">檢查中...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 模型測試 -->
+        <div class="test-section">
+            <h2>📦 模型載入測試</h2>
+            <div class="test-grid">
+                <div class="test-card">
+                    <h3>Tiny 模型</h3>
+                    <div class="model-info">
+                        <span>最快速度</span>
+                        <span class="model-size">~39MB</span>
+                    </div>
+                    <button class="test-button" onclick="testModel('tiny')">載入測試</button>
+                    <span id="tiny-status" class="status-indicator">未測試</span>
+                    <div id="tiny-result" class="test-result" style="display: none;"></div>
+                    <div id="tiny-progress" class="progress-container" style="display: none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 0%">0%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="test-card">
+                    <h3>Base 模型</h3>
+                    <div class="model-info">
+                        <span>平衡選擇</span>
+                        <span class="model-size">~74MB</span>
+                    </div>
+                    <button class="test-button" onclick="testModel('base')">載入測試</button>
+                    <span id="base-status" class="status-indicator">未測試</span>
+                    <div id="base-result" class="test-result" style="display: none;"></div>
+                    <div id="base-progress" class="progress-container" style="display: none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 0%">0%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="test-card">
+                    <h3>Small 模型</h3>
+                    <div class="model-info">
+                        <span>最佳品質</span>
+                        <span class="model-size">~244MB</span>
+                    </div>
+                    <button class="test-button" onclick="testModel('small')">載入測試</button>
+                    <span id="small-status" class="status-indicator">未測試</span>
+                    <div id="small-result" class="test-result" style="display: none;"></div>
+                    <div id="small-progress" class="progress-container" style="display: none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 0%">0%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 轉譯測試 -->
+        <div class="test-section">
+            <h2>🎙️ 轉譯功能測試</h2>
+            
+            <div class="file-upload-area" id="upload-area">
+                <p>拖曳音訊檔案到這裡，或點擊選擇檔案</p>
+                <input type="file" id="audio-file" accept="audio/*" style="display: none;">
+                <button class="test-button" onclick="document.getElementById('audio-file').click()">選擇檔案</button>
+            </div>
+
+            <div id="file-info" style="display: none; margin-bottom: 20px;">
+                <h4>檔案資訊</h4>
+                <div class="model-info">
+                    <span id="file-name">檔案名稱</span>
+                    <span id="file-size" class="model-size">大小</span>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label for="model-select">選擇模型：</label>
+                <select id="model-select" style="padding: 5px 10px; border-radius: 5px; border: 1px solid #cbd5e0;">
+                    <option value="tiny">Tiny (快速)</option>
+                    <option value="base" selected>Base (推薦)</option>
+                    <option value="small">Small (高品質)</option>
+                </select>
+            </div>
+
+            <button class="test-button" id="transcribe-btn" onclick="testTranscription()" disabled>
+                開始轉譯測試
+            </button>
+
+            <div id="transcription-progress" class="progress-container" style="display: none;">
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: 0%">0%</div>
+                </div>
+            </div>
+
+            <div id="transcription-result" class="test-result" style="display: none;"></div>
+        </div>
+
+        <!-- 效能測試 -->
+        <div class="test-section">
+            <h2>⚡ 效能測試</h2>
+            <button class="test-button" onclick="runPerformanceTest()">執行效能測試</button>
+            <div id="performance-result" class="test-result" style="display: none;"></div>
+        </div>
+
+        <!-- 測試總結 -->
+        <div class="test-summary" id="test-summary" style="display: none;">
+            <h3>📊 測試總結</h3>
+            <div class="summary-item">
+                <span>環境檢查</span>
+                <span class="metric-value" id="env-summary">-</span>
+            </div>
+            <div class="summary-item">
+                <span>模型載入</span>
+                <span class="metric-value" id="model-summary">-</span>
+            </div>
+            <div class="summary-item">
+                <span>轉譯測試</span>
+                <span class="metric-value" id="transcription-summary">-</span>
+            </div>
+            <div class="summary-item">
+                <span>效能評分</span>
+                <span class="metric-value" id="performance-summary">-</span>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { WhisperWASMManager } from '../js/wasm/whisper-wasm-manager.js';
+
+        let wasmManager = null;
+        let selectedFile = null;
+        const testResults = {
+            environment: {},
+            models: {},
+            transcription: null,
+            performance: null
+        };
+
+        // 環境檢查
+        async function checkEnvironment() {
+            // 瀏覽器檢查
+            const browserCheck = document.getElementById('browser-check');
+            const userAgent = navigator.userAgent;
+            const isChrome = /Chrome/.test(userAgent) && /Google Inc/.test(navigator.vendor);
+            const isFirefox = /Firefox/.test(userAgent);
+            const isSafari = /Safari/.test(userAgent) && /Apple Computer/.test(navigator.vendor);
+            
+            if (isChrome || isFirefox || isSafari) {
+                browserCheck.className = 'test-result success';
+                browserCheck.textContent = `✓ 支援的瀏覽器: ${isChrome ? 'Chrome' : isFirefox ? 'Firefox' : 'Safari'}`;
+                testResults.environment.browser = true;
+            } else {
+                browserCheck.className = 'test-result error';
+                browserCheck.textContent = '✗ 不支援的瀏覽器，請使用 Chrome、Firefox 或 Safari';
+                testResults.environment.browser = false;
+            }
+
+            // WebAssembly 檢查
+            const wasmCheck = document.getElementById('wasm-check');
+            if (typeof WebAssembly === 'object') {
+                wasmCheck.className = 'test-result success';
+                wasmCheck.textContent = '✓ WebAssembly 支援正常';
+                testResults.environment.wasm = true;
+            } else {
+                wasmCheck.className = 'test-result error';
+                wasmCheck.textContent = '✗ WebAssembly 不支援';
+                testResults.environment.wasm = false;
+            }
+
+            // 記憶體檢查
+            const memoryCheck = document.getElementById('memory-check');
+            if (performance.memory) {
+                const totalMemory = performance.memory.jsHeapSizeLimit / (1024 * 1024);
+                const usedMemory = performance.memory.usedJSHeapSize / (1024 * 1024);
+                const availableMemory = totalMemory - usedMemory;
+                
+                memoryCheck.className = availableMemory > 500 ? 'test-result success' : 'test-result error';
+                memoryCheck.textContent = `${availableMemory > 500 ? '✓' : '✗'} 可用記憶體: ${Math.round(availableMemory)}MB / ${Math.round(totalMemory)}MB`;
+                testResults.environment.memory = availableMemory > 500;
+            } else {
+                memoryCheck.className = 'test-result info';
+                memoryCheck.textContent = '⚠️ 無法檢測記憶體狀況（非 Chrome 瀏覽器）';
+                testResults.environment.memory = true; // 假設正常
+            }
+
+            // 網路檢查
+            const networkCheck = document.getElementById('network-check');
+            try {
+                const response = await fetch('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.6.0', { method: 'HEAD' });
+                if (response.ok) {
+                    networkCheck.className = 'test-result success';
+                    networkCheck.textContent = '✓ 網路連接正常，CDN 可存取';
+                    testResults.environment.network = true;
+                } else {
+                    throw new Error('CDN 無法存取');
+                }
+            } catch (error) {
+                networkCheck.className = 'test-result error';
+                networkCheck.textContent = '✗ 網路連接問題，無法存取 CDN';
+                testResults.environment.network = false;
+            }
+
+            updateSummary();
+        }
+
+        // 測試模型載入
+        window.testModel = async function(modelName) {
+            const button = event.target;
+            const statusEl = document.getElementById(`${modelName}-status`);
+            const resultEl = document.getElementById(`${modelName}-result`);
+            const progressEl = document.getElementById(`${modelName}-progress`);
+            const progressFill = progressEl.querySelector('.progress-fill');
+
+            button.disabled = true;
+            statusEl.className = 'status-indicator loading';
+            statusEl.textContent = '載入中...';
+            resultEl.style.display = 'none';
+            progressEl.style.display = 'block';
+
+            const startTime = Date.now();
+
+            try {
+                if (!wasmManager) {
+                    wasmManager = new WhisperWASMManager();
+                }
+
+                // 設定進度回調
+                let lastProgress = 0;
+                const updateProgress = (progress) => {
+                    if (progress.percentage) {
+                        lastProgress = progress.percentage;
+                        progressFill.style.width = `${progress.percentage}%`;
+                        progressFill.textContent = `${Math.round(progress.percentage)}%`;
+                    }
+                    if (progress.message) {
+                        resultEl.style.display = 'block';
+                        resultEl.className = 'test-result info';
+                        resultEl.textContent = progress.message;
+                    }
+                };
+
+                // 檢查快取
+                const isCached = await wasmManager.isModelCached(modelName);
+                
+                await wasmManager.initialize(modelName);
+
+                const endTime = Date.now();
+                const loadTime = (endTime - startTime) / 1000;
+
+                statusEl.className = 'status-indicator ready';
+                statusEl.textContent = '已載入';
+                resultEl.className = 'test-result success';
+                resultEl.textContent = `✓ 模型載入成功\n載入時間: ${loadTime.toFixed(2)} 秒\n來源: ${isCached ? '本地快取' : 'CDN 下載'}`;
+                
+                testResults.models[modelName] = {
+                    success: true,
+                    loadTime: loadTime,
+                    cached: isCached
+                };
+
+            } catch (error) {
+                statusEl.className = 'status-indicator error';
+                statusEl.textContent = '載入失敗';
+                resultEl.className = 'test-result error';
+                resultEl.textContent = `✗ 載入失敗: ${error.message}`;
+                resultEl.style.display = 'block';
+                
+                testResults.models[modelName] = {
+                    success: false,
+                    error: error.message
+                };
+            } finally {
+                button.disabled = false;
+                progressEl.style.display = 'none';
+                updateSummary();
+            }
+        };
+
+        // 檔案上傳處理
+        const uploadArea = document.getElementById('upload-area');
+        const fileInput = document.getElementById('audio-file');
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('drag-over');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('drag-over');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('drag-over');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0 && files[0].type.startsWith('audio/')) {
+                handleFile(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            selectedFile = file;
+            document.getElementById('file-info').style.display = 'block';
+            document.getElementById('file-name').textContent = file.name;
+            document.getElementById('file-size').textContent = `${(file.size / 1024 / 1024).toFixed(2)} MB`;
+            document.getElementById('transcribe-btn').disabled = false;
+        }
+
+        // 測試轉譯
+        window.testTranscription = async function() {
+            if (!selectedFile) return;
+
+            const button = document.getElementById('transcribe-btn');
+            const progressEl = document.getElementById('transcription-progress');
+            const progressFill = progressEl.querySelector('.progress-fill');
+            const resultEl = document.getElementById('transcription-result');
+            const modelSelect = document.getElementById('model-select');
+            const selectedModel = modelSelect.value;
+
+            button.disabled = true;
+            progressEl.style.display = 'block';
+            resultEl.style.display = 'none';
+
+            const startTime = Date.now();
+
+            try {
+                if (!wasmManager) {
+                    wasmManager = new WhisperWASMManager();
+                }
+
+                // 初始化模型
+                await wasmManager.initialize(selectedModel);
+
+                // 執行轉譯
+                const result = await wasmManager.transcribe(selectedFile, {
+                    onProgress: (progress) => {
+                        if (progress.percentage) {
+                            progressFill.style.width = `${progress.percentage}%`;
+                            progressFill.textContent = `${Math.round(progress.percentage)}%`;
+                        }
+                    }
+                });
+
+                const endTime = Date.now();
+                const processTime = (endTime - startTime) / 1000;
+
+                resultEl.className = 'test-result success';
+                resultEl.style.display = 'block';
+                resultEl.textContent = `✓ 轉譯成功！
+處理時間: ${processTime.toFixed(2)} 秒
+音訊長度: ${result.duration ? result.duration.toFixed(2) : '未知'} 秒
+語言: ${result.language || '自動檢測'}
+轉譯方式: ${result.method || 'WASM'}
+
+轉譯文字:
+${result.text}
+
+段落數: ${result.segments ? result.segments.length : 0}`;
+
+                testResults.transcription = {
+                    success: true,
+                    processTime: processTime,
+                    duration: result.duration,
+                    model: selectedModel
+                };
+
+            } catch (error) {
+                resultEl.className = 'test-result error';
+                resultEl.style.display = 'block';
+                resultEl.textContent = `✗ 轉譯失敗: ${error.message}`;
+                
+                testResults.transcription = {
+                    success: false,
+                    error: error.message
+                };
+            } finally {
+                button.disabled = false;
+                progressEl.style.display = 'none';
+                updateSummary();
+            }
+        };
+
+        // 效能測試
+        window.runPerformanceTest = async function() {
+            const button = event.target;
+            const resultEl = document.getElementById('performance-result');
+            
+            button.disabled = true;
+            resultEl.style.display = 'block';
+            resultEl.className = 'test-result info';
+            resultEl.textContent = '執行效能測試中...';
+
+            try {
+                const tests = [];
+                
+                // 測試 1: 模型快取檢查速度
+                const cacheStart = performance.now();
+                if (wasmManager) {
+                    await wasmManager.isModelCached('tiny');
+                }
+                const cacheTime = performance.now() - cacheStart;
+                tests.push(`快取檢查: ${cacheTime.toFixed(2)}ms`);
+
+                // 測試 2: Audio Context 創建速度
+                const audioStart = performance.now();
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                audioContext.close();
+                const audioTime = performance.now() - audioStart;
+                tests.push(`Audio Context: ${audioTime.toFixed(2)}ms`);
+
+                // 測試 3: Worker 創建速度
+                const workerStart = performance.now();
+                const testWorker = new Worker('data:text/javascript,self.postMessage("test")');
+                await new Promise(resolve => {
+                    testWorker.onmessage = resolve;
+                });
+                testWorker.terminate();
+                const workerTime = performance.now() - workerStart;
+                tests.push(`Worker 創建: ${workerTime.toFixed(2)}ms`);
+
+                // 計算總分
+                const totalTime = cacheTime + audioTime + workerTime;
+                let score = '優秀';
+                if (totalTime > 100) score = '良好';
+                if (totalTime > 200) score = '一般';
+                if (totalTime > 500) score = '較差';
+
+                resultEl.className = 'test-result success';
+                resultEl.textContent = `✓ 效能測試完成
+
+${tests.join('\n')}
+
+總耗時: ${totalTime.toFixed(2)}ms
+效能評分: ${score}`;
+
+                testResults.performance = {
+                    score: score,
+                    totalTime: totalTime
+                };
+
+            } catch (error) {
+                resultEl.className = 'test-result error';
+                resultEl.textContent = `✗ 效能測試失敗: ${error.message}`;
+                
+                testResults.performance = {
+                    score: '錯誤',
+                    error: error.message
+                };
+            } finally {
+                button.disabled = false;
+                updateSummary();
+            }
+        };
+
+        // 更新測試總結
+        function updateSummary() {
+            const summary = document.getElementById('test-summary');
+            summary.style.display = 'block';
+
+            // 環境總結
+            const envCount = Object.values(testResults.environment).filter(v => v === true).length;
+            const envTotal = Object.keys(testResults.environment).length;
+            document.getElementById('env-summary').textContent = `${envCount}/${envTotal} 通過`;
+
+            // 模型總結
+            const modelCount = Object.values(testResults.models).filter(v => v.success).length;
+            const modelTotal = Object.keys(testResults.models).length;
+            document.getElementById('model-summary').textContent = modelTotal > 0 ? `${modelCount}/${modelTotal} 成功` : '未測試';
+
+            // 轉譯總結
+            if (testResults.transcription) {
+                document.getElementById('transcription-summary').textContent = 
+                    testResults.transcription.success ? '成功' : '失敗';
+            } else {
+                document.getElementById('transcription-summary').textContent = '未測試';
+            }
+
+            // 效能總結
+            if (testResults.performance) {
+                document.getElementById('performance-summary').textContent = 
+                    testResults.performance.score || '未知';
+            } else {
+                document.getElementById('performance-summary').textContent = '未測試';
+            }
+        }
+
+        // 初始化
+        checkEnvironment();
+    </script>
+</body>
+</html>

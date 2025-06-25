@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>大檔案取消功能測試</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <style>
+        .test-container {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+        
+        .test-info {
+            background: var(--bg-secondary);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .test-info h3 {
+            margin-top: 0;
+            color: var(--primary-color);
+        }
+        
+        .file-generator {
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .test-controls {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        
+        .test-output {
+            background: var(--bg-secondary);
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        
+        .dialog-preview {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: var(--bg-primary);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            max-width: 300px;
+        }
+        
+        .dialog-preview h4 {
+            margin-top: 0;
+            font-size: 14px;
+        }
+        
+        .dialog-preview ul {
+            margin: 10px 0;
+            padding-left: 20px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <h1>大檔案取消功能測試</h1>
+            <p>測試大於 25MB 檔案使用 API 轉譯時的取消功能</p>
+        </header>
+
+        <div class="test-container">
+            <div class="test-info">
+                <h3>測試說明</h3>
+                <p>這個測試頁面模擬大檔案轉譯流程，測試在不同階段的取消功能：</p>
+                <ol>
+                    <li>選擇轉譯方式對話框階段</li>
+                    <li>選擇處理方式對話框階段</li>
+                    <li>實際轉譯處理階段</li>
+                </ol>
+                <p><strong>重點：</strong>浮動取消按鈕會始終顯示在右下角，確保使用者可以隨時取消。</p>
+            </div>
+
+            <div class="file-generator">
+                <h3>生成測試檔案</h3>
+                <p>點擊下方按鈕生成一個大於 25MB 的測試音訊檔案</p>
+                <button id="generateFileBtn" class="btn btn-primary">生成 30MB 測試檔案</button>
+                <div id="generatedFile" style="margin-top: 10px;"></div>
+            </div>
+
+            <div class="test-controls">
+                <button id="startTestBtn" class="btn btn-primary" disabled>開始測試轉譯流程</button>
+                <button id="clearLogBtn" class="btn btn-secondary">清除日誌</button>
+            </div>
+
+            <div class="test-output" id="testOutput">等待開始測試...</div>
+        </div>
+
+        <!-- 對話框預覽 -->
+        <div class="dialog-preview" id="dialogPreview" style="display: none;">
+            <h4>當前對話框狀態</h4>
+            <ul id="dialogStatus">
+                <li>等待顯示...</li>
+            </ul>
+        </div>
+
+        <!-- 轉譯狀態區域（模擬主程式） -->
+        <div id="transcriptionStatus" class="transcription-status" style="display: none;">
+            <span id="statusMessage"></span>
+            <div id="progressIndicator" class="progress-indicator"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { WhisperApp } from '../js/main.js';
+        import { floatingCancelButton } from '../js/floating-cancel-button.js';
+        
+        const output = document.getElementById('testOutput');
+        const dialogPreview = document.getElementById('dialogPreview');
+        const dialogStatus = document.getElementById('dialogStatus');
+        let generatedFile = null;
+        let app = null;
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const color = {
+                info: '#333',
+                success: '#28a745',
+                warning: '#ffc107',
+                error: '#dc3545'
+            }[type] || '#333';
+            
+            output.innerHTML += `<span style="color: ${color}">[${timestamp}] ${message}</span>\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+        
+        // 生成大檔案
+        document.getElementById('generateFileBtn').addEventListener('click', async () => {
+            log('正在生成測試檔案...');
+            
+            try {
+                // 創建 30MB 的假音訊資料
+                const sampleRate = 44100;
+                const duration = 60 * 15; // 15 分鐘
+                const numSamples = sampleRate * duration;
+                const buffer = new ArrayBuffer(numSamples * 2); // 16-bit samples
+                const view = new Int16Array(buffer);
+                
+                // 填充一些假音訊資料
+                for (let i = 0; i < numSamples; i++) {
+                    view[i] = Math.sin(i / 100) * 10000;
+                }
+                
+                // 創建 WAV 檔案
+                const wavBlob = createWAVFile(buffer, sampleRate);
+                generatedFile = new File([wavBlob], 'test-large-file-30mb.wav', {
+                    type: 'audio/wav',
+                    lastModified: Date.now()
+                });
+                
+                const sizeMB = (generatedFile.size / 1024 / 1024).toFixed(2);
+                log(`生成成功！檔案大小：${sizeMB} MB`, 'success');
+                
+                document.getElementById('generatedFile').innerHTML = 
+                    `<strong>檔案：</strong>${generatedFile.name} (${sizeMB} MB)`;
+                document.getElementById('startTestBtn').disabled = false;
+                
+            } catch (error) {
+                log(`生成失敗：${error.message}`, 'error');
+            }
+        });
+        
+        // 創建 WAV 檔案
+        function createWAVFile(buffer, sampleRate) {
+            const length = buffer.byteLength;
+            const arrayBuffer = new ArrayBuffer(44 + length);
+            const view = new DataView(arrayBuffer);
+            
+            // WAV 檔頭
+            const writeString = (offset, string) => {
+                for (let i = 0; i < string.length; i++) {
+                    view.setUint8(offset + i, string.charCodeAt(i));
+                }
+            };
+            
+            writeString(0, 'RIFF');
+            view.setUint32(4, 36 + length, true);
+            writeString(8, 'WAVE');
+            writeString(12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, 1, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true);
+            writeString(36, 'data');
+            view.setUint32(40, length, true);
+            
+            // 複製音訊資料
+            const data = new Int16Array(buffer);
+            const output = new Int16Array(arrayBuffer, 44);
+            output.set(data);
+            
+            return new Blob([arrayBuffer], { type: 'audio/wav' });
+        }
+        
+        // 開始測試
+        document.getElementById('startTestBtn').addEventListener('click', async () => {
+            if (!generatedFile) {
+                log('請先生成測試檔案', 'warning');
+                return;
+            }
+            
+            log('開始測試大檔案取消功能...');
+            
+            // 初始化應用程式
+            if (!app) {
+                app = new WhisperApp();
+                // 設定測試 API Key
+                app.apiKey = 'sk-test-api-key';
+                app.whisperAPI = { 
+                    transcribe: () => new Promise(resolve => setTimeout(resolve, 5000)),
+                    cancel: () => {}
+                };
+            }
+            
+            // 模擬檔案上傳
+            app.player = {
+                getCurrentFile: () => generatedFile
+            };
+            
+            // 監控對話框狀態
+            monitorDialogs();
+            
+            try {
+                log('調用 startTranscription...');
+                await app.startTranscription();
+                log('轉譯完成', 'success');
+            } catch (error) {
+                if (error.message.includes('取消')) {
+                    log(`轉譯已取消：${error.message}`, 'warning');
+                } else {
+                    log(`轉譯失敗：${error.message}`, 'error');
+                }
+            }
+            
+            dialogPreview.style.display = 'none';
+        });
+        
+        // 監控對話框
+        function monitorDialogs() {
+            dialogPreview.style.display = 'block';
+            
+            const observer = new MutationObserver((mutations) => {
+                const overlays = document.querySelectorAll('.dialog-overlay');
+                if (overlays.length > 0) {
+                    const titles = Array.from(overlays).map(overlay => {
+                        const header = overlay.querySelector('.dialog-header h3');
+                        return header ? header.textContent : '未知對話框';
+                    });
+                    
+                    dialogStatus.innerHTML = titles.map(title => 
+                        `<li>顯示中：${title}</li>`
+                    ).join('');
+                    
+                    // 檢查浮動取消按鈕
+                    const cancelBtn = document.querySelector('.floating-cancel-container');
+                    if (cancelBtn) {
+                        dialogStatus.innerHTML += '<li style="color: #28a745;">✓ 浮動取消按鈕可見</li>';
+                    }
+                } else {
+                    dialogStatus.innerHTML = '<li>無對話框顯示</li>';
+                }
+            });
+            
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+            
+            // 5 秒後停止監控
+            setTimeout(() => observer.disconnect(), 30000);
+        }
+        
+        // 清除日誌
+        document.getElementById('clearLogBtn').addEventListener('click', () => {
+            output.innerHTML = '日誌已清除\n';
+        });
+        
+        // 初始日誌
+        log('測試頁面已載入');
+        log('請先生成測試檔案，然後開始測試');
+    </script>
+</body>
+</html>

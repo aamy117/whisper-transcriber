@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="css/shared.css">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/preprocessing.css">
+    <link rel="stylesheet" href="css/progress.css">
     
     <!-- Open Graph meta tags -->
     <meta property="og:title" content="Whisper 聽打工具">
@@ -191,6 +192,9 @@
                             <button class="toolbar-btn" id="punctuationToggleBtn" title="切換標點符號顯示">
                                 <span class="icon" id="punctuationIcon">。</span>
                             </button>
+                            <button class="toolbar-btn" id="batchEditBtn" title="批次編輯模式">
+                                <span class="icon">✓</span>
+                            </button>
                             <button class="toolbar-btn" id="replaceToolbarBtn" title="尋找和取代 (Ctrl+H)">
                                 <span class="icon">🔄</span>
                             </button>
@@ -223,6 +227,23 @@
                 </section>
             </div>
         </main>
+
+        <!-- Batch Edit Toolbar -->
+        <div class="batch-toolbar" id="batchToolbar" style="display: none;">
+            <span class="selection-info">已選擇 <span id="selectedCount">0</span> 個段落</span>
+            
+            <!-- Selection operations -->
+            <button class="btn-select" onclick="window.transcriptionEditor?.batchSelectAll()">全選</button>
+            <button class="btn-select" onclick="window.transcriptionEditor?.batchSelectNone()">取消全選</button>
+            <button class="btn-select" onclick="window.transcriptionEditor?.batchSelectInvert()">反選</button>
+            
+            <!-- Batch operations -->
+            <button class="btn-operation" onclick="window.transcriptionEditor?.executeBatchOperation('merge')">合併</button>
+            <button class="btn-operation" onclick="window.transcriptionEditor?.executeBatchOperation('split')">分割</button>
+            <button class="btn-operation" onclick="window.transcriptionEditor?.executeBatchOperation('findReplace')">尋找取代</button>
+            <button class="btn-operation" onclick="window.transcriptionEditor?.executeBatchOperation('adjustTime')">調整時間</button>
+            <button class="btn-danger" onclick="window.transcriptionEditor?.executeBatchOperation('delete')">刪除</button>
+        </div>
 
         <!-- Settings Modal -->
         <div class="modal" id="settingsModal">

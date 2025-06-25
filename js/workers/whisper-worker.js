@@ -1,3 +1,6 @@
+// 調試模式開關（生產環境設為 false）
+const DEBUG = typeof process !== 'undefined' ? process.env.NODE_ENV !== 'production' : location.hostname === 'localhost';
+
 /**
  * Whisper Web Worker
  * 在背景執行緒處理音訊轉譯，避免阻塞主執行緒
@@ -20,7 +23,7 @@ class WhisperWorker {
     try {
       if (DEVELOPMENT_MODE) {
         // 開發模式：模擬初始化
-        console.log('[Worker] 開發模式 - 模擬初始化');
+        DEBUG && console.log('[Worker] 開發模式 - 模擬初始化');
         await this.simulateDelay(500);
         this.isInitialized = true;
       } else {
@@ -67,22 +70,22 @@ class WhisperWorker {
     // 估算音訊長度（假設 16kHz 採樣率）
     const duration = audioData.length / 16000;
     const segments = [];
-    
+
     // 模擬分段處理
     const segmentDuration = 30; // 每段 30 秒
     const totalSegments = Math.ceil(duration / segmentDuration);
-    
+
     for (let i = 0; i < totalSegments; i++) {
       const start = i * segmentDuration;
       const end = Math.min((i + 1) * segmentDuration, duration);
-      
+
       // 模擬處理時間
       await this.simulateDelay(1000);
-      
+
       // 更新進度
       const progress = ((i + 1) / totalSegments) * 100;
       this.postProgress(progress, `處理第 ${i + 1}/${totalSegments} 段...`);
-      
+
       // 生成模擬段落
       segments.push({
         id: i,
@@ -124,9 +127,9 @@ class WhisperWorker {
   postProgress(percentage, message) {
     self.postMessage({
       type: 'progress',
-      data: { 
-        percentage: Math.round(percentage), 
-        message: message 
+      data: {
+        percentage: Math.round(percentage),
+        message: message
       }
     });
   }
@@ -137,7 +140,7 @@ class WhisperWorker {
   postError(error) {
     self.postMessage({
       type: 'error',
-      data: { 
+      data: {
         message: error.message || '未知錯誤',
         stack: error.stack
       }
@@ -175,10 +178,10 @@ self.onmessage = async function(event) {
         if (!worker) {
           worker = new WhisperWorker();
         }
-        
+
         // 執行轉譯
         const result = await worker.transcribe(audioData, options);
-        
+
         // 返回結果
         self.postMessage({
           type: 'result',
@@ -192,7 +195,7 @@ self.onmessage = async function(event) {
           worker = new WhisperWorker();
         }
         await worker.initialize();
-        
+
         self.postMessage({
           type: 'initialized',
           data: { success: true }
@@ -215,9 +218,9 @@ self.onmessage = async function(event) {
     // 發送錯誤訊息
     self.postMessage({
       type: 'error',
-      data: { 
+      data: {
         message: error.message,
-        stack: error.stack 
+        stack: error.stack
       }
     });
   }
@@ -225,10 +228,10 @@ self.onmessage = async function(event) {
 
 // Worker 錯誤處理
 self.onerror = function(error) {
-  console.error('[Worker] 錯誤:', error);
+  if (typeof DEBUG !== 'undefined' && DEBUG) console.error('[Worker] 錯誤:', error);
   self.postMessage({
     type: 'error',
-    data: { 
+    data: {
       message: '工作執行緒發生錯誤',
       error: error.toString()
     }

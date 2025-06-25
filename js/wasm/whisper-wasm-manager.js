@@ -1,9 +1,16 @@
+// 調試模式開關（生產環境設為 false）
+const DEBUG = typeof process !== 'undefined' ? process.env.NODE_ENV !== 'production' : location.hostname === 'localhost';
+
 /**
  * Whisper WASM Manager
  * 管理 WebAssembly 模組的載入、初始化和轉譯功能
  */
 
 import { WhisperTransformers } from './whisper-transformers.js';
+import { modelPreloader } from './model-preloader.js';
+import { optimizedWhisperWASM } from './whisper-wasm-optimized.js';
+import { createOptimizedWorkerPool } from './whisper-hybrid-worker.js';
+import WASMConfig from './wasm-config.js';
 
 class WhisperWASMManager {
   constructor() {
@@ -12,25 +19,30 @@ class WhisperWASMManager {
     this.currentModel = null;
     this.worker = null;
     
+    // 根據配置選擇實現
+    this.useOptimized = WASMConfig.useOptimized;
+    this.optimizedEngine = null;
+    this.hybridWorkerPool = null; // 混合式 Worker 池
+
     // 模型配置
     this.models = {
-      tiny: { 
-        file: 'ggml-tiny.bin', 
-        size: 75 * 1024 * 1024, 
+      tiny: {
+        file: 'ggml-tiny.bin',
+        size: 75 * 1024 * 1024,
         speed: 3,
         accuracy: '基本',
         description: '最快速度，適合快速預覽'
       },
-      base: { 
-        file: 'ggml-base.bin', 
-        size: 142 * 1024 * 1024, 
+      base: {
+        file: 'ggml-base.bin',
+        size: 142 * 1024 * 1024,
         speed: 2,
         accuracy: '良好',
         description: '平衡速度與品質'
       },
-      small: { 
-        file: 'ggml-small.bin', 
-        size: 466 * 1024 * 1024, 
+      small: {
+        file: 'ggml-small.bin',
+        size: 466 * 1024 * 1024,
         speed: 1.5,
         accuracy: '高',
         description: '最佳品質，速度較慢'
@@ -39,7 +51,7 @@ class WhisperWASMManager {
 
     // 功能開關
     this.ENABLE_REAL_WASM = true; // 預設啟用真實 WASM
-    
+
     // 真實 WASM 實現
     this.realWASM = null;
   }
@@ -52,31 +64,97 @@ class WhisperWASMManager {
     if (this.isInitialized && this.currentModel === modelName) {
       return; // 已經初始化相同模型
     }
-    
-    // 如果啟用真實 WASM，使用 Transformers.js
-    if (this.ENABLE_REAL_WASM) {
+
+    // 檢查是否有預載入的模型
+    const preloadedModel = modelPreloader.loadedModels.get(modelName);
+    if (preloadedModel) {
+      DEBUG && console.log(`使用預載入的模型: ${modelName}`);
+    }
+
+    // 使用優化版引擎
+    if (this.useOptimized) {
       try {
-        console.log('初始化真實 WASM (Transformers.js)...');
+        DEBUG && console.log('初始化優化版 WASM 引擎...');
         
-        if (!this.realWASM) {
-          this.realWASM = new WhisperTransformers();
-          
-          // 設定進度回調
-          this.realWASM.setProgressCallback((progress) => {
-            console.log('WASM 進度:', progress);
-            // 可以轉發給 UI
-          });
+        if (!this.optimizedEngine) {
+          this.optimizedEngine = optimizedWhisperWASM;
         }
         
-        await this.realWASM.initialize(modelName);
+        await this.optimizedEngine.initialize(modelName);
         this.isInitialized = true;
         this.currentModel = modelName;
         
-        console.log('真實 WASM 初始化完成');
+        DEBUG && console.log('優化版 WASM 引擎初始化完成');
+        
+        // 顯示優化資訊
+        const perfEstimate = WASMConfig.getPerformanceEstimate(25);
+        DEBUG && console.log('效能預估:', perfEstimate);
+        
         return;
         
       } catch (error) {
-        console.error('真實 WASM 初始化失敗:', error);
+        if (typeof DEBUG !== 'undefined' && DEBUG) {
+          console.error('優化版引擎初始化失敗，嘗試混合式架構:', error);
+          console.log('提示：優化版需要特殊的伺服器設定。詳見 docs/wasm-optimization-guide.md');
+        }
+        
+        // 嘗試使用混合式 Worker 架構
+        try {
+          DEBUG && console.log('初始化混合式 Worker 架構...');
+          
+          // 獲取 Worker 路徑
+          const workerPath = this.getWorkerPath();
+          this.hybridWorkerPool = await createOptimizedWorkerPool(workerPath);
+          
+          // 如果返回的是 Promise（完整優化版），等待它
+          if (this.hybridWorkerPool instanceof Promise) {
+            this.hybridWorkerPool = await this.hybridWorkerPool;
+            this.useOptimized = true;
+          } else {
+            // 使用混合式版本，需要初始化
+            this.useOptimized = false;
+            await this.hybridWorkerPool.initialize(modelName);
+            DEBUG && console.log('使用混合式 Worker 池，預期 2-3x 效能提升');
+          }
+          
+          this.isInitialized = true;
+          this.currentModel = modelName;
+          return;
+          
+        } catch (hybridError) {
+          if (typeof DEBUG !== 'undefined' && DEBUG) {
+            console.error('混合式架構也失敗，降級到標準版:', hybridError);
+          }
+          this.useOptimized = false;
+          this.hybridWorkerPool = null;
+        }
+      }
+    }
+
+    // 如果優化版失敗或未啟用，使用標準版
+    if (this.ENABLE_REAL_WASM) {
+      try {
+        DEBUG && console.log('初始化標準版 WASM (Transformers.js)...');
+
+        if (!this.realWASM) {
+          this.realWASM = new WhisperTransformers();
+
+          // 設定進度回調
+          this.realWASM.setProgressCallback((progress) => {
+            DEBUG && console.log('WASM 進度:', progress);
+            // 可以轉發給 UI
+          });
+        }
+
+        await this.realWASM.initialize(modelName);
+        this.isInitialized = true;
+        this.currentModel = modelName;
+
+        DEBUG && console.log('標準版 WASM 初始化完成');
+        return;
+
+      } catch (error) {
+        if (typeof DEBUG !== 'undefined' && DEBUG) console.error('標準版 WASM 初始化失敗:', error);
         // 可以選擇回退到模擬模式
         this.ENABLE_REAL_WASM = false;
       }
@@ -97,7 +175,7 @@ class WhisperWASMManager {
         await this.loadModel(modelName);
       } else {
         // 開發模式：模擬載入
-        console.log(`[開發模式] 模擬載入 ${modelName} 模型`);
+        DEBUG && console.log(`[開發模式] 模擬載入 ${modelName} 模型`);
         await this.simulateLoading(2000); // 模擬 2 秒載入時間
       }
 
@@ -105,7 +183,7 @@ class WhisperWASMManager {
       this.currentModel = modelName;
 
     } catch (error) {
-      console.error('WASM 初始化失敗:', error);
+      if (typeof DEBUG !== 'undefined' && DEBUG) console.error('WASM 初始化失敗:', error);
       throw error;
     }
   }
@@ -146,7 +224,7 @@ class WhisperWASMManager {
     if ('memory' in performance) {
       const memInfo = performance.memory;
       const availableMemory = memInfo.jsHeapSizeLimit - memInfo.usedJSHeapSize;
-      
+
       if (availableMemory < requiredMemory) {
         throw new Error(`記憶體不足。需要：${Math.round(requiredMemory / 1024 / 1024)}MB，可用：${Math.round(availableMemory / 1024 / 1024)}MB。建議關閉其他標籤頁或使用較小的模型。`);
       }
@@ -157,8 +235,25 @@ class WhisperWASMManager {
    * 載入 WASM 模組（真實實作）
    */
   async loadWASMModule() {
-    // TODO: 實際載入 whisper.wasm
-    throw new Error('WASM 模組載入尚未實作，請使用開發模式');
+    // 真實 WASM 尚未實現，優雅降級到 Transformers.js
+    if (typeof DEBUG !== 'undefined' && DEBUG) {
+      console.warn('真實 WASM (whisper.cpp) 尚未實現，使用 Transformers.js 作為替代方案');
+      console.log('如需真實 WASM 支援，請參考 docs/wasm-implementation-technical-plan.md');
+    }
+    
+    // 降級到 Transformers.js 實現
+    this.ENABLE_REAL_WASM = false;
+    
+    if (!this.realWASM) {
+      this.realWASM = new WhisperTransformers();
+      
+      // 設定進度回調
+      this.realWASM.setProgressCallback((progress) => {
+        DEBUG && console.log('Transformers.js 進度:', progress);
+      });
+    }
+    
+    return; // 成功降級
   }
 
   /**
@@ -172,13 +267,13 @@ class WhisperWASMManager {
       // 檢查快取
       const cachedModel = await this.getCachedModel(modelName);
       if (cachedModel) {
-        console.log('使用快取的模型');
+        DEBUG && console.log('使用快取的模型');
         return;
       }
 
       // TODO: 實際下載和載入模型
-      console.log(`需要下載模型: ${modelName} (${Math.round(modelInfo.size / 1024 / 1024)}MB)`);
-      
+      DEBUG && console.log(`需要下載模型: ${modelName} (${Math.round(modelInfo.size / 1024 / 1024)}MB)`);
+
     } catch (error) {
       throw new Error(`載入模型失敗: ${error.message}`);
     }
@@ -188,12 +283,64 @@ class WhisperWASMManager {
    * 執行轉譯
    * @param {File} audioFile - 音訊檔案
    * @param {Object} options - 轉譯選項
+   * @param {CancellationToken} options.cancellationToken - 取消令牌
+   * @param {Function} options.onProgress - 進度回調
    */
   async transcribe(audioFile, options = {}) {
     if (!this.isInitialized) {
       throw new Error('WASM 模組尚未初始化');
     }
 
+    // 檢查是否已取消
+    if (options.cancellationToken) {
+      options.cancellationToken.throwIfCancelled();
+    }
+
+    // 使用優化版引擎
+    if (this.useOptimized && this.optimizedEngine) {
+      try {
+        DEBUG && console.log('使用優化版引擎進行轉譯...');
+        const result = await this.optimizedEngine.transcribe(audioFile, options);
+        return result;
+      } catch (error) {
+        if (typeof DEBUG !== 'undefined' && DEBUG) console.error('優化版轉譯失敗，降級到混合式:', error);
+        this.useOptimized = false;
+      }
+    }
+    
+    // 使用混合式 Worker 池
+    if (this.hybridWorkerPool && !this.useOptimized) {
+      try {
+        DEBUG && console.log('使用混合式 Worker 池進行轉譯...');
+        
+        // 準備音訊資料
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const arrayBuffer = await audioFile.arrayBuffer();
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        
+        // 使用混合式架構處理
+        const result = await this.hybridWorkerPool.processAudio(audioBuffer, {
+          onProgress: options.onProgress,
+          cancellationToken: options.cancellationToken,
+          language: options.language || 'zh',
+          task: options.task || 'transcribe'
+        });
+        
+        // 格式化結果以符合統一介面
+        return {
+          ...result,
+          language: 'zh-TW',
+          duration: audioBuffer.duration,
+          method: 'local-wasm-hybrid'
+        };
+        
+      } catch (error) {
+        if (typeof DEBUG !== 'undefined' && DEBUG) console.error('混合式轉譯失敗，降級到標準版:', error);
+        this.hybridWorkerPool = null;
+      }
+    }
+
+    // 使用標準版
     if (this.ENABLE_REAL_WASM) {
       // 真實 WASM 轉譯
       return await this.transcribeWithWASM(audioFile, options);
@@ -210,15 +357,15 @@ class WhisperWASMManager {
     // 如果使用真實 WASM，直接調用 WhisperTransformers
     if (this.realWASM) {
       try {
-        console.log('使用 Transformers.js 進行轉譯...');
+        DEBUG && console.log('使用 Transformers.js 進行轉譯...');
         const result = await this.realWASM.transcribe(audioFile, options);
         return result;
       } catch (error) {
-        console.error('Transformers.js 轉譯失敗:', error);
+        if (typeof DEBUG !== 'undefined' && DEBUG) console.error('Transformers.js 轉譯失敗:', error);
         throw error;
       }
     }
-    
+
     // 否則使用 Worker 方式
     return new Promise((resolve, reject) => {
       // 建立 Web Worker
@@ -238,17 +385,28 @@ class WhisperWASMManager {
             // 移除所有函數類型的選項
           }
         };
-        
+
         // 過濾掉函數類型的屬性
         Object.keys(options).forEach(key => {
           if (typeof options[key] !== 'function') {
             messageData.options[key] = options[key];
           }
         });
-        
+
         this.worker.postMessage(messageData);
       }).catch(reject);
 
+      // 如果有取消令牌，註冊取消回調
+      if (options.cancellationToken) {
+        options.cancellationToken.onCancelled(() => {
+          if (this.worker) {
+            this.worker.postMessage({ command: 'cancel' });
+            this.worker.terminate();
+            this.worker = null;
+          }
+        });
+      }
+      
       // 監聽 Worker 訊息
       this.worker.onmessage = (event) => {
         const { type, data } = event.data;
@@ -260,6 +418,10 @@ class WhisperWASMManager {
               window.dispatchEvent(new CustomEvent('whisper-progress', {
                 detail: data
               }));
+            }
+            // 同時調用 onProgress 回調
+            if (options.onProgress) {
+              options.onProgress(data);
             }
             break;
 
@@ -273,6 +435,12 @@ class WhisperWASMManager {
             this.worker.terminate();
             this.worker = null;
             reject(new Error(data.message));
+            break;
+            
+          case 'cancelled':
+            this.worker.terminate();
+            this.worker = null;
+            reject(new Error('操作已取消'));
             break;
         }
       };
@@ -289,8 +457,8 @@ class WhisperWASMManager {
    * 模擬轉譯（開發模式）
    */
   async simulateTranscription(audioFile, options) {
-    console.log('[開發模式] 模擬轉譯:', audioFile.name);
-    
+    DEBUG && console.log('[開發模式] 模擬轉譯:', audioFile.name);
+
     // 取得音訊長度
     const duration = await this.getAudioDuration(audioFile);
     const modelSpeed = this.models[this.currentModel].speed;
@@ -301,11 +469,18 @@ class WhisperWASMManager {
     const totalSteps = Math.ceil(processingTime / progressInterval);
     let currentStep = 0;
 
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const timer = setInterval(() => {
+        // 檢查是否已取消
+        if (options.cancellationToken && options.cancellationToken.isCancelled) {
+          clearInterval(timer);
+          reject(new Error('操作已取消'));
+          return;
+        }
+        
         currentStep++;
         const progress = (currentStep / totalSteps) * 100;
-        
+
         if (options.onProgress) {
           options.onProgress({
             percentage: Math.min(progress, 100),
@@ -315,7 +490,7 @@ class WhisperWASMManager {
 
         if (currentStep >= totalSteps) {
           clearInterval(timer);
-          
+
           // 返回模擬結果（繁體中文、無標點）
           resolve({
             text: `[開發模式] 這是 ${audioFile.name} 的模擬轉譯結果 音訊長度 ${Math.round(duration)}秒 使用模型 ${this.currentModel} 處理時間 ${Math.round(processingTime / 1000)}秒`,
@@ -380,7 +555,7 @@ class WhisperWASMManager {
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
       return audioBuffer.duration;
     } catch (error) {
-      console.warn('無法取得音訊長度，使用估計值');
+      DEBUG && console.warn('無法取得音訊長度，使用估計值');
       // 根據檔案大小估計（假設 128kbps）
       return (audioFile.size * 8) / (128 * 1000);
     }
@@ -401,7 +576,7 @@ class WhisperWASMManager {
         request.onerror = () => reject(request.error);
       });
     } catch (error) {
-      console.warn('無法從快取載入模型:', error);
+      DEBUG && console.warn('無法從快取載入模型:', error);
       return null;
     }
   }
@@ -411,24 +586,24 @@ class WhisperWASMManager {
       const db = await this.openIndexedDB();
       const transaction = db.transaction(['models'], 'readwrite');
       const store = transaction.objectStore('models');
-      
+
       await store.put({
         name: modelName,
         data: modelData,
         timestamp: Date.now()
       });
     } catch (error) {
-      console.warn('無法快取模型:', error);
+      DEBUG && console.warn('無法快取模型:', error);
     }
   }
 
   async openIndexedDB() {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open('WhisperModels', 1);
-      
+
       request.onerror = () => reject(request.error);
       request.onsuccess = () => resolve(request.result);
-      
+
       request.onupgradeneeded = (event) => {
         const db = event.target.result;
         if (!db.objectStoreNames.contains('models')) {
@@ -472,9 +647,9 @@ class WhisperWASMManager {
       const transaction = db.transaction(['models'], 'readwrite');
       const store = transaction.objectStore('models');
       await store.clear();
-      console.log('模型快取已清除');
+      DEBUG && console.log('模型快取已清除');
     } catch (error) {
-      console.error('清除快取失敗:', error);
+      if (typeof DEBUG !== 'undefined' && DEBUG) console.error('清除快取失敗:', error);
     }
   }
 
@@ -502,8 +677,52 @@ class WhisperWASMManager {
   estimateProcessingTime(duration, modelName) {
     const modelInfo = this.models[modelName];
     if (!modelInfo) return null;
-    
+
     return duration / modelInfo.speed;
+  }
+
+  /**
+   * 預載入模型
+   * @param {string} modelName - 模型名稱
+   * @param {Object} options - 預載入選項
+   */
+  async preloadModel(modelName, options = {}) {
+    return modelPreloader.preloadModel(modelName, options);
+  }
+  
+  /**
+   * 開始自動預載入
+   */
+  startAutoPreload() {
+    modelPreloader.startAutoPreload();
+  }
+  
+  /**
+   * 獲取預載入狀態
+   */
+  getPreloadStatus() {
+    return modelPreloader.getStatus();
+  }
+  
+  /**
+   * 訂閱預載入事件
+   */
+  subscribeToPreload(callback) {
+    return modelPreloader.subscribe(callback);
+  }
+  
+  /**
+   * 取消預載入
+   */
+  cancelPreload(modelName) {
+    modelPreloader.cancelPreload(modelName);
+  }
+  
+  /**
+   * 設定預載入配置
+   */
+  setPreloadConfig(config) {
+    modelPreloader.setConfig(config);
   }
 
   /**
@@ -513,12 +732,12 @@ class WhisperWASMManager {
     // 取得當前頁面的路徑
     const currentPath = window.location.pathname;
     const pathSegments = currentPath.split('/').filter(Boolean);
-    
+
     // 如果在 test 目錄或其他子目錄中
     if (pathSegments.length > 1 || (pathSegments.length === 1 && pathSegments[0].includes('test'))) {
       return '../js/workers/whisper-worker.js';
     }
-    
+
     // 如果在根目錄
     return 'js/workers/whisper-worker.js';
   }

@@ -9,7 +9,7 @@ export class OpenCCLite {
         this.s2tMap = new Map();
         this.initializeMapping();
     }
-    
+
     /**
      * 初始化簡繁對照表
      */
@@ -248,27 +248,27 @@ export class OpenCCLite {
             '刷': '刷', '丛': '叢', '赫': '赫', '泽': '澤', '旨': '旨',
             // 繼續添加更多對照...
         };
-        
+
         // 將對照表加入 Map
         for (const [simplified, traditional] of Object.entries(mappings)) {
             this.s2tMap.set(simplified, traditional);
         }
     }
-    
+
     /**
      * 簡體轉繁體
      */
     convert(text) {
         if (!text) return text;
-        
+
         let result = '';
-        
+
         // 逐字轉換
         for (const char of text) {
             const traditional = this.s2tMap.get(char);
             result += traditional || char;
         }
-        
+
         return result;
     }
 }

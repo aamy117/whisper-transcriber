@@ -1,0 +1,263 @@
+/**
+ * 首次使用引導樣式
+ */
+
+/* 遮罩層 */
+.guide-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9990;
+  animation: fadeIn 0.3s ease;
+}
+
+/* 引導框 */
+.guide-box {
+  position: fixed;
+  background: var(--bg-primary, #fff);
+  border-radius: 8px;
+  padding: 0;
+  min-width: 320px;
+  max-width: 420px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  z-index: 9992;
+  animation: slideIn 0.3s ease;
+}
+
+.guide-header {
+  padding: 20px 20px 15px;
+  border-bottom: 1px solid var(--border-color, #e0e0e0);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.guide-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary, #333);
+}
+
+.guide-close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: var(--text-secondary, #666);
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.guide-close:hover {
+  background: var(--bg-secondary, #f0f0f0);
+  color: var(--text-primary, #333);
+}
+
+.guide-content {
+  padding: 20px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-secondary, #666);
+}
+
+.guide-footer {
+  padding: 15px 20px;
+  border-top: 1px solid var(--border-color, #e0e0e0);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.guide-progress {
+  font-size: 12px;
+  color: var(--text-tertiary, #999);
+}
+
+.guide-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.guide-btn {
+  padding: 8px 16px;
+  border: 1px solid var(--border-color, #ddd);
+  background: var(--bg-secondary, #f8f8f8);
+  color: var(--text-primary, #333);
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.guide-btn:hover {
+  background: var(--bg-tertiary, #f0f0f0);
+  transform: translateY(-1px);
+}
+
+.guide-btn-primary {
+  background: var(--primary-color, #0066cc);
+  color: white;
+  border-color: var(--primary-color, #0066cc);
+}
+
+.guide-btn-primary:hover {
+  background: var(--primary-hover, #0052a3);
+  border-color: var(--primary-hover, #0052a3);
+}
+
+/* 高亮框 */
+.guide-highlight {
+  position: fixed;
+  border: 3px solid var(--primary-color, #0066cc);
+  border-radius: 8px;
+  pointer-events: none;
+  z-index: 9991;
+  animation: pulse 2s ease-in-out infinite;
+  display: none;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(0, 102, 204, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(0, 102, 204, 0);
+  }
+}
+
+/* 歡迎訊息 */
+.welcome-toast {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  background: var(--success-color, #28a745);
+  color: white;
+  padding: 15px 25px;
+  border-radius: 30px;
+  box-shadow: 0 4px 20px rgba(40, 167, 69, 0.3);
+  z-index: 9999;
+  transition: transform 0.3s ease;
+}
+
+.welcome-toast.show {
+  transform: translateX(-50%) translateY(0);
+}
+
+.welcome-toast-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.welcome-toast-icon {
+  font-size: 20px;
+}
+
+.welcome-toast-text {
+  font-size: 15px;
+}
+
+/* 更新通知 */
+.update-notice {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 20px;
+  border-radius: 12px;
+  max-width: 350px;
+  box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+  z-index: 1000;
+  transform: translateX(400px);
+  transition: transform 0.3s ease;
+}
+
+.update-notice.show {
+  transform: translateX(0);
+}
+
+.update-notice-content h4 {
+  margin: 0 0 10px 0;
+  font-size: 16px;
+}
+
+.update-notice-content p {
+  margin: 0 0 15px 0;
+  font-size: 14px;
+  opacity: 0.9;
+  line-height: 1.5;
+}
+
+.update-notice-btn {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 6px 16px;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.update-notice-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* 動畫 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 響應式設計 */
+@media (max-width: 768px) {
+  .guide-box {
+    min-width: 280px;
+    max-width: calc(100vw - 40px);
+    margin: 0 20px;
+  }
+  
+  .update-notice {
+    right: 10px;
+    left: 10px;
+    max-width: none;
+  }
+}
+
+/* 深色模式支援 */
+@media (prefers-color-scheme: dark) {
+  .guide-overlay {
+    background: rgba(0, 0, 0, 0.7);
+  }
+  
+  .guide-box {
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  }
+}

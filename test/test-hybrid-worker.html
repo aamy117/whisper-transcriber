@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>混合式 Worker 架構測試</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/progress.css">
+  <style>
+    body {
+      padding: 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    .test-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    
+    .info-section, .result-section {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 20px;
+    }
+    
+    .test-button {
+      padding: 10px 20px;
+      background: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    
+    .test-button:hover {
+      opacity: 0.8;
+    }
+    
+    .test-button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .result-area {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      padding: 15px;
+      margin-top: 20px;
+      min-height: 200px;
+      max-height: 400px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    
+    .progress-container {
+      margin: 20px 0;
+    }
+    
+    .progress-bar {
+      width: 100%;
+      height: 20px;
+      background: var(--bg-tertiary);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: var(--primary-color);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+    
+    .status-indicator {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 5px;
+    }
+    
+    .status-success { background: var(--success-color); }
+    .status-error { background: var(--danger-color); }
+    .status-warning { background: var(--warning-color); }
+    .status-info { background: var(--info-color); }
+    
+    .comparison-table {
+      width: 100%;
+      margin-top: 20px;
+      border-collapse: collapse;
+    }
+    
+    .comparison-table th, .comparison-table td {
+      padding: 10px;
+      border: 1px solid var(--border-color);
+      text-align: left;
+    }
+    
+    .comparison-table th {
+      background: var(--bg-tertiary);
+    }
+  </style>
+</head>
+<body>
+  <h1>混合式 Worker 架構測試</h1>
+  <p>測試不依賴 SharedArrayBuffer 的 Worker 池實現，適用於 GitHub Pages</p>
+  
+  <div class="test-container">
+    <!-- 環境資訊 -->
+    <div class="info-section">
+      <h2>環境檢測</h2>
+      <div id="envInfo"></div>
+      
+      <h3>效能預期</h3>
+      <table class="comparison-table">
+        <tr>
+          <th>架構</th>
+          <th>需要 Headers</th>
+          <th>速度提升</th>
+          <th>GitHub Pages</th>
+        </tr>
+        <tr>
+          <td>完整優化版</td>
+          <td>✅ 需要</td>
+          <td>4-16x</td>
+          <td>❌</td>
+        </tr>
+        <tr>
+          <td><strong>混合式架構</strong></td>
+          <td>❌ 不需要</td>
+          <td><strong>2-3x</strong></td>
+          <td><strong>✅</strong></td>
+        </tr>
+        <tr>
+          <td>標準版</td>
+          <td>❌ 不需要</td>
+          <td>1x</td>
+          <td>✅</td>
+        </tr>
+      </table>
+    </div>
+    
+    <!-- 測試控制 -->
+    <div class="info-section">
+      <h2>測試控制</h2>
+      
+      <div>
+        <label>選擇音訊檔案：</label>
+        <input type="file" id="fileInput" accept="audio/*,video/*">
+      </div>
+      
+      <div style="margin: 15px 0;">
+        <label>選擇模型：</label>
+        <select id="modelSelect">
+          <option value="tiny">Tiny (最快)</option>
+          <option value="base" selected>Base (平衡)</option>
+          <option value="small">Small (最準)</option>
+        </select>
+      </div>
+      
+      <div style="margin: 15px 0;">
+        <label>Worker 數量：</label>
+        <select id="workerCount">
+          <option value="1">1 (單執行緒)</option>
+          <option value="2">2</option>
+          <option value="4" selected>4</option>
+          <option value="8">8</option>
+        </select>
+      </div>
+      
+      <button class="test-button" onclick="testHybridWorker()">測試混合式架構</button>
+      <button class="test-button" onclick="testStandardWorker()">測試標準版</button>
+      <button class="test-button" onclick="comparePerformance()">效能對比</button>
+      <button class="test-button" onclick="clearResults()">清除結果</button>
+      
+      <div class="progress-container">
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressBar"></div>
+        </div>
+        <div id="progressText" style="margin-top: 5px;">準備就緒</div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 結果顯示 -->
+  <div class="result-section">
+    <h2>測試結果</h2>
+    <div class="result-area" id="results"></div>
+  </div>
+  
+  <script type="module">
+    import { WhisperWASMManager } from '../js/wasm/whisper-wasm-manager.js';
+    import WASMConfig from '../js/wasm/wasm-config.js';
+    
+    // 環境檢測
+    function checkEnvironment() {
+      const envInfo = document.getElementById('envInfo');
+      const checks = [];
+      
+      // SharedArrayBuffer
+      if (typeof SharedArrayBuffer !== 'undefined') {
+        checks.push('<span class="status-indicator status-success"></span>SharedArrayBuffer 可用（完整優化）');
+      } else {
+        checks.push('<span class="status-indicator status-warning"></span>SharedArrayBuffer 不可用（使用混合式）');
+      }
+      
+      // Web Workers
+      if ('Worker' in window) {
+        checks.push('<span class="status-indicator status-success"></span>Web Workers 支援');
+      } else {
+        checks.push('<span class="status-indicator status-error"></span>Web Workers 不支援');
+      }
+      
+      // CPU 核心數
+      const cores = navigator.hardwareConcurrency || '未知';
+      checks.push(`<span class="status-indicator status-info"></span>CPU 核心數：${cores}`);
+      
+      // 記憶體
+      if (navigator.deviceMemory) {
+        checks.push(`<span class="status-indicator status-info"></span>設備記憶體：${navigator.deviceMemory} GB`);
+      }
+      
+      envInfo.innerHTML = checks.join('<br>');
+    }
+    
+    // 初始化
+    document.addEventListener('DOMContentLoaded', () => {
+      checkEnvironment();
+      logResult('測試頁面載入完成', 'success');
+    });
+    
+    // 測試混合式架構
+    window.testHybridWorker = async function() {
+      const file = document.getElementById('fileInput').files[0];
+      if (!file) {
+        logResult('請選擇音訊檔案', 'error');
+        return;
+      }
+      
+      logResult('=== 測試混合式 Worker 架構 ===', 'info');
+      
+      // 強制使用混合式架構
+      WASMConfig.useOptimized = false;
+      WASMConfig.optimization.workerPoolSize = parseInt(document.getElementById('workerCount').value);
+      
+      await runTest(file, '混合式架構');
+    };
+    
+    // 測試標準版
+    window.testStandardWorker = async function() {
+      const file = document.getElementById('fileInput').files[0];
+      if (!file) {
+        logResult('請選擇音訊檔案', 'error');
+        return;
+      }
+      
+      logResult('=== 測試標準版 WASM ===', 'info');
+      
+      // 使用標準版（單執行緒）
+      WASMConfig.useOptimized = false;
+      WASMConfig.optimization.workerPoolSize = 1;
+      
+      await runTest(file, '標準版');
+    };
+    
+    // 效能對比
+    window.comparePerformance = async function() {
+      const file = document.getElementById('fileInput').files[0];
+      if (!file) {
+        logResult('請選擇音訊檔案', 'error');
+        return;
+      }
+      
+      logResult('=== 開始效能對比測試 ===', 'info');
+      
+      // 測試標準版
+      WASMConfig.optimization.workerPoolSize = 1;
+      const standardTime = await runTest(file, '標準版');
+      
+      // 測試混合式
+      WASMConfig.optimization.workerPoolSize = parseInt(document.getElementById('workerCount').value);
+      const hybridTime = await runTest(file, '混合式架構');
+      
+      // 顯示對比結果
+      if (standardTime && hybridTime) {
+        const speedup = (standardTime / hybridTime).toFixed(2);
+        logResult('=== 效能對比結果 ===', 'success');
+        logResult(`標準版時間：${(standardTime / 1000).toFixed(2)} 秒`, 'info');
+        logResult(`混合式時間：${(hybridTime / 1000).toFixed(2)} 秒`, 'info');
+        logResult(`效能提升：${speedup}x 倍`, 'success');
+      }
+    };
+    
+    // 執行測試
+    async function runTest(file, version) {
+      const startTime = performance.now();
+      
+      try {
+        logResult(`開始 ${version} 測試...`, 'info');
+        logResult(`檔案：${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`, 'info');
+        
+        // 禁用按鈕
+        document.querySelectorAll('.test-button').forEach(btn => btn.disabled = true);
+        updateProgress(0, '初始化...');
+        
+        // 創建新的管理器實例
+        const wasmManager = new WhisperWASMManager();
+        const model = document.getElementById('modelSelect').value;
+        
+        // 初始化
+        logResult(`初始化 ${model} 模型...`, 'info');
+        await wasmManager.initialize(model);
+        
+        // 執行轉譯
+        updateProgress(10, '開始轉譯...');
+        
+        const result = await wasmManager.transcribe(file, {
+          onProgress: (progress) => {
+            if (progress.percentage !== undefined) {
+              updateProgress(10 + progress.percentage * 0.9, `轉譯中... ${Math.round(progress.percentage)}%`);
+            } else if (typeof progress === 'number') {
+              updateProgress(10 + progress * 90, `轉譯中... ${Math.round(progress * 100)}%`);
+            }
+          }
+        });
+        
+        // 計算時間
+        const endTime = performance.now();
+        const totalTime = endTime - startTime;
+        
+        // 顯示結果
+        updateProgress(100, '完成！');
+        logResult(`${version} 完成！處理時間：${(totalTime / 1000).toFixed(2)} 秒`, 'success');
+        logResult(`轉譯方法：${result.method || 'unknown'}`, 'info');
+        logResult(`段落數量：${result.segments.length}`, 'info');
+        
+        // 顯示前幾個段落
+        if (result.segments.length > 0) {
+          logResult('前 3 個段落：', 'info');
+          result.segments.slice(0, 3).forEach((seg, idx) => {
+            logResult(`  ${idx + 1}. [${seg.start.toFixed(1)}s - ${seg.end.toFixed(1)}s] ${seg.text}`, 'info');
+          });
+        }
+        
+        return totalTime;
+        
+      } catch (error) {
+        logResult(`${version} 測試失敗：${error.message}`, 'error');
+        updateProgress(0, '測試失敗');
+        return null;
+        
+      } finally {
+        // 重新啟用按鈕
+        document.querySelectorAll('.test-button').forEach(btn => btn.disabled = false);
+      }
+    }
+    
+    // 記錄結果
+    function logResult(message, type = 'info') {
+      const timestamp = new Date().toLocaleTimeString('zh-TW');
+      const resultDiv = document.getElementById('results');
+      
+      const entry = document.createElement('div');
+      entry.style.marginBottom = '2px';
+      entry.style.color = {
+        'success': 'var(--success-color)',
+        'error': 'var(--danger-color)',
+        'warning': 'var(--warning-color)',
+        'info': 'var(--text-primary)'
+      }[type] || 'var(--text-primary)';
+      
+      entry.textContent = `[${timestamp}] ${message}`;
+      resultDiv.appendChild(entry);
+      resultDiv.scrollTop = resultDiv.scrollHeight;
+    }
+    
+    // 更新進度
+    function updateProgress(percent, text) {
+      document.getElementById('progressBar').style.width = percent + '%';
+      document.getElementById('progressText').textContent = text;
+    }
+    
+    // 清除結果
+    window.clearResults = function() {
+      document.getElementById('results').innerHTML = '';
+      updateProgress(0, '準備就緒');
+    };
+  </script>
+</body>
+</html>

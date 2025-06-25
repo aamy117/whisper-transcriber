@@ -1,3 +1,6 @@
+// 調試模式開關（生產環境設為 false）
+const DEBUG = typeof process !== 'undefined' ? process.env.NODE_ENV !== 'production' : location.hostname === 'localhost';
+
 // DOM 載入狀態管理器
 export class DOMReadyManager {
   constructor() {
@@ -6,11 +9,11 @@ export class DOMReadyManager {
     this.requiredElements = new Map();
     this.elementCache = new Map();
     this.initTime = Date.now();
-    
+
     // 監聽 DOM 狀態變化
     this.setupDOMListeners();
   }
-  
+
   /**
    * 設置 DOM 監聽器
    */
@@ -18,7 +21,7 @@ export class DOMReadyManager {
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', () => this.checkReadyState());
     }
-    
+
     if (document.readyState !== 'complete') {
       window.addEventListener('load', () => this.checkReadyState());
     } else {
@@ -26,7 +29,7 @@ export class DOMReadyManager {
       this.checkReadyState();
     }
   }
-  
+
   /**
    * 檢查 DOM 就緒狀態
    */
@@ -35,29 +38,29 @@ export class DOMReadyManager {
       this.markAsReady();
     }
   }
-  
+
   /**
    * 標記為就緒狀態
    */
   markAsReady() {
     if (this.isReady) return;
-    
+
     this.isReady = true;
     const loadTime = Date.now() - this.initTime;
-    console.log(`✅ DOM 載入完成，耗時: ${loadTime}ms`);
-    
+    DEBUG && console.log(`✅ DOM 載入完成，耗時: ${loadTime}ms`);
+
     // 執行所有等待中的回調
     this.readyCallbacks.forEach(callback => {
       try {
         callback();
       } catch (error) {
-        console.error('執行 DOM ready 回調時發生錯誤:', error);
+        if (typeof DEBUG !== 'undefined' && DEBUG) console.error('執行 DOM ready 回調時發生錯誤:', error);
       }
     });
-    
+
     this.readyCallbacks = [];
   }
-  
+
   /**
    * 註冊必要的 DOM 元素
    * @param {Array} elements - 元素配置陣列
@@ -70,16 +73,16 @@ export class DOMReadyManager {
    */
   requireElements(elements) {
     elements.forEach(({ id, optional = false, selector = null }) => {
-      this.requiredElements.set(id, { 
+      this.requiredElements.set(id, {
         id,
         selector: selector || `#${id}`,
-        found: false, 
+        found: false,
         optional,
         element: null
       });
     });
   }
-  
+
   /**
    * 檢查所有必要元素是否存在
    * @returns {Object} 檢查結果
@@ -91,12 +94,12 @@ export class DOMReadyManager {
       found: [],
       optional: []
     };
-    
+
     for (const [id, info] of this.requiredElements) {
       const element = document.querySelector(info.selector);
       info.found = !!element;
       info.element = element;
-      
+
       if (element) {
         this.elementCache.set(id, element);
         results.found.push(id);
@@ -107,10 +110,10 @@ export class DOMReadyManager {
         results.missing.push(id);
       }
     }
-    
+
     return results;
   }
-  
+
   /**
    * 等待 DOM 就緒
    * @param {number} timeout - 超時時間（毫秒）
@@ -120,19 +123,19 @@ export class DOMReadyManager {
     if (this.isReady) {
       return Promise.resolve(true);
     }
-    
+
     return new Promise((resolve, reject) => {
       const timeoutId = setTimeout(() => {
         reject(new Error(`DOM 載入超時 (${timeout}ms)`));
       }, timeout);
-      
+
       this.onReady(() => {
         clearTimeout(timeoutId);
         resolve(true);
       });
     });
   }
-  
+
   /**
    * 註冊 DOM 就緒回調
    * @param {Function} callback - 回調函數
@@ -141,7 +144,7 @@ export class DOMReadyManager {
     if (typeof callback !== 'function') {
       throw new Error('回調必須是函數');
     }
-    
+
     if (this.isReady) {
       // DOM 已就緒，立即執行
       callback();
@@ -150,7 +153,7 @@ export class DOMReadyManager {
       this.readyCallbacks.push(callback);
     }
   }
-  
+
   /**
    * 等待特定元素出現
    * @param {string} selector - 元素選擇器
@@ -159,7 +162,7 @@ export class DOMReadyManager {
    */
   async waitForElement(selector, timeout = 5000) {
     const startTime = Date.now();
-    
+
     return new Promise((resolve, reject) => {
       // 先檢查元素是否已存在
       const element = document.querySelector(selector);
@@ -167,7 +170,7 @@ export class DOMReadyManager {
         resolve(element);
         return;
       }
-      
+
       // 使用 MutationObserver 監聽 DOM 變化
       const observer = new MutationObserver((mutations, obs) => {
         const element = document.querySelector(selector);
@@ -179,12 +182,12 @@ export class DOMReadyManager {
           reject(new Error(`等待元素 "${selector}" 超時`));
         }
       });
-      
+
       observer.observe(document.body, {
         childList: true,
         subtree: true
       });
-      
+
       // 設置超時
       setTimeout(() => {
         observer.disconnect();
@@ -192,7 +195,7 @@ export class DOMReadyManager {
       }, timeout);
     });
   }
-  
+
   /**
    * 批量等待多個元素
    * @param {Array<string>} selectors - 選擇器陣列
@@ -200,26 +203,26 @@ export class DOMReadyManager {
    * @returns {Promise<Map<string, Element>>}
    */
   async waitForElements(selectors, timeout = 5000) {
-    const promises = selectors.map(selector => 
+    const promises = selectors.map(selector =>
       this.waitForElement(selector, timeout)
         .then(element => ({ selector, element }))
         .catch(error => ({ selector, error }))
     );
-    
+
     const results = await Promise.all(promises);
     const elementMap = new Map();
-    
+
     results.forEach(({ selector, element, error }) => {
       if (element) {
         elementMap.set(selector, element);
       } else {
-        console.warn(`無法找到元素: ${selector}`, error);
+        DEBUG && console.warn(`無法找到元素: ${selector}`, error);
       }
     });
-    
+
     return elementMap;
   }
-  
+
   /**
    * 獲取快取的元素
    * @param {string} id - 元素 ID
@@ -228,7 +231,7 @@ export class DOMReadyManager {
   getElement(id) {
     return this.elementCache.get(id) || null;
   }
-  
+
   /**
    * 獲取所有快取的元素
    * @returns {Object} 元素映射對象
@@ -240,14 +243,14 @@ export class DOMReadyManager {
     }
     return elements;
   }
-  
+
   /**
    * 診斷 DOM 狀態
    * @returns {Object} 診斷資訊
    */
   diagnose() {
     const checkResult = this.checkElements();
-    
+
     return {
       domReady: this.isReady,
       readyState: document.readyState,
@@ -264,7 +267,7 @@ export class DOMReadyManager {
       }
     };
   }
-  
+
   /**
    * 重置管理器狀態
    */

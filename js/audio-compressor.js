@@ -1,3 +1,6 @@
+// 調試模式開關（生產環境設為 false）
+const DEBUG = typeof process !== 'undefined' ? process.env.NODE_ENV !== 'production' : location.hostname === 'localhost';
+
 /**
  * 音訊壓縮模組
  * 使用 Web Audio API 實現客戶端音訊壓縮
@@ -10,7 +13,7 @@ export class AudioCompressor {
   constructor() {
     this.audioContext = null;
     this.targetFileSize = 24 * 1024 * 1024; // 目標大小：24MB (留 1MB 餘量)
-    
+
     // 語音優化的壓縮參數
     this.compressionProfiles = {
       light: {
@@ -36,53 +39,77 @@ export class AudioCompressor {
       }
     };
   }
-  
+
   /**
    * 壓縮音訊檔案
+   * @param {File} file - 要壓縮的音訊檔案
+   * @param {Object} options - 選項
+   * @param {number} options.targetSize - 目標檔案大小
+   * @param {string} options.profile - 壓縮配置
+   * @param {Function} options.onProgress - 進度回調
+   * @param {CancellationToken} options.cancellationToken - 取消令牌
    */
   async compressAudioFile(file, options = {}) {
     const {
       targetSize = this.targetFileSize,
       profile = 'auto',
-      onProgress = null
+      onProgress = null,
+      cancellationToken = null
     } = options;
-    
+
     try {
       // 初始化 Audio Context
       this.initAudioContext();
-      
+
       // 讀取音訊檔案
       notify.info('正在讀取音訊檔案...');
-      const arrayBuffer = await this.readFileAsArrayBuffer(file);
       
+      // 檢查是否已取消
+      if (cancellationToken) {
+        cancellationToken.throwIfCancelled();
+      }
+      
+      const arrayBuffer = await this.readFileAsArrayBuffer(file);
+
       // 解碼音訊
       notify.info('正在解碼音訊...');
-      const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
       
+      // 檢查是否已取消
+      if (cancellationToken) {
+        cancellationToken.throwIfCancelled();
+      }
+      
+      const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+
       // 選擇壓縮配置
       const compressionProfile = this.selectCompressionProfile(file.size, targetSize, profile);
       notify.info(`使用${compressionProfile.description}`);
-      
+
       // 執行壓縮
-      const compressedBuffer = await this.processAudio(audioBuffer, compressionProfile, onProgress);
-      
+      const compressedBuffer = await this.processAudio(audioBuffer, compressionProfile, onProgress, cancellationToken);
+
       // 編碼為檔案（使用 WAV 格式）
-      const compressedBlob = await this.encodeAudioBuffer(compressedBuffer, 'audio/wav', compressionProfile);
+      // 檢查是否已取消
+      if (cancellationToken) {
+        cancellationToken.throwIfCancelled();
+      }
       
+      const compressedBlob = await this.encodeAudioBuffer(compressedBuffer, 'audio/wav', compressionProfile);
+
       // 檢查壓縮結果
       if (compressedBlob.size > targetSize) {
         // 如果還是太大，嘗試更激進的壓縮
         notify.warning('檔案仍然過大，嘗試更高壓縮率...');
         return await this.compressWithFallback(audioBuffer, targetSize, onProgress);
       }
-      
+
       // 建立檔案物件
       const compressedFile = new File(
         [compressedBlob],
         file.name.replace(/\.[^/.]+$/, '_compressed.wav'),
         { type: 'audio/wav' }
       );
-      
+
       return {
         success: true,
         file: compressedFile,
@@ -92,13 +119,13 @@ export class AudioCompressor {
         profile: compressionProfile,
         duration: audioBuffer.duration
       };
-      
+
     } catch (error) {
-      console.error('音訊壓縮失敗:', error);
+      if (typeof DEBUG !== 'undefined' && DEBUG) console.error('音訊壓縮失敗:', error);
       throw new Error(`音訊壓縮失敗: ${error.message}`);
     }
   }
-  
+
   /**
    * 初始化 Audio Context
    */
@@ -107,7 +134,7 @@ export class AudioCompressor {
       this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
     }
   }
-  
+
   /**
    * 讀取檔案為 ArrayBuffer
    */
@@ -119,7 +146,7 @@ export class AudioCompressor {
       reader.readAsArrayBuffer(file);
     });
   }
-  
+
   /**
    * 選擇壓縮配置
    */
@@ -127,10 +154,10 @@ export class AudioCompressor {
     if (profile !== 'auto' && this.compressionProfiles[profile]) {
       return this.compressionProfiles[profile];
     }
-    
+
     // 自動選擇基於壓縮比
     const requiredRatio = targetSize / originalSize;
-    
+
     if (requiredRatio > 0.7) {
       return this.compressionProfiles.light;
     } else if (requiredRatio > 0.3) {
@@ -139,50 +166,69 @@ export class AudioCompressor {
       return this.compressionProfiles.aggressive;
     }
   }
-  
+
   /**
    * 處理音訊（重採樣、降噪、單聲道轉換）
+   * @param {AudioBuffer} audioBuffer - 音訊緩衝區
+   * @param {Object} profile - 壓縮配置
+   * @param {Function} onProgress - 進度回調
+   * @param {CancellationToken} cancellationToken - 取消令牌
    */
-  async processAudio(audioBuffer, profile, onProgress) {
+  async processAudio(audioBuffer, profile, onProgress, cancellationToken) {
     const steps = [
       { name: '轉換為單聲道', weight: 0.2 },
       { name: '重新採樣', weight: 0.5 },
       { name: '應用語音優化', weight: 0.3 }
     ];
-    
+
     let currentProgress = 0;
-    
+
     // Step 1: 轉換為單聲道
     if (onProgress) {
       onProgress({ stage: steps[0].name, percentage: currentProgress });
     }
     
+    // 檢查是否已取消
+    if (cancellationToken) {
+      cancellationToken.throwIfCancelled();
+    }
+
     const monoBuffer = this.convertToMono(audioBuffer);
     currentProgress += steps[0].weight * 100;
-    
+
     // Step 2: 重新採樣
     if (onProgress) {
       onProgress({ stage: steps[1].name, percentage: currentProgress });
     }
     
+    // 檢查是否已取消
+    if (cancellationToken) {
+      cancellationToken.throwIfCancelled();
+    }
+
     const resampledBuffer = await this.resample(monoBuffer, profile.sampleRate);
     currentProgress += steps[1].weight * 100;
-    
+
     // Step 3: 應用語音優化
     if (onProgress) {
       onProgress({ stage: steps[2].name, percentage: currentProgress });
     }
     
+    // 檢查是否已取消
+    if (cancellationToken) {
+      cancellationToken.throwIfCancelled();
+    }
+
     const optimizedBuffer = this.applyVoiceOptimization(resampledBuffer, profile);
     currentProgress += steps[2].weight * 100;
-    
+
     if (onProgress) {
       onProgress({ stage: '完成', percentage: 100 });
     }
-    
+
     return optimizedBuffer;
   }
-  
+
   /**
    * 轉換為單聲道
    */
@@ -190,15 +236,15 @@ export class AudioCompressor {
     if (audioBuffer.numberOfChannels === 1) {
       return audioBuffer;
     }
-    
+
     const monoBuffer = this.audioContext.createBuffer(
       1,
       audioBuffer.length,
       audioBuffer.sampleRate
     );
-    
+
     const monoData = monoBuffer.getChannelData(0);
-    
+
     // 混合所有聲道
     for (let i = 0; i < audioBuffer.length; i++) {
       let sum = 0;
@@ -207,10 +253,10 @@ export class AudioCompressor {
       }
       monoData[i] = sum / audioBuffer.numberOfChannels;
     }
-    
+
     return monoBuffer;
   }
-  
+
   /**
    * 重新採樣
    */
@@ -218,22 +264,22 @@ export class AudioCompressor {
     if (audioBuffer.sampleRate === targetSampleRate) {
       return audioBuffer;
     }
-    
+
     // 使用 OfflineAudioContext 進行高品質重採樣
     const offlineContext = new OfflineAudioContext(
       audioBuffer.numberOfChannels,
       audioBuffer.duration * targetSampleRate,
       targetSampleRate
     );
-    
+
     const source = offlineContext.createBufferSource();
     source.buffer = audioBuffer;
     source.connect(offlineContext.destination);
     source.start();
-    
+
     return await offlineContext.startRendering();
   }
-  
+
   /**
    * 應用語音優化
    */
@@ -244,20 +290,20 @@ export class AudioCompressor {
       audioBuffer.length,
       audioBuffer.sampleRate
     );
-    
+
     const source = offlineContext.createBufferSource();
     source.buffer = audioBuffer;
-    
+
     // 高通濾波器（移除低頻噪音）
     const highpass = offlineContext.createBiquadFilter();
     highpass.type = 'highpass';
     highpass.frequency.value = 80; // 80Hz 以下對語音不重要
-    
+
     // 低通濾波器（移除高頻噪音）
     const lowpass = offlineContext.createBiquadFilter();
     lowpass.type = 'lowpass';
     lowpass.frequency.value = Math.min(3400, audioBuffer.sampleRate / 2 - 100); // 語音範圍
-    
+
     // 動態壓縮（提高語音清晰度）
     const compressor = offlineContext.createDynamicsCompressor();
     compressor.threshold.value = -24;
@@ -265,18 +311,18 @@ export class AudioCompressor {
     compressor.ratio.value = 12;
     compressor.attack.value = 0.003;
     compressor.release.value = 0.25;
-    
+
     // 連接音訊節點
     source.connect(highpass);
     highpass.connect(lowpass);
     lowpass.connect(compressor);
     compressor.connect(offlineContext.destination);
-    
+
     source.start();
-    
+
     return offlineContext.startRendering();
   }
-  
+
   /**
    * 編碼音訊緩衝
    */
@@ -286,7 +332,7 @@ export class AudioCompressor {
     // 壓縮主要通過降低取樣率和轉換為單聲道來實現
     return await this.audioBufferToWav(audioBuffer);
   }
-  
+
   /**
    * AudioBuffer 轉 WAV
    */
@@ -295,10 +341,10 @@ export class AudioCompressor {
     const sampleRate = audioBuffer.sampleRate;
     const format = 1; // PCM
     const bitDepth = 16;
-    
+
     const bytesPerSample = bitDepth / 8;
     const blockAlign = numberOfChannels * bytesPerSample;
-    
+
     const data = [];
     for (let i = 0; i < audioBuffer.length; i++) {
       for (let channel = 0; channel < numberOfChannels; channel++) {
@@ -307,17 +353,17 @@ export class AudioCompressor {
         data.push(value);
       }
     }
-    
+
     const buffer = new ArrayBuffer(44 + data.length * bytesPerSample);
     const view = new DataView(buffer);
-    
+
     // WAV 檔頭
     const writeString = (offset, string) => {
       for (let i = 0; i < string.length; i++) {
         view.setUint8(offset + i, string.charCodeAt(i));
       }
     };
-    
+
     writeString(0, 'RIFF');
     view.setUint32(4, 36 + data.length * bytesPerSample, true);
     writeString(8, 'WAVE');
@@ -331,17 +377,17 @@ export class AudioCompressor {
     view.setUint16(34, bitDepth, true);
     writeString(36, 'data');
     view.setUint32(40, data.length * bytesPerSample, true);
-    
+
     // 寫入音訊資料
     let offset = 44;
     for (const sample of data) {
       view.setInt16(offset, sample, true);
       offset += 2;
     }
-    
+
     return new Blob([buffer], { type: 'audio/wav' });
   }
-  
+
   /**
    * 使用更激進的壓縮作為後備方案
    */
@@ -354,16 +400,16 @@ export class AudioCompressor {
       quality: 0.3,
       description: '極限壓縮'
     };
-    
+
     const compressedBuffer = await this.processAudio(audioBuffer, aggressiveProfile, onProgress);
     const compressedBlob = await this.encodeAudioBuffer(compressedBuffer, 'audio/wav', aggressiveProfile);
-    
+
     const compressedFile = new File(
       [compressedBlob],
       'compressed_extreme.wav',
       { type: 'audio/wav' }
     );
-    
+
     return {
       success: true,
       file: compressedFile,
@@ -375,7 +421,7 @@ export class AudioCompressor {
       warning: '使用極限壓縮，音質可能明顯下降'
     };
   }
-  
+
   /**
    * 估算壓縮後的檔案大小
    */
@@ -384,10 +430,10 @@ export class AudioCompressor {
     const sampleRateRatio = profile.sampleRate / 44100;
     const channelRatio = profile.channels / 2;
     const bitRateRatio = profile.bitRate / 128;
-    
+
     return originalSize * sampleRateRatio * channelRatio * bitRateRatio;
   }
-  
+
   /**
    * 清理資源
    */

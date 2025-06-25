@@ -1,0 +1,409 @@
+/**
+ * PWA 相關樣式
+ * 包含安裝按鈕、通知、橫幅等 UI 元素
+ */
+
+/* PWA 安裝按鈕 */
+.pwa-install-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.pwa-install-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.pwa-install-button:active {
+  transform: translateY(0);
+}
+
+.pwa-install-icon {
+  font-size: 16px;
+}
+
+.pwa-install-text {
+  font-size: 13px;
+}
+
+/* PWA 安裝橫幅 */
+.pwa-install-banner {
+  position: relative;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  margin: 20px 0;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3);
+  transform: translateY(-20px);
+  opacity: 0;
+  transition: all 0.4s ease;
+}
+
+.pwa-install-banner.show {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.pwa-banner-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px;
+  gap: 20px;
+}
+
+.pwa-banner-info h3 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.pwa-banner-info p {
+  margin: 0;
+  font-size: 14px;
+  opacity: 0.9;
+  line-height: 1.4;
+}
+
+.pwa-banner-actions {
+  display: flex;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.pwa-banner-actions button {
+  padding: 10px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+.pwa-banner-actions button:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.pwa-banner-actions button:first-child {
+  background: rgba(255, 255, 255, 0.9);
+  color: #667eea;
+  border-color: transparent;
+}
+
+.pwa-banner-actions button:first-child:hover {
+  background: white;
+}
+
+/* PWA 更新通知 */
+.pwa-update-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+  color: white;
+  border-radius: 12px;
+  padding: 0;
+  min-width: 320px;
+  max-width: 400px;
+  box-shadow: 0 10px 30px rgba(40, 167, 69, 0.3);
+  z-index: 1000;
+  transform: translateX(450px);
+  transition: transform 0.4s ease;
+}
+
+.pwa-update-notification.show {
+  transform: translateX(0);
+}
+
+.pwa-notification-content {
+  padding: 20px;
+}
+
+.pwa-notification-content h4 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.pwa-notification-content p {
+  margin: 0 0 16px 0;
+  font-size: 14px;
+  opacity: 0.95;
+  line-height: 1.5;
+}
+
+.pwa-notification-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.pwa-notification-actions button {
+  flex: 1;
+  padding: 10px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.pwa-notification-actions button:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.pwa-notification-actions button:first-child {
+  background: rgba(255, 255, 255, 0.9);
+  color: #28a745;
+  border-color: transparent;
+}
+
+.pwa-notification-actions button:first-child:hover {
+  background: white;
+}
+
+/* 離線指示器 */
+.pwa-offline-indicator {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #ffc107;
+  color: #212529;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  z-index: 1001;
+  box-shadow: 0 2px 8px rgba(255, 193, 7, 0.3);
+  display: none;
+}
+
+.pwa-offline-indicator.show {
+  display: block;
+  animation: slideDown 0.3s ease;
+}
+
+.pwa-offline-indicator.success {
+  background: #28a745;
+  color: white;
+}
+
+/* PWA 狀態面板 */
+.pwa-status-panel {
+  background: var(--bg-secondary, #f8f9fa);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 16px 0;
+  border: 1px solid var(--border-color, #e0e0e0);
+}
+
+.pwa-status-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+  color: var(--text-primary, #333);
+}
+
+.pwa-status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.pwa-status-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.pwa-status-icon {
+  font-size: 16px;
+}
+
+.pwa-status-label {
+  color: var(--text-secondary, #666);
+}
+
+.pwa-status-value {
+  font-weight: 500;
+  color: var(--text-primary, #333);
+}
+
+.pwa-status-value.success {
+  color: #28a745;
+}
+
+.pwa-status-value.warning {
+  color: #ffc107;
+}
+
+.pwa-status-value.error {
+  color: #dc3545;
+}
+
+/* PWA 控制按鈕組 */
+.pwa-controls {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.pwa-control-btn {
+  padding: 8px 16px;
+  background: var(--bg-primary, #fff);
+  color: var(--text-primary, #333);
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.pwa-control-btn:hover {
+  background: var(--bg-tertiary, #f0f0f0);
+  transform: translateY(-1px);
+}
+
+.pwa-control-btn.primary {
+  background: var(--primary-color, #0066cc);
+  color: white;
+  border-color: var(--primary-color, #0066cc);
+}
+
+.pwa-control-btn.primary:hover {
+  background: var(--primary-hover, #0052a3);
+}
+
+.pwa-control-btn.danger {
+  background: #dc3545;
+  color: white;
+  border-color: #dc3545;
+}
+
+.pwa-control-btn.danger:hover {
+  background: #c82333;
+}
+
+/* 快取資訊表格 */
+.pwa-cache-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+  font-size: 14px;
+}
+
+.pwa-cache-table th,
+.pwa-cache-table td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color, #e0e0e0);
+}
+
+.pwa-cache-table th {
+  background: var(--bg-tertiary, #f0f0f0);
+  font-weight: 600;
+  color: var(--text-primary, #333);
+}
+
+.pwa-cache-table td {
+  color: var(--text-secondary, #666);
+}
+
+/* 動畫 */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.pwa-install-button:hover {
+  animation: pulse 2s infinite;
+}
+
+/* 響應式設計 */
+@media (max-width: 768px) {
+  .pwa-banner-content {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+  
+  .pwa-banner-actions {
+    justify-content: center;
+  }
+  
+  .pwa-update-notification {
+    right: 10px;
+    left: 10px;
+    max-width: none;
+    min-width: auto;
+  }
+  
+  .pwa-install-button .pwa-install-text {
+    display: none;
+  }
+  
+  .pwa-status-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .pwa-controls {
+    justify-content: center;
+  }
+}
+
+/* 深色模式支援 */
+[data-theme="dark"] .pwa-status-panel {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .pwa-cache-table th {
+  background: var(--bg-tertiary);
+}
+
+[data-theme="dark"] .pwa-control-btn {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .pwa-control-btn:hover {
+  background: var(--bg-tertiary);
+}

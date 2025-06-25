@@ -13,7 +13,13 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git rm:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(jq:*)",
+      "Bash(node:*)",
+      "Bash(mv:*)",
+      "Bash(find:*)",
+      "mcp__project-files__edit_file",
+      "mcp__project-files__write_file"
     ],
     "deny": []
   }

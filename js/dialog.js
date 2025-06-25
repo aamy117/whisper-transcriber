@@ -5,14 +5,14 @@ export class DialogSystem {
     this.dialogId = 0;
     this.init();
   }
-  
+
   init() {
     this.injectStyles();
   }
-  
+
   injectStyles() {
     if (document.getElementById('dialog-styles')) return;
-    
+
     const style = document.createElement('style');
     style.id = 'dialog-styles';
     style.textContent = `
@@ -30,11 +30,11 @@ export class DialogSystem {
         opacity: 0;
         transition: opacity 0.3s ease-out;
       }
-      
+
       .dialog-overlay.show {
         opacity: 1;
       }
-      
+
       .dialog {
         background: white;
         border-radius: 8px;
@@ -46,29 +46,29 @@ export class DialogSystem {
         transform: scale(0.9);
         transition: transform 0.3s ease-out;
       }
-      
+
       .dialog-overlay.show .dialog {
         transform: scale(1);
       }
-      
+
       .dialog-header {
         padding: 20px;
         border-bottom: 1px solid #e9ecef;
       }
-      
+
       .dialog-title {
         margin: 0;
         font-size: 1.25rem;
         font-weight: 600;
         color: #212529;
       }
-      
+
       .dialog-body {
         padding: 20px;
         overflow-y: auto;
         max-height: calc(90vh - 140px);
       }
-      
+
       .dialog-footer {
         padding: 20px;
         border-top: 1px solid #e9ecef;
@@ -76,7 +76,7 @@ export class DialogSystem {
         justify-content: flex-end;
         gap: 10px;
       }
-      
+
       .dialog-btn {
         padding: 8px 16px;
         border: none;
@@ -85,25 +85,25 @@ export class DialogSystem {
         cursor: pointer;
         transition: all 0.2s;
       }
-      
+
       .dialog-btn-primary {
         background: #007bff;
         color: white;
       }
-      
+
       .dialog-btn-primary:hover {
         background: #0056b3;
       }
-      
+
       .dialog-btn-secondary {
         background: #6c757d;
         color: white;
       }
-      
+
       .dialog-btn-secondary:hover {
         background: #545b62;
       }
-      
+
       .dialog-input {
         width: 100%;
         padding: 8px 12px;
@@ -112,54 +112,54 @@ export class DialogSystem {
         font-size: 14px;
         margin-top: 10px;
       }
-      
+
       .dialog-input:focus {
         outline: none;
         border-color: #80bdff;
         box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
       }
-      
+
       .dialog-label {
         display: block;
         margin-bottom: 5px;
         font-weight: 500;
         color: #495057;
       }
-      
+
       .dialog-hint {
         font-size: 12px;
         color: #6c757d;
         margin-top: 5px;
       }
-      
+
       /* 深色模式 */
       [data-theme="dark"] .dialog {
         background: #2b2b2b;
       }
-      
+
       [data-theme="dark"] .dialog-header,
       [data-theme="dark"] .dialog-footer {
         border-color: #404040;
       }
-      
+
       [data-theme="dark"] .dialog-title {
         color: #f8f9fa;
       }
-      
+
       [data-theme="dark"] .dialog-input {
         background: #1a1a1a;
         border-color: #404040;
         color: #f8f9fa;
       }
-      
+
       [data-theme="dark"] .dialog-label {
         color: #adb5bd;
       }
     `;
-    
+
     document.head.appendChild(style);
   }
-  
+
   async prompt(options = {}) {
     const {
       title = '請輸入',
@@ -171,10 +171,10 @@ export class DialogSystem {
       cancelText = '取消',
       validate = null
     } = options;
-    
+
     return new Promise((resolve) => {
       const id = ++this.dialogId;
-      
+
       // 建立對話框
       const overlay = document.createElement('div');
       overlay.className = 'dialog-overlay';
@@ -185,8 +185,8 @@ export class DialogSystem {
           </div>
           <div class="dialog-body">
             ${message ? `<p>${this.escapeHtml(message)}</p>` : ''}
-            <input type="text" 
-                   class="dialog-input" 
+            <input type="text"
+                   class="dialog-input"
                    id="dialog-input-${id}"
                    value="${this.escapeHtml(defaultValue)}"
                    placeholder="${this.escapeHtml(placeholder)}"
@@ -203,24 +203,24 @@ export class DialogSystem {
           </div>
         </div>
       `;
-      
+
       document.body.appendChild(overlay);
-      
+
       // 取得元素
       const input = overlay.querySelector(`#dialog-input-${id}`);
       const dialog = overlay.querySelector('.dialog');
-      
+
       // 聚焦並選擇文字
       setTimeout(() => {
         overlay.classList.add('show');
         input.focus();
         input.select();
       }, 10);
-      
+
       // 處理確定
       const handleOk = async () => {
         const value = input.value;
-        
+
         // 驗證
         if (validate) {
           const error = await validate(value);
@@ -230,17 +230,17 @@ export class DialogSystem {
             return;
           }
         }
-        
+
         close();
         resolve(value);
       };
-      
+
       // 處理取消
       const handleCancel = () => {
         close();
         resolve(null);
       };
-      
+
       // 關閉對話框
       const close = () => {
         overlay.classList.remove('show');
@@ -248,13 +248,13 @@ export class DialogSystem {
           overlay.remove();
         }, 300);
       };
-      
+
       // 事件監聽
       overlay.addEventListener('click', (e) => {
         if (e.target === overlay) {
           handleCancel();
         }
-        
+
         const action = e.target.dataset.action;
         if (action === 'ok') {
           handleOk();
@@ -262,7 +262,7 @@ export class DialogSystem {
           handleCancel();
         }
       });
-      
+
       // 鍵盤事件
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
@@ -273,7 +273,7 @@ export class DialogSystem {
           handleCancel();
         }
       });
-      
+
       dialog.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
           e.preventDefault();
@@ -282,7 +282,7 @@ export class DialogSystem {
       });
     });
   }
-  
+
   async confirm(options = {}) {
     const {
       title = '確認',
@@ -291,7 +291,7 @@ export class DialogSystem {
       cancelText = '取消',
       type = 'info'
     } = options;
-    
+
     return new Promise((resolve) => {
       const overlay = document.createElement('div');
       overlay.className = 'dialog-overlay';
@@ -313,13 +313,13 @@ export class DialogSystem {
           </div>
         </div>
       `;
-      
+
       document.body.appendChild(overlay);
-      
+
       setTimeout(() => {
         overlay.classList.add('show');
       }, 10);
-      
+
       const close = (result) => {
         overlay.classList.remove('show');
         setTimeout(() => {
@@ -327,12 +327,12 @@ export class DialogSystem {
           resolve(result);
         }, 300);
       };
-      
+
       overlay.addEventListener('click', (e) => {
         if (e.target === overlay) {
           close(false);
         }
-        
+
         const action = e.target.dataset.action;
         if (action === 'ok') {
           close(true);
@@ -340,7 +340,7 @@ export class DialogSystem {
           close(false);
         }
       });
-      
+
       overlay.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
           e.preventDefault();
@@ -349,7 +349,7 @@ export class DialogSystem {
       });
     });
   }
-  
+
   escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;

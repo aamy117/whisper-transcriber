@@ -14,7 +14,7 @@ export class BatchProcessor {
     this.isProcessing = false;
     this.isPaused = false;
     this.results = [];
-    
+
     // 批次處理選項
     this.options = {
       language: 'zh',
@@ -22,7 +22,7 @@ export class BatchProcessor {
       continueOnError: true,
       autoSaveResults: true
     };
-    
+
     // 事件監聽器
     this.listeners = {
       progress: [],
@@ -31,7 +31,7 @@ export class BatchProcessor {
       itemComplete: []
     };
   }
-  
+
   /**
    * 添加檔案到佇列
    */
@@ -46,13 +46,13 @@ export class BatchProcessor {
       startTime: null,
       endTime: null
     }));
-    
+
     this.queue.push(...newItems);
     this.emit('progress', this.getProgress());
-    
+
     return newItems.length;
   }
-  
+
   /**
    * 開始批次處理
    */
@@ -61,23 +61,23 @@ export class BatchProcessor {
       notify.warning('批次處理已在進行中');
       return;
     }
-    
+
     if (this.queue.length === 0) {
       notify.warning('沒有待處理的檔案');
       return;
     }
-    
+
     this.isProcessing = true;
     this.isPaused = false;
-    
+
     // 從上次停止的位置繼續，或從頭開始
     if (this.currentIndex === -1 || this.currentIndex >= this.queue.length - 1) {
       this.currentIndex = -1;
     }
-    
+
     await this.processNext();
   }
-  
+
   /**
    * 處理下一個檔案
    */
@@ -85,9 +85,9 @@ export class BatchProcessor {
     if (this.isPaused || !this.isProcessing) {
       return;
     }
-    
+
     this.currentIndex++;
-    
+
     if (this.currentIndex >= this.queue.length) {
       // 批次處理完成
       this.isProcessing = false;
@@ -95,19 +95,19 @@ export class BatchProcessor {
       notify.success('批次處理完成！');
       return;
     }
-    
+
     const item = this.queue[this.currentIndex];
-    
+
     try {
       item.status = 'processing';
       item.startTime = new Date();
       this.emit('progress', this.getProgress());
-      
+
       // 預處理檔案
       const preprocessResult = await transcriptionPreprocessor.prepareForTranscription(item.file);
-      
+
       let finalResult = null;
-      
+
       if (preprocessResult.strategy === 'direct') {
         // 直接轉譯
         finalResult = await this.whisperAPI.transcribe(item.file, {
@@ -118,7 +118,7 @@ export class BatchProcessor {
         // 處理分段
         finalResult = await this.processSegments(preprocessResult, item);
       }
-      
+
       // 保存結果
       item.status = 'completed';
       item.endTime = new Date();
@@ -129,33 +129,33 @@ export class BatchProcessor {
         processingTime: item.endTime - item.startTime,
         processingStrategy: preprocessResult.strategy
       };
-      
+
       this.results.push(item.result);
       this.emit('itemComplete', item);
-      
+
       // 自動保存結果
       if (this.options.autoSaveResults) {
         this.saveItemResult(item);
       }
-      
+
     } catch (error) {
       item.status = 'error';
       item.error = error.message;
       item.endTime = new Date();
-      
+
       this.emit('error', { item, error });
-      
+
       if (!this.options.continueOnError) {
         this.isProcessing = false;
         notify.error(`批次處理失敗：${error.message}`);
         return;
       }
     }
-    
+
     // 處理下一個
     setTimeout(() => this.processNext(), 1000); // 延遲1秒避免API限制
   }
-  
+
   /**
    * 處理分段檔案
    */
@@ -163,20 +163,20 @@ export class BatchProcessor {
     const allSegments = [];
     let allText = '';
     const totalFiles = preprocessResult.files.length;
-    
+
     for (let i = 0; i < totalFiles; i++) {
       const segmentFile = preprocessResult.files[i];
       const segmentInfo = preprocessResult.segments ? preprocessResult.segments[i] : null;
-      
+
       // 更新進度
       item.progress = (i / totalFiles) * 100;
       this.emit('progress', this.getProgress());
-      
+
       const segmentResult = await this.whisperAPI.transcribe(segmentFile, {
         ...this.options,
         skipSizeCheck: true
       });
-      
+
       // 調整時間戳
       if (segmentInfo && segmentResult.segments) {
         const timeOffset = segmentInfo.startTime;
@@ -185,11 +185,11 @@ export class BatchProcessor {
           seg.end += timeOffset;
         });
       }
-      
+
       allSegments.push(...(segmentResult.segments || []));
       allText += (allText ? ' ' : '') + segmentResult.text;
     }
-    
+
     return {
       text: allText,
       segments: allSegments,
@@ -197,7 +197,7 @@ export class BatchProcessor {
       duration: preprocessResult.totalDuration || 0
     };
   }
-  
+
   /**
    * 暫停批次處理
    */
@@ -207,7 +207,7 @@ export class BatchProcessor {
       notify.info('批次處理已暫停');
     }
   }
-  
+
   /**
    * 繼續批次處理
    */
@@ -218,7 +218,7 @@ export class BatchProcessor {
       notify.info('批次處理已繼續');
     }
   }
-  
+
   /**
    * 停止批次處理
    */
@@ -227,7 +227,7 @@ export class BatchProcessor {
     this.isPaused = false;
     notify.info('批次處理已停止');
   }
-  
+
   /**
    * 清空佇列
    */
@@ -237,7 +237,7 @@ export class BatchProcessor {
     this.results = [];
     this.emit('progress', this.getProgress());
   }
-  
+
   /**
    * 取得進度資訊
    */
@@ -247,7 +247,7 @@ export class BatchProcessor {
     const failed = this.queue.filter(item => item.status === 'error').length;
     const processing = this.queue.filter(item => item.status === 'processing').length;
     const pending = this.queue.filter(item => item.status === 'pending').length;
-    
+
     return {
       total,
       completed,
@@ -260,7 +260,7 @@ export class BatchProcessor {
       isPaused: this.isPaused
     };
   }
-  
+
   /**
    * 保存單個項目結果
    */
@@ -275,11 +275,11 @@ export class BatchProcessor {
       transcription: item.result,
       batchProcessed: true
     };
-    
+
     const key = `whisper_${projectId}`;
     localStorage.setItem(key, JSON.stringify(projectData));
   }
-  
+
   /**
    * 匯出批次結果
    */
@@ -288,34 +288,34 @@ export class BatchProcessor {
       notify.warning('沒有可匯出的結果');
       return;
     }
-    
+
     let content;
     let mimeType;
     let fileName;
-    
+
     switch (format) {
       case 'json':
         content = JSON.stringify(this.results, null, 2);
         mimeType = 'application/json';
         fileName = `batch_results_${new Date().toISOString().slice(0, 10)}.json`;
         break;
-        
+
       case 'csv':
         content = this.resultsToCSV();
         mimeType = 'text/csv';
         fileName = `batch_results_${new Date().toISOString().slice(0, 10)}.csv`;
         break;
-        
+
       case 'txt':
         content = this.resultsToText();
         mimeType = 'text/plain';
         fileName = `batch_results_${new Date().toISOString().slice(0, 10)}.txt`;
         break;
-        
+
       default:
         throw new Error(`不支援的匯出格式：${format}`);
     }
-    
+
     const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -323,17 +323,17 @@ export class BatchProcessor {
     a.download = fileName;
     a.click();
     URL.revokeObjectURL(url);
-    
+
     notify.success('批次結果已匯出');
   }
-  
+
   /**
    * 轉換結果為 CSV
    */
   resultsToCSV() {
     const headers = ['檔案名稱', '檔案大小', '處理時間(秒)', '音訊時長(秒)', '處理策略', '轉譯文字'];
     const rows = [headers];
-    
+
     this.results.forEach(result => {
       rows.push([
         result.fileName,
@@ -344,27 +344,27 @@ export class BatchProcessor {
         `"${result.text.replace(/"/g, '""')}"`
       ]);
     });
-    
+
     return rows.map(row => row.join(',')).join('\n');
   }
-  
+
   /**
    * 轉換結果為純文字
    */
   resultsToText() {
     let text = '批次轉譯結果\n';
     text += '=' .repeat(50) + '\n\n';
-    
+
     this.results.forEach((result, index) => {
       text += `檔案 ${index + 1}: ${result.fileName}\n`;
       text += '-'.repeat(30) + '\n';
       text += result.text + '\n\n';
       text += '=' .repeat(50) + '\n\n';
     });
-    
+
     return text;
   }
-  
+
   /**
    * 事件處理
    */
@@ -373,13 +373,13 @@ export class BatchProcessor {
       this.listeners[event].push(callback);
     }
   }
-  
+
   off(event, callback) {
     if (this.listeners[event]) {
       this.listeners[event] = this.listeners[event].filter(cb => cb !== callback);
     }
   }
-  
+
   emit(event, data) {
     if (this.listeners[event]) {
       this.listeners[event].forEach(callback => callback(data));

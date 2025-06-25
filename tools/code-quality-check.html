@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>代碼品質檢查工具</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #0056b3;
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .file-list {
+            margin-bottom: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .file-item {
+            padding: 5px 10px;
+            margin: 2px 0;
+            background: white;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .results {
+            margin-top: 20px;
+        }
+        
+        .issue {
+            margin-bottom: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid;
+        }
+        
+        .issue.error {
+            background: #fee;
+            border-color: #dc3545;
+        }
+        
+        .issue.warning {
+            background: #fff3cd;
+            border-color: #ffc107;
+        }
+        
+        .issue.info {
+            background: #e3f2fd;
+            border-color: #2196f3;
+        }
+        
+        .issue-header {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .issue-location {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .issue-code {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 13px;
+            overflow-x: auto;
+        }
+        
+        .summary {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .summary h3 {
+            margin-top: 0;
+        }
+        
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .stat-card {
+            padding: 15px;
+            background: white;
+            border-radius: 6px;
+            text-align: center;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .stat-number {
+            font-size: 32px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #e0e0e0;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 20px 0;
+            display: none;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #4caf50;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .filter-options {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+        }
+        
+        input[type="checkbox"] {
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 JavaScript 代碼品質檢查</h1>
+        
+        <div class="controls">
+            <button id="checkBtn">開始檢查</button>
+            <button id="clearBtn">清除結果</button>
+            <button id="exportBtn" disabled>匯出報告</button>
+        </div>
+        
+        <div class="filter-options">
+            <label>
+                <input type="checkbox" id="showErrors" checked> 顯示錯誤
+            </label>
+            <label>
+                <input type="checkbox" id="showWarnings" checked> 顯示警告
+            </label>
+            <label>
+                <input type="checkbox" id="showInfo" checked> 顯示資訊
+            </label>
+        </div>
+        
+        <div class="progress-bar" id="progressBar">
+            <div class="progress-fill" id="progressFill">0%</div>
+        </div>
+        
+        <div class="file-list" id="fileList" style="display: none;">
+            <h3>檢查的檔案：</h3>
+            <div id="fileListContent"></div>
+        </div>
+        
+        <div class="results" id="results"></div>
+        
+        <div class="summary" id="summary" style="display: none;">
+            <h3>檢查摘要</h3>
+            <div class="stat-grid">
+                <div class="stat-card">
+                    <div class="stat-label">檢查檔案數</div>
+                    <div class="stat-number" id="filesCount">0</div>
+                </div>
+                <div class="stat-card" style="border-color: #dc3545;">
+                    <div class="stat-label">錯誤</div>
+                    <div class="stat-number" id="errorsCount" style="color: #dc3545;">0</div>
+                </div>
+                <div class="stat-card" style="border-color: #ffc107;">
+                    <div class="stat-label">警告</div>
+                    <div class="stat-number" id="warningsCount" style="color: #ffc107;">0</div>
+                </div>
+                <div class="stat-card" style="border-color: #2196f3;">
+                    <div class="stat-label">資訊</div>
+                    <div class="stat-number" id="infoCount" style="color: #2196f3;">0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // JavaScript 檔案列表
+        const jsFiles = [
+            'js/api.js',
+            'js/audio-compressor.js',
+            'js/audio-splitter.js',
+            'js/batch-processor.js',
+            'js/config.js',
+            'js/dialog.js',
+            'js/dom-batch-update.js',
+            'js/editor.js',
+            'js/export.js',
+            'js/main.js',
+            'js/notification.js',
+            'js/player.js',
+            'js/transcription-preprocessor.js',
+            'js/virtual-scroll.js',
+            'js/utils/debounce.js',
+            'js/utils/opencc-lite.js',
+            'js/utils/text-converter.js',
+            'js/wasm/whisper-transformers.js',
+            'js/wasm/whisper-wasm-manager.js',
+            'js/wasm/whisper-wasm-real.js',
+            'js/workers/whisper-worker.js'
+        ];
+        
+        // 檢查規則
+        const rules = {
+            consoleStatements: {
+                pattern: /console\.(log|debug|info|warn|error)/g,
+                message: '發現 console 語句',
+                severity: 'warning',
+                autoFix: false
+            },
+            debuggerStatements: {
+                pattern: /\bdebugger\b/g,
+                message: '發現 debugger 語句',
+                severity: 'error',
+                autoFix: true
+            },
+            todoComments: {
+                pattern: /\/\/\s*(TODO|FIXME|HACK|XXX)(.*)$/gm,
+                message: '發現 TODO 註解',
+                severity: 'info',
+                autoFix: false
+            },
+            trailingSpaces: {
+                pattern: /[ \t]+$/gm,
+                message: '行尾有多餘空格',
+                severity: 'warning',
+                autoFix: true
+            },
+            multipleEmptyLines: {
+                pattern: /\n\n\n+/g,
+                message: '多個連續空行',
+                severity: 'warning',
+                autoFix: true
+            },
+            missingFinalNewline: {
+                check: (content) => !content.endsWith('\n'),
+                message: '檔案結尾缺少換行',
+                severity: 'warning',
+                autoFix: true
+            }
+        };
+        
+        let allIssues = [];
+        let stats = {
+            files: 0,
+            errors: 0,
+            warnings: 0,
+            info: 0
+        };
+        
+        // 檢查單個檔案
+        async function checkFile(filePath) {
+            try {
+                const response = await fetch(filePath);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const content = await response.text();
+                const lines = content.split('\n');
+                const issues = [];
+                
+                // 執行各項檢查
+                for (const [ruleName, rule] of Object.entries(rules)) {
+                    if (rule.pattern) {
+                        const matches = [...content.matchAll(rule.pattern)];
+                        
+                        for (const match of matches) {
+                            const lineNumber = content.substring(0, match.index).split('\n').length;
+                            const line = lines[lineNumber - 1];
+                            
+                            issues.push({
+                                file: filePath,
+                                line: lineNumber,
+                                column: match.index - content.lastIndexOf('\n', match.index - 1),
+                                rule: ruleName,
+                                message: rule.message,
+                                severity: rule.severity,
+                                match: match[0],
+                                context: line ? line.trim() : '',
+                                autoFix: rule.autoFix
+                            });
+                        }
+                    } else if (rule.check) {
+                        if (rule.check(content)) {
+                            issues.push({
+                                file: filePath,
+                                line: lines.length,
+                                column: 0,
+                                rule: ruleName,
+                                message: rule.message,
+                                severity: rule.severity,
+                                context: '',
+                                autoFix: rule.autoFix
+                            });
+                        }
+                    }
+                }
+                
+                return issues;
+                
+            } catch (error) {
+                console.error(`Error checking file ${filePath}:`, error);
+                return [{
+                    file: filePath,
+                    line: 0,
+                    column: 0,
+                    rule: 'fileError',
+                    message: `無法讀取檔案: ${error.message}`,
+                    severity: 'error',
+                    context: '',
+                    autoFix: false
+                }];
+            }
+        }
+        
+        // 顯示進度
+        function updateProgress(current, total) {
+            const percent = Math.round((current / total) * 100);
+            document.getElementById('progressFill').style.width = `${percent}%`;
+            document.getElementById('progressFill').textContent = `${percent}%`;
+        }
+        
+        // 顯示結果
+        function displayResults() {
+            const resultsEl = document.getElementById('results');
+            resultsEl.innerHTML = '';
+            
+            const filters = {
+                error: document.getElementById('showErrors').checked,
+                warning: document.getElementById('showWarnings').checked,
+                info: document.getElementById('showInfo').checked
+            };
+            
+            const filteredIssues = allIssues.filter(issue => filters[issue.severity]);
+            
+            if (filteredIssues.length === 0) {
+                resultsEl.innerHTML = '<p style="text-align: center; color: #28a745; font-size: 18px;">✅ 沒有發現問題！</p>';
+                return;
+            }
+            
+            // 按檔案分組
+            const byFile = {};
+            for (const issue of filteredIssues) {
+                if (!byFile[issue.file]) {
+                    byFile[issue.file] = [];
+                }
+                byFile[issue.file].push(issue);
+            }
+            
+            // 顯示每個檔案的問題
+            for (const [file, issues] of Object.entries(byFile)) {
+                const fileSection = document.createElement('div');
+                fileSection.innerHTML = `<h3 style="margin-top: 20px;">📄 ${file}</h3>`;
+                
+                for (const issue of issues) {
+                    const issueEl = document.createElement('div');
+                    issueEl.className = `issue ${issue.severity}`;
+                    
+                    const icon = issue.severity === 'error' ? '❌' : 
+                                issue.severity === 'warning' ? '⚠️' : 'ℹ️';
+                    
+                    issueEl.innerHTML = `
+                        <div class="issue-header">${icon} ${issue.message}</div>
+                        <div class="issue-location">行 ${issue.line}, 列 ${issue.column}</div>
+                        ${issue.context ? `<div class="issue-code">${escapeHtml(issue.context)}</div>` : ''}
+                    `;
+                    
+                    fileSection.appendChild(issueEl);
+                }
+                
+                resultsEl.appendChild(fileSection);
+            }
+        }
+        
+        // HTML 轉義
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // 更新統計
+        function updateStats() {
+            document.getElementById('filesCount').textContent = stats.files;
+            document.getElementById('errorsCount').textContent = stats.errors;
+            document.getElementById('warningsCount').textContent = stats.warnings;
+            document.getElementById('infoCount').textContent = stats.info;
+        }
+        
+        // 主檢查函數
+        async function runCheck() {
+            // 重置
+            allIssues = [];
+            stats = { files: 0, errors: 0, warnings: 0, info: 0 };
+            
+            // 顯示進度條
+            document.getElementById('progressBar').style.display = 'block';
+            document.getElementById('checkBtn').disabled = true;
+            
+            // 顯示檔案列表
+            document.getElementById('fileList').style.display = 'block';
+            document.getElementById('fileListContent').innerHTML = jsFiles.map(f => 
+                `<div class="file-item">${f}</div>`
+            ).join('');
+            
+            // 檢查每個檔案
+            for (let i = 0; i < jsFiles.length; i++) {
+                updateProgress(i + 1, jsFiles.length);
+                
+                const issues = await checkFile(jsFiles[i]);
+                allIssues.push(...issues);
+                
+                // 更新統計
+                stats.files++;
+                for (const issue of issues) {
+                    stats[issue.severity + 's']++;
+                }
+                
+                // 短暫延遲以顯示進度
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+            
+            // 顯示結果
+            displayResults();
+            updateStats();
+            
+            // 顯示摘要
+            document.getElementById('summary').style.display = 'block';
+            document.getElementById('progressBar').style.display = 'none';
+            document.getElementById('checkBtn').disabled = false;
+            document.getElementById('exportBtn').disabled = false;
+        }
+        
+        // 清除結果
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+            document.getElementById('summary').style.display = 'none';
+            document.getElementById('fileList').style.display = 'none';
+            document.getElementById('exportBtn').disabled = true;
+            allIssues = [];
+            stats = { files: 0, errors: 0, warnings: 0, info: 0 };
+        }
+        
+        // 匯出報告
+        function exportReport() {
+            const report = {
+                timestamp: new Date().toISOString(),
+                stats: stats,
+                issues: allIssues
+            };
+            
+            const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `code-quality-report-${new Date().toISOString().slice(0, 10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+        
+        // 綁定事件
+        document.getElementById('checkBtn').addEventListener('click', runCheck);
+        document.getElementById('clearBtn').addEventListener('click', clearResults);
+        document.getElementById('exportBtn').addEventListener('click', exportReport);
+        
+        // 篩選器變更時重新顯示結果
+        document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                if (allIssues.length > 0) {
+                    displayResults();
+                }
+            });
+        });
+    </script>
+</body>
+</html>

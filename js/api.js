@@ -1,3 +1,6 @@
+// 調試模式開關（生產環境設為 false）
+const DEBUG = typeof process !== 'undefined' ? process.env.NODE_ENV !== 'production' : location.hostname === 'localhost';
+
 // Whisper API 模組
 import Config from './config.js';
 import { textConverter } from './utils/text-converter.js';
@@ -9,18 +12,18 @@ class WhisperAPI {
     this.model = Config.api.model;
     this.abortController = null;
   }
-  
+
   // 從 localStorage 取得 API Key
   getApiKey() {
     return localStorage.getItem(Config.storage.prefix + 'apiKey');
   }
-  
+
   // 更新 API Key
   setApiKey(key) {
     this.apiKey = key;
     localStorage.setItem(Config.storage.prefix + 'apiKey', key);
   }
-  
+
   // 驗證 API Key
   validateApiKey() {
     if (!this.apiKey) {
@@ -31,19 +34,19 @@ class WhisperAPI {
     }
     return true;
   }
-  
+
   // 驗證檔案
   validateFile(file, skipSizeCheck = false) {
     if (!file) {
       throw new Error('請選擇檔案');
     }
-    
+
     // 檔案大小檢查可選（因為預處理器會處理大檔案）
     if (!skipSizeCheck && file.size > Config.api.maxFileSize) {
       const maxSizeMB = Config.api.maxFileSize / 1024 / 1024;
       throw new Error(`檔案大小超過 OpenAI API 限制（最大 ${maxSizeMB}MB）。請使用較小的檔案進行轉譯。`);
     }
-    
+
     // 檢查檔案格式
     const extension = file.name.split('.').pop().toLowerCase();
     // 允許 WAV 格式（壓縮和分割後的格式）
@@ -51,22 +54,22 @@ class WhisperAPI {
     if (!supportedFormats.includes(extension)) {
       throw new Error(`不支援的檔案格式：${extension}`);
     }
-    
+
     return true;
   }
-  
+
   // 主要轉譯方法
   async transcribe(audioFile, options = {}) {
     try {
       // 驗證
       this.validateApiKey();
       this.validateFile(audioFile, options.skipSizeCheck);
-      
+
       // 建立 FormData
       const formData = new FormData();
       formData.append('file', audioFile);
       formData.append('model', this.model);
-      
+
       // 可選參數
       if (options.language) {
         formData.append('language', options.language);
@@ -77,13 +80,33 @@ class WhisperAPI {
       if (options.temperature !== undefined) {
         formData.append('temperature', options.temperature.toString());
       }
-      
+
       // 回應格式：verbose_json 包含時間戳
       formData.append('response_format', options.responseFormat || 'verbose_json');
-      
-      // 建立新的 AbortController
+
+      // 建立新的 AbortController 或使用提供的 signal
       this.abortController = new AbortController();
       
+      // 如果提供了外部的取消信號，合併兩個信號
+      let signal = this.abortController.signal;
+      if (options.signal) {
+        // 創建一個新的 AbortController 來合併信號
+        const mergedController = new AbortController();
+        
+        // 監聽內部控制器
+        this.abortController.signal.addEventListener('abort', () => {
+          mergedController.abort();
+        });
+        
+        // 監聽外部信號
+        options.signal.addEventListener('abort', () => {
+          mergedController.abort();
+          this.cancel();  // 同時取消內部控制器
+        });
+        
+        signal = mergedController.signal;
+      }
+
       // 發送請求
       const response = await fetch(this.endpoint, {
         method: 'POST',
@@ -91,37 +114,37 @@ class WhisperAPI {
           'Authorization': `Bearer ${this.apiKey}`
         },
         body: formData,
-        signal: this.abortController.signal
+        signal: signal
       });
-      
+
       // 處理回應
       if (!response.ok) {
         await this.handleErrorResponse(response);
       }
-      
+
       const result = await response.json();
       return this.processResult(result);
-      
+
     } catch (error) {
       // 處理取消請求
       if (error.name === 'AbortError') {
         throw new Error('轉譯已取消');
       }
-      
-      console.error('Transcription error:', error);
+
+      if (typeof DEBUG !== 'undefined' && DEBUG) console.error('Transcription error:', error);
       throw error;
     } finally {
       this.abortController = null;
     }
   }
-  
+
   // 處理錯誤回應
   async handleErrorResponse(response) {
     let errorMessage = '轉譯失敗';
-    
+
     try {
       const errorData = await response.json();
-      
+
       switch (response.status) {
         case 401:
           errorMessage = 'API Key 無效或已過期';
@@ -143,10 +166,10 @@ class WhisperAPI {
       // 如果無法解析錯誤回應
       errorMessage = `轉譯失敗 (${response.status})`;
     }
-    
+
     throw new Error(errorMessage);
   }
-  
+
   // 處理轉譯結果
   processResult(rawResult) {
     // 確保結果格式正確
@@ -156,13 +179,13 @@ class WhisperAPI {
       language: rawResult.language || 'unknown',
       duration: rawResult.duration || 0
     };
-    
+
     // 處理段落：確保每個段落都有必要的欄位
     result.segments = result.segments.map((segment, index) => {
       // 處理文字：簡轉繁、生成無標點版本
       const processedText = textConverter.simplifiedToTraditional(segment.text || '');
       const textWithoutPunctuation = textConverter.removePunctuation(processedText);
-      
+
       return {
         id: segment.id || index,
         seek: segment.seek || 0,
@@ -177,10 +200,10 @@ class WhisperAPI {
         no_speech_prob: segment.no_speech_prob || 0
       };
     });
-    
+
     return result;
   }
-  
+
   // 取消轉譯
   cancel() {
     if (this.abortController) {
@@ -188,19 +211,19 @@ class WhisperAPI {
       this.abortController = null;
     }
   }
-  
+
   // 測試 API 連接
   async testConnection() {
     try {
       this.validateApiKey();
-      
+
       // 建立一個小的測試音訊檔案
       const testAudioData = new Uint8Array(1024);
       const testFile = new File([testAudioData], 'test.mp3', { type: 'audio/mp3' });
-      
+
       // 嘗試轉譯（會失敗，但可以測試連接）
       await this.transcribe(testFile, { responseFormat: 'text' });
-      
+
       return true;
     } catch (error) {
       // 如果是 401 錯誤，表示 API Key 無效
@@ -211,14 +234,14 @@ class WhisperAPI {
       return true;
     }
   }
-  
+
   // 估算轉譯時間（基於檔案大小）
   estimateTranscriptionTime(fileSize) {
     // 粗略估算：每 MB 約 2-5 秒
     const sizeMB = fileSize / 1024 / 1024;
     const minTime = Math.ceil(sizeMB * 2);
     const maxTime = Math.ceil(sizeMB * 5);
-    
+
     return {
       min: minTime,
       max: maxTime,

@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>大檔案本地轉譯修復測試 - Whisper 聽打工具</title>
+    
+    <!-- 樣式 -->
+    <link rel="stylesheet" href="../css/style.css">
+    
+    <style>
+        .test-container {
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+        
+        .test-section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid var(--border-color, #e0e0e0);
+            border-radius: 8px;
+            background: var(--bg-secondary, #f8f9fa);
+        }
+        
+        .test-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 0 0 16px 0;
+            color: var(--primary-color, #0066cc);
+        }
+        
+        .memory-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin: 16px 0;
+            padding: 16px;
+            background: var(--bg-primary, #fff);
+            border-radius: 6px;
+            border: 1px solid var(--border-color, #e0e0e0);
+        }
+        
+        .memory-item {
+            text-align: center;
+        }
+        
+        .memory-value {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--primary-color, #0066cc);
+        }
+        
+        .memory-label {
+            font-size: 12px;
+            color: var(--text-secondary, #666);
+            margin-top: 4px;
+        }
+        
+        .file-info {
+            background: var(--bg-primary, #fff);
+            padding: 16px;
+            border-radius: 6px;
+            margin: 16px 0;
+        }
+        
+        .progress-container {
+            margin: 20px 0;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: var(--bg-tertiary, #f0f0f0);
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary-color, #0066cc), #4a90e2);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .progress-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 12px;
+            font-weight: 600;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+        
+        .test-output {
+            background: var(--bg-primary, #fff);
+            border: 1px solid var(--border-color, #e0e0e0);
+            border-radius: 4px;
+            padding: 16px;
+            margin: 16px 0;
+            font-family: monospace;
+            font-size: 13px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            background: var(--primary-color, #0066cc);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 8px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn:hover {
+            background: var(--primary-hover, #0052a3);
+            transform: translateY(-1px);
+        }
+        
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .btn.secondary {
+            background: var(--bg-primary, #fff);
+            color: var(--text-primary, #333);
+            border: 1px solid var(--border-color, #ddd);
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-success { background: #28a745; }
+        .status-warning { background: #ffc107; }
+        .status-error { background: #dc3545; }
+        .status-info { background: #17a2b8; }
+        
+        .file-upload {
+            border: 2px dashed var(--border-color, #ddd);
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .file-upload:hover {
+            border-color: var(--primary-color, #0066cc);
+            background: rgba(0, 102, 204, 0.05);
+        }
+        
+        .file-upload.dragover {
+            border-color: var(--primary-color, #0066cc);
+            background: rgba(0, 102, 204, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>大檔案本地轉譯修復測試</h1>
+        <p>測試修復後的大檔案本地轉譯功能，包含記憶體管理、分段處理等改進</p>
+        
+        <!-- 記憶體監控 -->
+        <div class="test-section">
+            <h2 class="test-title">💾 記憶體監控</h2>
+            <div class="memory-info" id="memoryInfo">
+                <div class="memory-item">
+                    <div class="memory-value" id="availableMemory">--</div>
+                    <div class="memory-label">可用記憶體 (MB)</div>
+                </div>
+                <div class="memory-item">
+                    <div class="memory-value" id="usedMemory">--</div>
+                    <div class="memory-label">已用記憶體 (MB)</div>
+                </div>
+                <div class="memory-item">
+                    <div class="memory-value" id="memoryPercentage">--</div>
+                    <div class="memory-label">使用率 (%)</div>
+                </div>
+                <div class="memory-item">
+                    <div class="memory-value" id="deviceMemory">--</div>
+                    <div class="memory-label">設備記憶體 (GB)</div>
+                </div>
+            </div>
+            
+            <button class="btn secondary" onclick="startMemoryMonitoring()">開始監控</button>
+            <button class="btn secondary" onclick="stopMemoryMonitoring()">停止監控</button>
+            <button class="btn secondary" onclick="forceGC()">強制垃圾回收</button>
+        </div>
+        
+        <!-- 檔案測試 -->
+        <div class="test-section">
+            <h2 class="test-title">📁 檔案安全檢查</h2>
+            
+            <div class="file-upload" id="fileUpload">
+                <div>📁 選擇或拖放音訊檔案</div>
+                <div style="font-size: 14px; color: var(--text-secondary); margin-top: 8px;">
+                    支援格式：MP3, WAV, M4A, FLAC, OGG
+                </div>
+                <input type="file" id="audioInput" accept="audio/*" style="display: none;">
+            </div>
+            
+            <div class="file-info" id="fileInfo" style="display: none;">
+                <h4>檔案資訊</h4>
+                <div id="fileDetails"></div>
+                
+                <h4>安全檢查結果</h4>
+                <div id="safetyCheck"></div>
+                
+                <div style="margin-top: 16px;">
+                    <button class="btn" id="testTranscribeBtn" onclick="testTranscription()" disabled>
+                        測試轉譯
+                    </button>
+                    <button class="btn secondary" onclick="clearFile()">清除檔案</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 轉譯測試 -->
+        <div class="test-section">
+            <h2 class="test-title">🎤 轉譯測試</h2>
+            
+            <div class="progress-container" id="progressContainer" style="display: none;">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                    <div class="progress-text" id="progressText">準備中...</div>
+                </div>
+                <div style="font-size: 12px; color: var(--text-secondary); margin-top: 8px;" id="progressDetails"></div>
+            </div>
+            
+            <div class="test-output" id="transcriptionOutput">等待測試...</div>
+            
+            <div>
+                <button class="btn secondary" onclick="downloadTransformers()" id="downloadBtn">下載 Transformers.js</button>
+                <button class="btn secondary" onclick="clearOutput()">清除輸出</button>
+            </div>
+        </div>
+        
+        <!-- 測試日誌 -->
+        <div class="test-section">
+            <h2 class="test-title">📝 測試日誌</h2>
+            <div class="test-output" id="testLog">測試開始...</div>
+            <button class="btn secondary" onclick="clearLog()">清除日誌</button>
+        </div>
+    </div>
+    
+    <!-- 載入修復的模組 -->
+    <script type="module">
+        import { MemoryManager } from '../js/utils/memory-manager.js';
+        import { WhisperTransformers } from '../js/wasm/whisper-transformers.js';
+        
+        // 全域變數
+        window.MemoryManager = MemoryManager;
+        window.WhisperTransformers = WhisperTransformers;
+        window.whisperTransformers = null;
+        window.memoryMonitor = null;
+        window.currentFile = null;
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', async () => {
+            await initializeTest();
+        });
+        
+        async function initializeTest() {
+            log('初始化測試環境...');
+            
+            // 顯示記憶體資訊
+            updateMemoryInfo();
+            
+            // 設定檔案上傳
+            setupFileUpload();
+            
+            log('✅ 測試環境初始化完成');
+        }
+        
+        function setupFileUpload() {
+            const fileUpload = document.getElementById('fileUpload');
+            const audioInput = document.getElementById('audioInput');
+            
+            fileUpload.addEventListener('click', () => audioInput.click());
+            
+            fileUpload.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                fileUpload.classList.add('dragover');
+            });
+            
+            fileUpload.addEventListener('dragleave', () => {
+                fileUpload.classList.remove('dragover');
+            });
+            
+            fileUpload.addEventListener('drop', (e) => {
+                e.preventDefault();
+                fileUpload.classList.remove('dragover');
+                const file = e.dataTransfer.files[0];
+                if (file && file.type.startsWith('audio/')) {
+                    handleFileSelect(file);
+                }
+            });
+            
+            audioInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    handleFileSelect(file);
+                }
+            });
+        }
+        
+        function handleFileSelect(file) {
+            window.currentFile = file;
+            
+            const fileSizeMB = file.size / 1024 / 1024;
+            const fileExtension = file.name.split('.').pop().toLowerCase();
+            
+            // 顯示檔案資訊
+            const fileDetails = document.getElementById('fileDetails');
+            fileDetails.innerHTML = `
+                <div><strong>檔案名稱：</strong>${file.name}</div>
+                <div><strong>檔案大小：</strong>${fileSizeMB.toFixed(2)} MB</div>
+                <div><strong>檔案格式：</strong>${file.type || fileExtension.toUpperCase()}</div>
+                <div><strong>最後修改：</strong>${new Date(file.lastModified).toLocaleString()}</div>
+            `;
+            
+            // 進行安全檢查
+            const memoryCheck = MemoryManager.canProcessFile(fileSizeMB, fileExtension);
+            const safetyCheck = document.getElementById('safetyCheck');
+            
+            let statusClass = 'status-success';
+            let statusText = '✅ 安全';
+            
+            if (!memoryCheck.canProcess) {
+                statusClass = 'status-error';
+                statusText = '❌ 不安全';
+            } else if (fileSizeMB > 50) {
+                statusClass = 'status-warning';
+                statusText = '⚠️ 需要分段處理';
+            }
+            
+            safetyCheck.innerHTML = `
+                <div style="margin-bottom: 12px;">
+                    <span class="status-indicator ${statusClass}"></span>
+                    <strong>${statusText}</strong>
+                </div>
+                <div><strong>可用記憶體：</strong>${memoryCheck.available} MB</div>
+                <div><strong>預估需求：</strong>${memoryCheck.required} MB</div>
+                <div><strong>安全緩衝：</strong>${memoryCheck.safetyBuffer} MB</div>
+                <div><strong>建議：</strong>${memoryCheck.recommendation}</div>
+            `;
+            
+            // 啟用/禁用測試按鈕
+            const testBtn = document.getElementById('testTranscribeBtn');
+            testBtn.disabled = !memoryCheck.canProcess;
+            
+            // 顯示檔案資訊區域
+            document.getElementById('fileInfo').style.display = 'block';
+            
+            log(`檔案選擇: ${file.name} (${fileSizeMB.toFixed(2)}MB) - ${statusText}`);
+        }
+        
+        async function testTranscription() {
+            if (!window.currentFile) {
+                alert('請先選擇檔案');
+                return;
+            }
+            
+            const output = document.getElementById('transcriptionOutput');
+            const progressContainer = document.getElementById('progressContainer');
+            const testBtn = document.getElementById('testTranscribeBtn');
+            
+            try {
+                testBtn.disabled = true;
+                progressContainer.style.display = 'block';
+                output.textContent = '正在初始化...';
+                
+                // 初始化 WhisperTransformers
+                if (!window.whisperTransformers) {
+                    window.whisperTransformers = new WhisperTransformers();
+                    
+                    // 設定進度回調
+                    window.whisperTransformers.onProgress = (progress) => {
+                        updateProgress(progress.percentage || 0, progress.message || '處理中...');
+                        log(`進度: ${progress.message} (${progress.percentage?.toFixed(1) || 0}%)`);
+                    };
+                }
+                
+                log('開始轉譯測試...');
+                updateProgress(0, '初始化模型...');
+                
+                // 初始化模型
+                await window.whisperTransformers.initialize('tiny');
+                updateProgress(20, '模型載入完成，開始轉譯...');
+                
+                // 執行轉譯
+                const result = await window.whisperTransformers.transcribe(window.currentFile, {
+                    language: 'chinese'
+                });
+                
+                updateProgress(100, '轉譯完成！');
+                
+                // 顯示結果
+                output.innerHTML = `
+                    <h4>轉譯結果</h4>
+                    <div style="margin: 12px 0; padding: 12px; background: #f0f8ff; border-radius: 6px;">
+                        ${result.text || '無轉譯結果'}
+                    </div>
+                    <h4>詳細資訊</h4>
+                    <div style="font-size: 12px;">
+                        <div><strong>段落數：</strong>${result.segments?.length || 0}</div>
+                        <div><strong>處理方法：</strong>${result.method || '未知'}</div>
+                        <div><strong>模型：</strong>${result.model || 'tiny'}</div>
+                    </div>
+                `;
+                
+                log('✅ 轉譯測試成功完成');
+                
+            } catch (error) {
+                updateProgress(0, '轉譯失敗');
+                output.innerHTML = `
+                    <h4 style="color: #dc3545;">❌ 轉譯失敗</h4>
+                    <div style="color: #dc3545; margin: 12px 0;">
+                        ${error.message}
+                    </div>
+                    <h4>錯誤詳情</h4>
+                    <pre style="font-size: 12px; background: #f8f8f8; padding: 12px; border-radius: 4px; overflow-x: auto;">
+${error.stack || error.toString()}
+                    </pre>
+                `;
+                
+                log(`❌ 轉譯失敗: ${error.message}`);
+                
+            } finally {
+                testBtn.disabled = false;
+                setTimeout(() => {
+                    progressContainer.style.display = 'none';
+                }, 3000);
+            }
+        }
+        
+        function updateProgress(percentage, message) {
+            const progressFill = document.getElementById('progressFill');
+            const progressText = document.getElementById('progressText');
+            const progressDetails = document.getElementById('progressDetails');
+            
+            progressFill.style.width = percentage + '%';
+            progressText.textContent = `${percentage.toFixed(0)}%`;
+            progressDetails.textContent = message;
+        }
+        
+        function updateMemoryInfo() {
+            const summary = MemoryManager.getMemorySummary();
+            const usage = MemoryManager.getMemoryUsage();
+            
+            document.getElementById('availableMemory').textContent = summary.available.replace('MB', '');
+            document.getElementById('usedMemory').textContent = summary.used.replace('MB', '');
+            document.getElementById('memoryPercentage').textContent = summary.percentage.replace('%', '');
+            document.getElementById('deviceMemory').textContent = summary.deviceMemory.replace('GB', '');
+        }
+        
+        function startMemoryMonitoring() {
+            if (window.memoryMonitor) {
+                stopMemoryMonitoring();
+            }
+            
+            window.memoryMonitor = MemoryManager.startMemoryMonitoring((info) => {
+                document.getElementById('availableMemory').textContent = info.available;
+                document.getElementById('usedMemory').textContent = info.used;
+                document.getElementById('memoryPercentage').textContent = info.percentage;
+                
+                if (info.percentage > 85) {
+                    log(`⚠️ 記憶體警告: 使用率 ${info.percentage}%`);
+                }
+            }, 1000);
+            
+            log('記憶體監控已啟動');
+        }
+        
+        function stopMemoryMonitoring() {
+            if (window.memoryMonitor) {
+                MemoryManager.stopMemoryMonitoring(window.memoryMonitor);
+                window.memoryMonitor = null;
+                log('記憶體監控已停止');
+            }
+        }
+        
+        function forceGC() {
+            MemoryManager.forceGarbageCollection();
+            setTimeout(updateMemoryInfo, 500);
+            log('已觸發垃圾回收');
+        }
+        
+        function clearFile() {
+            window.currentFile = null;
+            document.getElementById('fileInfo').style.display = 'none';
+            document.getElementById('audioInput').value = '';
+            log('已清除檔案');
+        }
+        
+        function clearOutput() {
+            document.getElementById('transcriptionOutput').textContent = '等待測試...';
+        }
+        
+        function clearLog() {
+            document.getElementById('testLog').textContent = '測試開始...';
+        }
+        
+        function log(message) {
+            const logElement = document.getElementById('testLog');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.textContent += `\n[${timestamp}] ${message}`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+        
+        async function downloadTransformers() {
+            const btn = document.getElementById('downloadBtn');
+            btn.disabled = true;
+            btn.textContent = '下載中...';
+            
+            try {
+                log('開始下載 Transformers.js...');
+                
+                // 嘗試載入 Transformers.js
+                const script = document.createElement('script');
+                script.type = 'module';
+                script.textContent = `
+                    import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.6.0';
+                    window.transformers = { pipeline, env };
+                `;
+                document.head.appendChild(script);
+                
+                // 等待載入完成
+                let attempts = 0;
+                while (!window.transformers && attempts < 30) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    attempts++;
+                }
+                
+                if (window.transformers) {
+                    log('✅ Transformers.js 載入成功');
+                } else {
+                    throw new Error('載入超時');
+                }
+                
+            } catch (error) {
+                log(`❌ Transformers.js 載入失敗: ${error.message}`);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '下載 Transformers.js';
+            }
+        }
+        
+        // 全域函數
+        window.startMemoryMonitoring = startMemoryMonitoring;
+        window.stopMemoryMonitoring = stopMemoryMonitoring;
+        window.forceGC = forceGC;
+        window.testTranscription = testTranscription;
+        window.clearFile = clearFile;
+        window.clearOutput = clearOutput;
+        window.clearLog = clearLog;
+        window.downloadTransformers = downloadTransformers;
+    </script>
+</body>
+</html>

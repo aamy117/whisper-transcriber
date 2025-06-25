@@ -1,3 +1,6 @@
+// 調試模式開關（生產環境設為 false）
+const DEBUG = typeof process !== 'undefined' ? process.env.NODE_ENV !== 'production' : location.hostname === 'localhost';
+
 /**
  * 真實的 Whisper WASM 實現
  * 使用 whisper.cpp 的 WebAssembly 版本
@@ -9,7 +12,7 @@ export class WhisperWASMReal {
     this.module = null;
     this.model = null;
     this.instance = null;
-    
+
     // 模型配置
     this.modelConfigs = {
       tiny: {
@@ -28,7 +31,7 @@ export class WhisperWASMReal {
         name: 'small'
       }
     };
-    
+
     // 支援的語言
     this.languages = {
       'en': 'english',
@@ -43,7 +46,7 @@ export class WhisperWASMReal {
       'ru': 'russian'
     };
   }
-  
+
   /**
    * 初始化 WASM 模組
    */
@@ -51,21 +54,21 @@ export class WhisperWASMReal {
     if (this.isInitialized && this.model === modelName) {
       return;
     }
-    
+
     try {
-      console.log('開始載入 Whisper WASM...');
-      
+      DEBUG && console.log('開始載入 Whisper WASM...');
+
       // 載入 whisper.wasm
       if (!this.module) {
         const script = document.createElement('script');
         script.src = 'https://cdn.jsdelivr.net/npm/whisper-wasm@latest/dist/whisper.js';
         document.head.appendChild(script);
-        
+
         await new Promise((resolve, reject) => {
           script.onload = resolve;
           script.onerror = reject;
         });
-        
+
         // 等待 Module 載入
         await new Promise((resolve) => {
           const checkInterval = setInterval(() => {
@@ -75,22 +78,22 @@ export class WhisperWASMReal {
             }
           }, 100);
         });
-        
+
         this.module = window.Module;
       }
-      
+
       // 載入模型
       await this.loadModel(modelName);
-      
+
       this.isInitialized = true;
-      console.log('Whisper WASM 初始化完成');
-      
+      DEBUG && console.log('Whisper WASM 初始化完成');
+
     } catch (error) {
-      console.error('Whisper WASM 初始化失敗:', error);
+      if (typeof DEBUG !== 'undefined' && DEBUG) console.error('Whisper WASM 初始化失敗:', error);
       throw error;
     }
   }
-  
+
   /**
    * 載入模型檔案
    */
@@ -99,40 +102,40 @@ export class WhisperWASMReal {
     if (!config) {
       throw new Error(`不支援的模型: ${modelName}`);
     }
-    
-    console.log(`開始下載 ${modelName} 模型 (${config.size}MB)...`);
-    
+
+    DEBUG && console.log(`開始下載 ${modelName} 模型 (${config.size}MB)...`);
+
     try {
       // 檢查快取
       const cachedModel = await this.getModelFromCache(modelName);
       if (cachedModel) {
-        console.log('使用快取的模型');
+        DEBUG && console.log('使用快取的模型');
         this.model = cachedModel;
         return;
       }
-      
+
       // 下載模型
       const response = await fetch(config.url);
       if (!response.ok) {
         throw new Error(`下載失敗: ${response.status}`);
       }
-      
+
       // 顯示下載進度
       const reader = response.body.getReader();
       const contentLength = +response.headers.get('Content-Length');
       const chunks = [];
       let receivedLength = 0;
-      
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        
+
         chunks.push(value);
         receivedLength += value.length;
-        
+
         const progress = (receivedLength / contentLength) * 100;
-        console.log(`下載進度: ${progress.toFixed(1)}%`);
-        
+        DEBUG && console.log(`下載進度: ${progress.toFixed(1)}%`);
+
         if (this.onProgress) {
           this.onProgress({
             type: 'download',
@@ -141,7 +144,7 @@ export class WhisperWASMReal {
           });
         }
       }
-      
+
       // 合併資料
       const modelData = new Uint8Array(receivedLength);
       let position = 0;
@@ -149,19 +152,19 @@ export class WhisperWASMReal {
         modelData.set(chunk, position);
         position += chunk.length;
       }
-      
+
       // 快取模型
       await this.cacheModel(modelName, modelData);
-      
+
       this.model = modelData;
-      console.log('模型載入完成');
-      
+      DEBUG && console.log('模型載入完成');
+
     } catch (error) {
-      console.error('模型載入失敗:', error);
+      if (typeof DEBUG !== 'undefined' && DEBUG) console.error('模型載入失敗:', error);
       throw error;
     }
   }
-  
+
   /**
    * 從 IndexedDB 取得快取的模型
    */
@@ -171,17 +174,17 @@ export class WhisperWASMReal {
       const tx = db.transaction(['models'], 'readonly');
       const store = tx.objectStore('models');
       const request = store.get(modelName);
-      
+
       return new Promise((resolve, reject) => {
         request.onsuccess = () => resolve(request.result?.data);
         request.onerror = () => reject(request.error);
       });
     } catch (error) {
-      console.warn('無法讀取快取:', error);
+      DEBUG && console.warn('無法讀取快取:', error);
       return null;
     }
   }
-  
+
   /**
    * 快取模型到 IndexedDB
    */
@@ -190,26 +193,26 @@ export class WhisperWASMReal {
       const db = await this.openDB();
       const tx = db.transaction(['models'], 'readwrite');
       const store = tx.objectStore('models');
-      
+
       await store.put({
         name: modelName,
         data: modelData,
         timestamp: Date.now()
       });
-      
-      console.log('模型已快取');
+
+      DEBUG && console.log('模型已快取');
     } catch (error) {
-      console.warn('快取失敗:', error);
+      DEBUG && console.warn('快取失敗:', error);
     }
   }
-  
+
   /**
    * 開啟 IndexedDB
    */
   async openDB() {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open('WhisperWASM', 1);
-      
+
       request.onupgradeneeded = (event) => {
         const db = event.target.result;
         if (!db.objectStoreNames.contains('models')) {
@@ -217,12 +220,12 @@ export class WhisperWASMReal {
           store.createIndex('timestamp', 'timestamp');
         }
       };
-      
+
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
   }
-  
+
   /**
    * 轉譯音訊
    */
@@ -230,13 +233,13 @@ export class WhisperWASMReal {
     if (!this.isInitialized) {
       throw new Error('WASM 尚未初始化');
     }
-    
+
     try {
-      console.log('開始轉譯...');
-      
+      DEBUG && console.log('開始轉譯...');
+
       // 轉換音訊格式
       const audioData = await this.prepareAudio(audioFile);
-      
+
       // 設定轉譯參數
       const params = {
         language: this.languages[options.language] || 'chinese',
@@ -244,32 +247,32 @@ export class WhisperWASMReal {
         no_timestamps: false,
         ...options
       };
-      
+
       // 執行轉譯
       const result = await this.runTranscription(audioData, params);
-      
+
       return this.formatResult(result);
-      
+
     } catch (error) {
-      console.error('轉譯失敗:', error);
+      if (typeof DEBUG !== 'undefined' && DEBUG) console.error('轉譯失敗:', error);
       throw error;
     }
   }
-  
+
   /**
    * 準備音訊資料
    */
   async prepareAudio(audioFile) {
     // 讀取檔案
     const arrayBuffer = await audioFile.arrayBuffer();
-    
+
     // 解碼音訊
     const audioContext = new (window.AudioContext || window.webkitAudioContext)({
       sampleRate: 16000 // Whisper 需要 16kHz
     });
-    
+
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-    
+
     // 轉換為單聲道 16kHz
     let pcmData;
     if (audioBuffer.numberOfChannels > 1) {
@@ -278,7 +281,7 @@ export class WhisperWASMReal {
       for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
         channelData.push(audioBuffer.getChannelData(i));
       }
-      
+
       pcmData = new Float32Array(audioBuffer.length);
       for (let i = 0; i < audioBuffer.length; i++) {
         let sum = 0;
@@ -290,12 +293,12 @@ export class WhisperWASMReal {
     } else {
       pcmData = audioBuffer.getChannelData(0);
     }
-    
+
     audioContext.close();
-    
+
     return pcmData;
   }
-  
+
   /**
    * 執行轉譯
    */
@@ -303,35 +306,35 @@ export class WhisperWASMReal {
     if (!this.module) {
       throw new Error('WASM 模組未載入');
     }
-    
+
     // 分配記憶體
     const nSamples = audioData.length;
     const heapSize = nSamples * 4; // Float32
     const heapPtr = this.module._malloc(heapSize);
-    
+
     // 複製音訊資料到 WASM 記憶體
     this.module.HEAPF32.set(audioData, heapPtr / 4);
-    
+
     try {
       // 建立 Whisper 實例
       const whisper = this.module._whisper_init_from_buffer(
         this.model.buffer,
         this.model.byteLength
       );
-      
+
       if (!whisper) {
         throw new Error('無法初始化 Whisper');
       }
-      
+
       // 設定參數
       const paramsPtr = this.module._whisper_full_default_params();
-      
+
       // 設定語言
       if (params.language) {
         const langId = this.module._whisper_lang_id(params.language);
         this.module._whisper_full_params_set_language(paramsPtr, langId);
       }
-      
+
       // 執行轉譯
       const ret = this.module._whisper_full(
         whisper,
@@ -339,48 +342,48 @@ export class WhisperWASMReal {
         heapPtr,
         nSamples
       );
-      
+
       if (ret !== 0) {
         throw new Error('轉譯失敗');
       }
-      
+
       // 獲取結果
       const nSegments = this.module._whisper_full_n_segments(whisper);
       const segments = [];
-      
+
       for (let i = 0; i < nSegments; i++) {
         const text = this.module.UTF8ToString(
           this.module._whisper_full_get_segment_text(whisper, i)
         );
-        
+
         const t0 = this.module._whisper_full_get_segment_t0(whisper, i);
         const t1 = this.module._whisper_full_get_segment_t1(whisper, i);
-        
+
         segments.push({
           start: t0 / 100.0, // 轉換為秒
           end: t1 / 100.0,
           text: text.trim()
         });
       }
-      
+
       // 釋放 Whisper 實例
       this.module._whisper_free(whisper);
-      
+
       return { segments };
-      
+
     } finally {
       // 釋放記憶體
       this.module._free(heapPtr);
     }
   }
-  
+
   /**
    * 格式化結果
    */
   formatResult(result) {
     const segments = result.segments || [];
     const fullText = segments.map(s => s.text).join(' ');
-    
+
     return {
       text: fullText,
       segments: segments,
@@ -388,14 +391,14 @@ export class WhisperWASMReal {
       duration: segments.length > 0 ? segments[segments.length - 1].end : 0
     };
   }
-  
+
   /**
    * 設定進度回調
    */
   setProgressCallback(callback) {
     this.onProgress = callback;
   }
-  
+
   /**
    * 清理資源
    */

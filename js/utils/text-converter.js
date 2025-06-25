@@ -39,11 +39,11 @@ export class TextConverter {
             '护': '護', '报': '報', '拟': '擬', '拥': '擁', '择': '擇',
             '换': '換', '损': '損', '摄': '攝', '搜': '搜', '摇': '搖'
         };
-        
+
         // 建立更完整的映射
         this.initializeFullMapping();
     }
-    
+
     /**
      * 初始化完整的簡繁對照表
      */
@@ -69,58 +69,58 @@ export class TextConverter {
             '弃': '棄', '张': '張', '弯': '彎', '当': '當', '录': '錄',
             '彩': '彩', '形': '形', '彦': '彥', '影': '影', '径': '徑'
         };
-        
+
         Object.assign(this.s2tMap, additionalMappings);
     }
-    
+
     /**
      * 簡體轉繁體
      */
     simplifiedToTraditional(text) {
         if (!text) return text;
-        
+
         // 使用 OpenCC 進行轉換
         return opencc.convert(text);
     }
-    
+
     /**
      * 移除標點符號
      */
     removePunctuation(text) {
         if (!text) return text;
-        
+
         // 定義要移除的標點符號
         const punctuationRegex = /[，。！？；：、,\.!?;:]/g;
-        
+
         // 移除標點符號，但保留空格
         return text.replace(punctuationRegex, ' ').replace(/\s+/g, ' ').trim();
     }
-    
+
     /**
      * 處理轉譯結果
      */
     processTranscriptionText(text, options = {}) {
         let result = text;
-        
+
         // 簡轉繁
         if (options.convertToTraditional !== false) {
             result = this.simplifiedToTraditional(result);
         }
-        
+
         // 移除標點
         if (options.removePunctuation !== false) {
             result = this.removePunctuation(result);
         }
-        
+
         return result;
     }
-    
+
     /**
      * 處理分段結果
      */
     processSegments(segments, options = {}) {
         if (!segments || !Array.isArray(segments)) return segments;
-        
+
         return segments.map(segment => ({
             ...segment,
             text: this.processTranscriptionText(segment.text, options)

@@ -4,39 +4,39 @@ const VideoConfig = {
   player: {
     // 進度更新間隔 (毫秒)
     progressUpdateInterval: 100,
-    
+
     // 尋找間隔 (秒)
     seekStep: 5,
-    
+
     // 音量步階
     volumeStep: 0.1,
-    
+
     // 支援的視訊格式
     supportedFormats: [
       'video/mp4',
       'video/webm',
       'video/ogg'
     ],
-    
+
     // 品質設定
     quality: {
       auto: true,
       levels: ['1080p', '720p', '480p', '360p']
     }
   },
-  
+
   // UI 設定
   ui: {
     // 控制列自動隱藏時間 (毫秒)
     controlsHideDelay: 3000,
-    
+
     // 響應式斷點
     breakpoints: {
       mobile: 768,
       tablet: 1024,
       desktop: 1200
     },
-    
+
     // 動畫持續時間
     animations: {
       fade: 200,
@@ -44,7 +44,7 @@ const VideoConfig = {
       scale: 250
     }
   },
-  
+
   // 儲存設定
   storage: {
     prefix: 'whisper_video_',
@@ -56,9 +56,9 @@ const VideoConfig = {
     warnSize: 2 * 1024 * 1024 * 1024, // 2GB 時顯示警告
     chunkSize: 1024 * 1024, // 1MB chunks for processing
     allowedTypes: [
-      'video/mp4', 
-      'video/webm', 
-      'video/ogg', 
+      'video/mp4',
+      'video/webm',
+      'video/ogg',
       'video/quicktime',
       'video/x-msvideo',
       'video/x-matroska',
@@ -79,7 +79,7 @@ const VideoConfig = {
     maxBufferTime: 60, // 最大緩衝 60 秒
     debug: true // 顯示串流除錯資訊
   },
-  
+
   // 快捷鍵設定
   shortcuts: {
     playPause: [' ', 'k'],
@@ -92,7 +92,7 @@ const VideoConfig = {
     seekBackward: ['a'],
     seekForward: ['d']
   },
-  
+
   // 偵錯設定
   debug: {
     enabled: false,
