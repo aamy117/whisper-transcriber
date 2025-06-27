@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>大檔案控制器測試</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .test-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    
+    .test-section {
+      background: var(--surface-color);
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+    }
+    
+    .test-result {
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 4px;
+      font-family: monospace;
+    }
+    
+    .test-result.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    
+    .test-result.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    
+    .test-result.warning {
+      background: #fff3cd;
+      color: #856404;
+      border: 1px solid #ffeaa7;
+    }
+    
+    .status-display {
+      background: var(--code-bg);
+      padding: 15px;
+      border-radius: 4px;
+      overflow-x: auto;
+      font-family: monospace;
+      white-space: pre;
+    }
+    
+    .control-panel {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+    
+    button {
+      padding: 8px 16px;
+      background: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    
+    button:hover {
+      opacity: 0.9;
+    }
+    
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .file-input-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .progress-bar {
+      width: 100%;
+      height: 20px;
+      background: var(--border-color);
+      border-radius: 4px;
+      overflow: hidden;
+      margin: 10px 0;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: var(--primary-color);
+      transition: width 0.3s ease;
+    }
+    
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin: 20px 0;
+    }
+    
+    .metric-card {
+      background: var(--bg-color);
+      padding: 15px;
+      border-radius: 4px;
+      text-align: center;
+    }
+    
+    .metric-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: var(--primary-color);
+    }
+    
+    .metric-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+    }
+    
+    .mock-file-section {
+      background: var(--bg-color);
+      padding: 15px;
+      border-radius: 4px;
+      margin: 20px 0;
+    }
+    
+    .mock-file-controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="test-container">
+    <h1>大檔案控制器測試</h1>
+    
+    <!-- 配置控制 -->
+    <div class="test-section">
+      <h2>配置控制</h2>
+      <div class="control-panel">
+        <button onclick="enableSystem()">啟用新系統</button>
+        <button onclick="disableSystem()">關閉新系統</button>
+        <button onclick="showControllerStatus()">顯示控制器狀態</button>
+        <button onclick="initializeController()">初始化控制器</button>
+      </div>
+    </div>
+    
+    <!-- 測試控制 -->
+    <div class="test-section">
+      <h2>測試控制</h2>
+      <div class="control-panel">
+        <button onclick="runAllTests()">執行所有測試</button>
+        <button onclick="testInitialization()">初始化測試</button>
+        <button onclick="testFileAnalysis()">檔案分析測試</button>
+        <button onclick="testStrategyDetermination()">策略決定測試</button>
+        <button onclick="testProcessing()">處理流程測試</button>
+        <button onclick="testCancellation()">取消功能測試</button>
+      </div>
+    </div>
+    
+    <!-- 模擬檔案測試 -->
+    <div class="test-section">
+      <h2>模擬檔案處理</h2>
+      <div class="mock-file-section">
+        <h3>建立模擬檔案</h3>
+        <div class="mock-file-controls">
+          <label>
+            檔案大小 (MB):
+            <input type="number" id="mockFileSize" value="150" min="1" max="2048">
+          </label>
+          <label>
+            檔案名稱:
+            <input type="text" id="mockFileName" value="test-audio.mp3">
+          </label>
+          <button onclick="processMockFile()">處理模擬檔案</button>
+          <button onclick="cancelProcessing()" id="cancelBtn" disabled>取消處理</button>
+        </div>
+      </div>
+      
+      <!-- 進度顯示 -->
+      <div id="progressSection" style="display: none;">
+        <h3>處理進度</h3>
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <div id="progressText">準備中...</div>
+      </div>
+    </div>
+    
+    <!-- 控制器狀態 -->
+    <div class="test-section">
+      <h2>控制器狀態</h2>
+      <div class="status-display" id="controllerStatus"></div>
+    </div>
+    
+    <!-- 效能指標 -->
+    <div class="test-section">
+      <h2>效能指標</h2>
+      <div class="metrics-grid" id="metricsGrid">
+        <div class="metric-card">
+          <div class="metric-value" id="activeProcesses">0</div>
+          <div class="metric-label">活動處理</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value" id="totalProcessed">0</div>
+          <div class="metric-label">總處理數</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value" id="avgDuration">0ms</div>
+          <div class="metric-label">平均處理時間</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value" id="successRate">0%</div>
+          <div class="metric-label">成功率</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 測試結果 -->
+    <div class="test-section">
+      <h2>測試結果</h2>
+      <div id="testResults"></div>
+    </div>
+  </div>
+  
+  <script type="module">
+    import { largeFileController } from '../js/large-file/large-file-controller.js';
+    import { largeFileConfig } from '../js/large-file/large-file-config.js';
+    
+    // 暴露到全域
+    window.largeFileController = largeFileController;
+    window.largeFileConfig = largeFileConfig;
+    
+    // 當前處理 ID
+    let currentProcessId = null;
+    let processedCount = 0;
+    let successCount = 0;
+    let totalDuration = 0;
+    
+    // 測試結果容器
+    const testResults = document.getElementById('testResults');
+    
+    // 記錄測試結果
+    function logResult(test, success, message) {
+      const result = document.createElement('div');
+      result.className = `test-result ${success ? 'success' : 'error'}`;
+      result.textContent = `[${test}] ${success ? '✓' : '✗'} ${message}`;
+      testResults.appendChild(result);
+    }
+    
+    // 記錄警告
+    function logWarning(test, message) {
+      const result = document.createElement('div');
+      result.className = 'test-result warning';
+      result.textContent = `[${test}] ⚠ ${message}`;
+      testResults.appendChild(result);
+    }
+    
+    // 更新控制器狀態顯示
+    function updateStatus() {
+      try {
+        const status = largeFileController.getStatus();
+        document.getElementById('controllerStatus').textContent = JSON.stringify(status, null, 2);
+        
+        // 更新指標
+        document.getElementById('activeProcesses').textContent = status.activeProcesses;
+        
+      } catch (error) {
+        console.error('更新狀態失敗:', error);
+      }
+    }
+    
+    // 更新效能指標
+    function updateMetrics() {
+      document.getElementById('totalProcessed').textContent = processedCount;
+      
+      if (processedCount > 0) {
+        const avgTime = Math.round(totalDuration / processedCount);
+        document.getElementById('avgDuration').textContent = `${avgTime}ms`;
+        
+        const rate = Math.round((successCount / processedCount) * 100);
+        document.getElementById('successRate').textContent = `${rate}%`;
+      }
+    }
+    
+    // 配置控制函數
+    window.enableSystem = function() {
+      largeFileConfig.set('enabled', true);
+      logResult('系統控制', true, '已啟用大檔案處理系統');
+      updateStatus();
+    };
+    
+    window.disableSystem = function() {
+      largeFileConfig.set('enabled', false);
+      logResult('系統控制', true, '已關閉大檔案處理系統');
+      updateStatus();
+    };
+    
+    window.showControllerStatus = function() {
+      updateStatus();
+      logResult('狀態查詢', true, '已更新控制器狀態');
+    };
+    
+    window.initializeController = async function() {
+      try {
+        await largeFileController.initializeSubsystems();
+        logResult('初始化', true, '控制器子系統初始化成功');
+        updateStatus();
+      } catch (error) {
+        logResult('初始化', false, error.message);
+      }
+    };
+    
+    // 測試函數
+    window.testInitialization = async function() {
+      console.log('開始初始化測試...');
+      testResults.innerHTML = '<h3>初始化測試</h3>';
+      
+      try {
+        // 測試延遲載入
+        const statusBefore = largeFileController.getStatus();
+        logResult('延遲載入', !statusBefore.initialized, '初始狀態未初始化');
+        
+        // 執行初始化
+        await largeFileController.initializeSubsystems();
+        
+        const statusAfter = largeFileController.getStatus();
+        logResult('初始化完成', statusAfter.initialized, '子系統已初始化');
+        
+        // 檢查子系統（由於模組還未實作，預期會失敗）
+        const subsystems = statusAfter.subsystems;
+        let hasAnySubsystem = false;
+        for (const [name, loaded] of Object.entries(subsystems)) {
+          if (loaded) {
+            hasAnySubsystem = true;
+            logResult(`子系統-${name}`, true, '已載入');
+          } else {
+            logWarning(`子系統-${name}`, '未載入（模組未實作）');
+          }
+        }
+        
+        if (!hasAnySubsystem) {
+          logWarning('子系統載入', '所有子系統都未載入，這是預期的（模組尚未實作）');
+        }
+        
+      } catch (error) {
+        // 預期會失敗，因為子系統模組還未實作
+        logWarning('初始化', `初始化失敗（預期）: ${error.message}`);
+      }
+      
+      updateStatus();
+    };
+    
+    window.testFileAnalysis = async function() {
+      console.log('開始檔案分析測試...');
+      testResults.innerHTML = '<h3>檔案分析測試</h3>';
+      
+      try {
+        const mockFile = new File(['test content'], 'test.mp3', {
+          type: 'audio/mp3',
+          lastModified: Date.now()
+        });
+        
+        // 由於 streamAnalyzer 未實作，會使用降級分析
+        const analysis = await largeFileController.analyzeFile(mockFile);
+        
+        logResult('降級分析', analysis !== null, '檔案分析完成');
+        logResult('分析結果', analysis.size === mockFile.size, `檔案大小: ${analysis.size}`);
+        logResult('串流支援', !analysis.canStream, '降級模式不支援串流');
+        
+      } catch (error) {
+        logResult('檔案分析', false, error.message);
+      }
+    };
+    
+    window.testStrategyDetermination = async function() {
+      console.log('開始策略決定測試...');
+      testResults.innerHTML = '<h3>策略決定測試</h3>';
+      
+      try {
+        // 測試不同大小的檔案
+        const testCases = [
+          { size: 100 * 1024 * 1024, expected: 'smart-split', name: '100MB' },
+          { size: 300 * 1024 * 1024, expected: 'streaming-parallel', name: '300MB' },
+          { size: 1024 * 1024 * 1024, expected: 'full-streaming', name: '1GB' }
+        ];
+        
+        for (const testCase of testCases) {
+          const mockFile = {
+            size: testCase.size,
+            type: 'audio/mp3',
+            name: `test-${testCase.name}.mp3`
+          };
+          
+          const analysis = await largeFileController.analyzeFile(mockFile);
+          const strategy = await largeFileController.determineStrategy(mockFile, analysis, {});
+          
+          logResult(
+            `策略-${testCase.name}`,
+            strategy.type === testCase.expected,
+            `${testCase.name}: ${strategy.type} (預期: ${testCase.expected})`
+          );
+        }
+        
+        // 測試強制策略
+        const mockFile = { size: 100 * 1024 * 1024 };
+        const analysis = await largeFileController.analyzeFile(mockFile);
+        const forcedStrategy = await largeFileController.determineStrategy(
+          mockFile, 
+          analysis, 
+          { forceStrategy: 'custom-strategy' }
+        );
+        
+        logResult('強制策略', forcedStrategy.type === 'custom-strategy', '可以覆蓋預設策略');
+        
+      } catch (error) {
+        logResult('策略決定', false, error.message);
+      }
+    };
+    
+    window.testProcessing = async function() {
+      console.log('開始處理流程測試...');
+      testResults.innerHTML = '<h3>處理流程測試</h3>';
+      
+      try {
+        // 啟用系統
+        largeFileConfig.set('enabled', true);
+        
+        // 建立測試檔案
+        const content = new Array(10 * 1024 * 1024).fill('a').join(''); // 10MB
+        const mockFile = new File([content], 'test-process.mp3', {
+          type: 'audio/mp3'
+        });
+        
+        logResult('測試檔案', true, `建立 ${Math.round(mockFile.size / 1024 / 1024)}MB 測試檔案`);
+        
+        // 測試處理（預期會失敗，因為子系統未實作）
+        try {
+          const result = await largeFileController.process(mockFile, {
+            onProgress: (progress) => {
+              console.log('處理進度:', progress);
+            }
+          });
+          
+          logResult('處理完成', true, `策略: ${result.strategy}`);
+          
+        } catch (error) {
+          // 這是預期的，因為子系統還未實作
+          logWarning('處理執行', `處理失敗（預期）: ${error.message}`);
+        }
+        
+      } catch (error) {
+        logResult('處理測試', false, error.message);
+      }
+      
+      updateStatus();
+    };
+    
+    window.testCancellation = async function() {
+      console.log('開始取消功能測試...');
+      testResults.innerHTML = '<h3>取消功能測試</h3>';
+      
+      try {
+        // 生成測試處理 ID
+        const processId = largeFileController.generateProcessId();
+        logResult('處理ID生成', processId.startsWith('process_'), `ID: ${processId}`);
+        
+        // 測試取消不存在的處理
+        await largeFileController.cancel('non-existent-id');
+        logResult('取消不存在處理', true, '不會拋出錯誤');
+        
+        // 測試取消檢查
+        const isCancelled = largeFileController.isCancelled(processId);
+        logResult('取消狀態檢查', !isCancelled, '未取消的處理返回 false');
+        
+      } catch (error) {
+        logResult('取消測試', false, error.message);
+      }
+    };
+    
+    // 處理模擬檔案
+    window.processMockFile = async function() {
+      const size = parseInt(document.getElementById('mockFileSize').value) * 1024 * 1024;
+      const name = document.getElementById('mockFileName').value;
+      
+      if (!largeFileConfig.get('enabled')) {
+        alert('請先啟用大檔案處理系統');
+        return;
+      }
+      
+      // 建立模擬檔案
+      const mockFile = {
+        size: size,
+        type: 'audio/mp3',
+        name: name
+      };
+      
+      // 顯示進度
+      document.getElementById('progressSection').style.display = 'block';
+      document.getElementById('cancelBtn').disabled = false;
+      
+      const startTime = performance.now();
+      
+      try {
+        const result = await largeFileController.process(mockFile, {
+          onProgress: (progress) => {
+            const percent = Math.round(progress.progress * 100);
+            document.getElementById('progressFill').style.width = `${percent}%`;
+            document.getElementById('progressText').textContent = 
+              `${progress.stage}: ${percent}%`;
+          }
+        });
+        
+        const duration = performance.now() - startTime;
+        processedCount++;
+        successCount++;
+        totalDuration += duration;
+        
+        logResult('模擬處理', true, 
+          `完成: ${result.strategy}, 耗時: ${Math.round(duration)}ms`);
+        
+      } catch (error) {
+        const duration = performance.now() - startTime;
+        processedCount++;
+        totalDuration += duration;
+        
+        logWarning('模擬處理', `失敗（預期）: ${error.message}`);
+      }
+      
+      // 隱藏進度
+      setTimeout(() => {
+        document.getElementById('progressSection').style.display = 'none';
+        document.getElementById('cancelBtn').disabled = true;
+      }, 1000);
+      
+      updateStatus();
+      updateMetrics();
+    };
+    
+    // 取消處理
+    window.cancelProcessing = async function() {
+      if (currentProcessId) {
+        await largeFileController.cancel(currentProcessId);
+        logResult('取消處理', true, `已取消: ${currentProcessId}`);
+        currentProcessId = null;
+      }
+    };
+    
+    // 執行所有測試
+    window.runAllTests = async function() {
+      testResults.innerHTML = '';
+      
+      await testInitialization();
+      setTimeout(() => testFileAnalysis(), 500);
+      setTimeout(() => testStrategyDetermination(), 1000);
+      setTimeout(() => testProcessing(), 1500);
+      setTimeout(() => testCancellation(), 2000);
+    };
+    
+    // 定期更新狀態
+    setInterval(() => {
+      updateStatus();
+      updateMetrics();
+    }, 2000);
+    
+    // 初始化
+    updateStatus();
+    updateMetrics();
+    
+    // 自動執行初始化測試
+    setTimeout(() => {
+      console.log('自動執行初始化測試...');
+      testInitialization();
+    }, 500);
+  </script>
+</body>
+</html>

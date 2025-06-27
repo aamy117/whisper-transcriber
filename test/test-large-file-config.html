@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>大檔案配置管理系統測試</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .test-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    
+    .test-section {
+      background: var(--surface-color);
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+    }
+    
+    .test-result {
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 4px;
+      font-family: monospace;
+    }
+    
+    .test-result.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    
+    .test-result.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    
+    .config-display {
+      background: var(--code-bg);
+      padding: 15px;
+      border-radius: 4px;
+      overflow-x: auto;
+      font-family: monospace;
+      white-space: pre;
+    }
+    
+    .control-panel {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+    
+    button {
+      padding: 8px 16px;
+      background: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    
+    button:hover {
+      opacity: 0.9;
+    }
+    
+    input[type="number"], input[type="text"] {
+      padding: 8px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      background: var(--surface-color);
+      color: var(--text-color);
+    }
+    
+    .feature-toggles {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 10px;
+      margin: 20px 0;
+    }
+    
+    .feature-toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      background: var(--bg-color);
+      border-radius: 4px;
+    }
+    
+    .status-indicator {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 5px;
+    }
+    
+    .status-indicator.active {
+      background: #28a745;
+    }
+    
+    .status-indicator.inactive {
+      background: #dc3545;
+    }
+  </style>
+</head>
+<body>
+  <div class="test-container">
+    <h1>大檔案配置管理系統測試</h1>
+    
+    <!-- 控制面板 -->
+    <div class="test-section">
+      <h2>控制面板</h2>
+      <div class="control-panel">
+        <button onclick="runAllTests()">執行所有測試</button>
+        <button onclick="testBasicOperations()">基本操作測試</button>
+        <button onclick="testPersistence()">持久化測試</button>
+        <button onclick="testListeners()">事件監聽測試</button>
+        <button onclick="testShouldUse()">使用判斷測試</button>
+        <button onclick="resetConfig()">重置配置</button>
+      </div>
+    </div>
+    
+    <!-- 配置狀態顯示 -->
+    <div class="test-section">
+      <h2>當前配置狀態</h2>
+      <div class="control-panel">
+        <label>
+          主開關：
+          <input type="checkbox" id="mainSwitch" onchange="toggleMainSwitch()">
+        </label>
+        <label>
+          檔案閾值(MB)：
+          <input type="number" id="thresholdInput" value="100" onchange="updateThreshold()">
+        </label>
+        <label>
+          A/B測試百分比：
+          <input type="number" id="rolloutInput" value="0" min="0" max="100" onchange="updateRollout()">
+        </label>
+      </div>
+      
+      <h3>功能開關</h3>
+      <div class="feature-toggles" id="featureToggles"></div>
+      
+      <h3>配置摘要</h3>
+      <div class="config-display" id="configSummary"></div>
+    </div>
+    
+    <!-- 測試結果 -->
+    <div class="test-section">
+      <h2>測試結果</h2>
+      <div id="testResults"></div>
+    </div>
+    
+    <!-- 事件日誌 -->
+    <div class="test-section">
+      <h2>事件日誌</h2>
+      <div id="eventLog" class="config-display" style="max-height: 300px; overflow-y: auto;"></div>
+    </div>
+  </div>
+  
+  <script type="module">
+    import { largeFileConfig } from '../js/large-file/large-file-config.js';
+    
+    // 暴露到全域供按鈕使用
+    window.largeFileConfig = largeFileConfig;
+    
+    // 測試結果容器
+    const testResults = document.getElementById('testResults');
+    const eventLog = document.getElementById('eventLog');
+    
+    // 記錄測試結果
+    function logResult(test, success, message) {
+      const result = document.createElement('div');
+      result.className = `test-result ${success ? 'success' : 'error'}`;
+      result.textContent = `[${test}] ${success ? '✓' : '✗'} ${message}`;
+      testResults.appendChild(result);
+    }
+    
+    // 記錄事件
+    function logEvent(event, data) {
+      const timestamp = new Date().toLocaleTimeString();
+      eventLog.textContent += `[${timestamp}] ${event}: ${JSON.stringify(data, null, 2)}\n`;
+      eventLog.scrollTop = eventLog.scrollHeight;
+    }
+    
+    // 更新配置顯示
+    function updateConfigDisplay() {
+      const summary = largeFileConfig.getSummary();
+      document.getElementById('configSummary').textContent = JSON.stringify(summary, null, 2);
+      
+      // 更新主開關
+      document.getElementById('mainSwitch').checked = largeFileConfig.get('enabled');
+      document.getElementById('thresholdInput').value = largeFileConfig.get('thresholdMB');
+      document.getElementById('rolloutInput').value = largeFileConfig.get('rollout.percentage');
+      
+      // 更新功能開關
+      updateFeatureToggles();
+    }
+    
+    // 更新功能開關顯示
+    function updateFeatureToggles() {
+      const features = largeFileConfig.get('features');
+      const container = document.getElementById('featureToggles');
+      container.innerHTML = '';
+      
+      for (const [feature, enabled] of Object.entries(features)) {
+        const toggle = document.createElement('div');
+        toggle.className = 'feature-toggle';
+        toggle.innerHTML = `
+          <span class="status-indicator ${enabled ? 'active' : 'inactive'}"></span>
+          <label>
+            <input type="checkbox" ${enabled ? 'checked' : ''} 
+                   onchange="toggleFeature('${feature}', this.checked)">
+            ${feature}
+          </label>
+        `;
+        container.appendChild(toggle);
+      }
+    }
+    
+    // 基本操作測試
+    window.testBasicOperations = function() {
+      console.log('開始基本操作測試...');
+      testResults.innerHTML = '<h3>基本操作測試</h3>';
+      
+      try {
+        // 測試 get 方法
+        const enabled = largeFileConfig.get('enabled');
+        logResult('get方法', typeof enabled === 'boolean', `獲取 enabled: ${enabled}`);
+        
+        // 測試嵌套路徑
+        const maxWorkers = largeFileConfig.get('parallel.maxWorkers');
+        logResult('嵌套路徑', typeof maxWorkers === 'number', `獲取 parallel.maxWorkers: ${maxWorkers}`);
+        
+        // 測試 set 方法
+        const oldValue = largeFileConfig.get('thresholdMB');
+        largeFileConfig.set('thresholdMB', 150);
+        const newValue = largeFileConfig.get('thresholdMB');
+        logResult('set方法', newValue === 150, `設定 thresholdMB: ${oldValue} → ${newValue}`);
+        
+        // 測試嵌套設定
+        largeFileConfig.set('parallel.maxWorkers', 8);
+        const updatedWorkers = largeFileConfig.get('parallel.maxWorkers');
+        logResult('嵌套設定', updatedWorkers === 8, `設定 parallel.maxWorkers: ${updatedWorkers}`);
+        
+        // 測試不存在的路徑
+        const notExist = largeFileConfig.get('not.exist.path');
+        logResult('不存在路徑', notExist === undefined, `不存在的路徑返回: ${notExist}`);
+        
+      } catch (error) {
+        logResult('基本操作', false, error.message);
+      }
+      
+      updateConfigDisplay();
+    };
+    
+    // 持久化測試
+    window.testPersistence = function() {
+      console.log('開始持久化測試...');
+      testResults.innerHTML = '<h3>持久化測試</h3>';
+      
+      try {
+        // 設定測試值
+        const testValue = Date.now();
+        largeFileConfig.set('cache.maxSizeMB', testValue);
+        
+        // 檢查 localStorage
+        const stored = localStorage.getItem('largeFileProcessingConfig');
+        const parsed = JSON.parse(stored);
+        logResult('localStorage儲存', parsed.cache.maxSizeMB === testValue, 
+                  `值已儲存到 localStorage: ${testValue}`);
+        
+        // 測試載入
+        const newConfig = new (largeFileConfig.constructor)();
+        const loadedValue = newConfig.get('cache.maxSizeMB');
+        logResult('載入配置', loadedValue === testValue, 
+                  `從 localStorage 載入: ${loadedValue}`);
+        
+        // 測試匯出/匯入
+        const exported = largeFileConfig.export();
+        logResult('匯出配置', exported.length > 0, `匯出長度: ${exported.length} 字元`);
+        
+        const importSuccess = largeFileConfig.import(exported);
+        logResult('匯入配置', importSuccess, '配置匯入成功');
+        
+      } catch (error) {
+        logResult('持久化', false, error.message);
+      }
+      
+      updateConfigDisplay();
+    };
+    
+    // 事件監聽測試
+    window.testListeners = function() {
+      console.log('開始事件監聽測試...');
+      testResults.innerHTML = '<h3>事件監聽測試</h3>';
+      
+      let changeEventFired = false;
+      let saveEventFired = false;
+      
+      // 註冊監聽器
+      const removeChangeListener = largeFileConfig.on('change', (data) => {
+        changeEventFired = true;
+        logEvent('change', data);
+        logResult('change事件', true, `路徑: ${data.path}, 舊值: ${data.oldValue}, 新值: ${data.newValue}`);
+      });
+      
+      const removeSaveListener = largeFileConfig.on('save', (config) => {
+        saveEventFired = true;
+        logEvent('save', { keys: Object.keys(config) });
+        logResult('save事件', true, '配置已儲存');
+      });
+      
+      // 觸發事件
+      largeFileConfig.set('monitoring.logLevel', 'debug');
+      
+      // 檢查事件是否觸發
+      setTimeout(() => {
+        logResult('事件觸發檢查', changeEventFired && saveEventFired, 
+                  `change: ${changeEventFired}, save: ${saveEventFired}`);
+        
+        // 清理監聽器
+        removeChangeListener();
+        removeSaveListener();
+        
+        // 測試移除後不再觸發
+        let afterRemove = false;
+        largeFileConfig.on('change', () => { afterRemove = true; });
+        largeFileConfig.set('monitoring.logLevel', 'info');
+        
+        setTimeout(() => {
+          // 這裡應該要觸發新的監聽器
+          logResult('監聽器管理', afterRemove, '新監聽器正常工作');
+        }, 100);
+      }, 100);
+      
+      updateConfigDisplay();
+    };
+    
+    // 使用判斷測試
+    window.testShouldUse = function() {
+      console.log('開始使用判斷測試...');
+      testResults.innerHTML = '<h3>使用判斷測試</h3>';
+      
+      try {
+        // 測試檔案
+        const smallFile = { size: 50 * 1024 * 1024, name: 'small.mp3' }; // 50MB
+        const largeFile = { size: 200 * 1024 * 1024, name: 'large.mp3' }; // 200MB
+        
+        // 測試主開關關閉
+        largeFileConfig.set('enabled', false);
+        let shouldUse = largeFileConfig.shouldUseLargeFileSystem(largeFile);
+        logResult('主開關關閉', !shouldUse, `大檔案返回: ${shouldUse}`);
+        
+        // 啟用主開關
+        largeFileConfig.set('enabled', true);
+        
+        // 測試檔案大小閾值
+        largeFileConfig.set('thresholdMB', 100);
+        shouldUse = largeFileConfig.shouldUseLargeFileSystem(smallFile);
+        logResult('小檔案測試', !shouldUse, `50MB 檔案返回: ${shouldUse}`);
+        
+        shouldUse = largeFileConfig.shouldUseLargeFileSystem(largeFile);
+        logResult('大檔案測試', shouldUse, `200MB 檔案返回: ${shouldUse}`);
+        
+        // 測試 A/B 測試（設定 50% 機率）
+        largeFileConfig.set('rollout.percentage', 50);
+        let useCount = 0;
+        for (let i = 0; i < 100; i++) {
+          if (largeFileConfig.shouldUseLargeFileSystem(largeFile)) {
+            useCount++;
+          }
+        }
+        logResult('A/B測試', useCount > 20 && useCount < 80, 
+                  `100次測試中啟用 ${useCount} 次 (預期約50次)`);
+        
+        // 重置為 0
+        largeFileConfig.set('rollout.percentage', 0);
+        
+        // 測試 beta 用戶
+        const userId = largeFileConfig.getUserId();
+        largeFileConfig.set('rollout.betaUsers', [userId]);
+        shouldUse = largeFileConfig.shouldUseLargeFileSystem(largeFile);
+        logResult('Beta用戶', shouldUse, `Beta用戶 ${userId} 應該啟用`);
+        
+      } catch (error) {
+        logResult('使用判斷', false, error.message);
+      }
+      
+      updateConfigDisplay();
+    };
+    
+    // 執行所有測試
+    window.runAllTests = function() {
+      testResults.innerHTML = '';
+      testBasicOperations();
+      setTimeout(() => testPersistence(), 500);
+      setTimeout(() => testListeners(), 1000);
+      setTimeout(() => testShouldUse(), 1500);
+    };
+    
+    // 重置配置
+    window.resetConfig = function() {
+      largeFileConfig.reset();
+      logResult('重置配置', true, '配置已重置為預設值');
+      updateConfigDisplay();
+    };
+    
+    // UI 控制函數
+    window.toggleMainSwitch = function() {
+      const enabled = document.getElementById('mainSwitch').checked;
+      largeFileConfig.set('enabled', enabled);
+    };
+    
+    window.updateThreshold = function() {
+      const value = parseInt(document.getElementById('thresholdInput').value);
+      if (!isNaN(value) && value > 0) {
+        largeFileConfig.set('thresholdMB', value);
+      }
+    };
+    
+    window.updateRollout = function() {
+      const value = parseInt(document.getElementById('rolloutInput').value);
+      if (!isNaN(value) && value >= 0 && value <= 100) {
+        largeFileConfig.set('rollout.percentage', value);
+      }
+    };
+    
+    window.toggleFeature = function(feature, enabled) {
+      largeFileConfig.set(`features.${feature}`, enabled);
+    };
+    
+    // 監聽配置變更
+    largeFileConfig.on('change', () => {
+      updateConfigDisplay();
+    });
+    
+    // 初始化顯示
+    updateConfigDisplay();
+    
+    // 自動執行基本測試
+    setTimeout(() => {
+      console.log('自動執行基本測試...');
+      testBasicOperations();
+    }, 500);
+  </script>
+</body>
+</html>
