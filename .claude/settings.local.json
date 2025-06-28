@@ -19,7 +19,25 @@
       "Bash(mv:*)",
       "Bash(find:*)",
       "mcp__project-files__edit_file",
-      "mcp__project-files__write_file"
+      "mcp__project-files__write_file",
+      "mcp__github__search_repositories",
+      "mcp__github__get_file_contents",
+      "Bash(claude --version)",
+      "Bash(claude config --help)",
+      "Bash(cat:*)",
+      "Bash(claude config)",
+      "Bash(claude config list:*)",
+      "Bash(claude mcp)",
+      "Bash(claude mcp:*)",
+      "Bash(claude config get globalSettings.mcpServers)",
+      "Bash(npx:*)",
+      "Bash(dos2unix:*)",
+      "Bash(sed:*)",
+      "Bash(npm --version)",
+      "Bash(timeout 10 npx:*)",
+      "Bash(chmod:*)",
+      "Bash(bash:*)",
+      "Bash(touch:*)"
     ],
     "deny": []
   }
