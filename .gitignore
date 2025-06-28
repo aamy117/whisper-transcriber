@@ -1,6 +1,7 @@
 # API Keys
 .env
 config.local.js
+PROJECT_PLAN.md
 
 # OS files
 .DS_Store
@@ -9,6 +10,7 @@ Thumbs.db
 # Editor files
 .vscode/
 .idea/
+docs/
 
 # Video files
 *.mp4
@@ -33,6 +35,7 @@ temp/
 tmp/
 draft-*
 old-del/
+scripts/
 
 # 個人筆記
 *個人筆記*
