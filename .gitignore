@@ -31,6 +31,19 @@ test-audio/
 *.tmp
 temp/
 tmp/
+draft-*
+old-del/
+
+# 個人筆記
+*個人筆記*
+*私人*
+
+# 但保留重要文件
+!docs/
+
+# 工作區檔案
+_workspace/
+!_workspace/INDEX.md
 
 # Logs
 logs/

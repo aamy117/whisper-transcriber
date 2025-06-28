@@ -289,7 +289,7 @@ export class SmartSplitter {
         size: targetEnd - currentPosition,
         startTime: (currentPosition - 44) / bytesPerSecond,
         endTime: (targetEnd - 44) / bytesPerSecond,
-        file: this.createWAVSegment(file, currentPosition, targetEnd, analysis),
+        file: await this.createWAVSegment(file, currentPosition, targetEnd, analysis),
         metadata: {
           method: 'wav-sample-aligned',
           format: 'wav'
@@ -351,6 +351,7 @@ export class SmartSplitter {
   async createStreamer(file, options = {}) {
     const chunkSize = options.chunkSize || 10 * 1024 * 1024;
     const analysis = await this.streamAnalyzer.analyze(file);
+    const self = this; // 保存 this 引用
     
     let position = 0;
     let chunkIndex = 0;
@@ -373,7 +374,7 @@ export class SmartSplitter {
           
           // 對齊到格式邊界
           if (this.analysis.format === 'mp3' && end < this.file.size) {
-            end = await this.findMP3FrameBoundary(this.file, end, { searchRange: 0.05 });
+            end = await self.findMP3FrameBoundary(this.file, end, { searchRange: 0.05 });
           }
           
           const chunk = {
@@ -400,7 +401,7 @@ export class SmartSplitter {
         
         // 對齊到格式邊界
         if (analysis.format === 'mp3' && end < file.size) {
-          end = await this.findMP3FrameBoundary(file, end, { searchRange: 0.05 });
+          end = await self.findMP3FrameBoundary(file, end, { searchRange: 0.05 });
         }
         
         const chunk = file.slice(start, end);

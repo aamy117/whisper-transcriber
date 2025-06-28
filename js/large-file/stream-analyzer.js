@@ -415,6 +415,7 @@ export class StreamAnalyzer {
   async createStreamReader(file, options = {}) {
     const chunkSize = options.chunkSize || 1024 * 1024; // 預設 1MB
     let position = 0;
+    const self = this; // 保存 this 引用
     
     return {
       file,
@@ -427,7 +428,7 @@ export class StreamAnalyzer {
         }
         
         const end = Math.min(position + chunkSize, file.size);
-        const chunk = await this.readFileSlice(file, position, end);
+        const chunk = await self.readFileSlice(file, position, end);
         position = end;
         
         return {

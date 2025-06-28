@@ -37,7 +37,8 @@
       "Bash(timeout 10 npx:*)",
       "Bash(chmod:*)",
       "Bash(bash:*)",
-      "Bash(touch:*)"
+      "Bash(touch:*)",
+      "Bash(pkill:*)"
     ],
     "deny": []
   }
