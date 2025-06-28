@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartSplitter 測試</title>
+    <style>
+        body {
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .control-group {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .control-group input[type="number"] {
+            width: 100%;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        #fileInput {
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px dashed #ccc;
+            border-radius: 4px;
+            text-align: center;
+            cursor: pointer;
+        }
+        .segment-info {
+            background: #e8f4f8;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+        }
+        .progress-bar {
+            background: #e9ecef;
+            height: 30px;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        .progress-fill {
+            background: #28a745;
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        .results {
+            display: grid;
+            gap: 10px;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        .segment-download {
+            display: inline-block;
+            padding: 5px 10px;
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        .segment-download:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🔪 SmartSplitter 測試</h1>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label for="targetSize">目標分段大小 (MB)</label>
+                <input type="number" id="targetSize" value="25" min="1" max="100">
+            </div>
+            <div class="control-group">
+                <label for="overlap">重疊時長 (秒)</label>
+                <input type="number" id="overlap" value="2" min="0" max="10">
+            </div>
+            <div class="control-group">
+                <label for="smartSplit">
+                    <input type="checkbox" id="smartSplit" checked>
+                    啟用智慧分割（基於音訊框架）
+                </label>
+            </div>
+            <div class="control-group">
+                <label for="estimateOnly">
+                    <input type="checkbox" id="estimateOnly">
+                    僅估算（不實際分割）
+                </label>
+            </div>
+        </div>
+        
+        <div id="fileInput">
+            <input type="file" id="audioFile" accept="audio/*">
+            <p>選擇音訊檔案進行分割測試</p>
+        </div>
+        
+        <div class="progress-bar" style="display: none;">
+            <div class="progress-fill" id="progressFill">0%</div>
+        </div>
+        
+        <div id="results"></div>
+    </div>
+
+    <script type="module">
+        import { SmartSplitter } from './js/large-file/smart-splitter.js';
+        
+        const splitter = new SmartSplitter();
+        const resultsDiv = document.getElementById('results');
+        const progressBar = document.querySelector('.progress-bar');
+        const progressFill = document.getElementById('progressFill');
+        
+        document.getElementById('audioFile').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            resultsDiv.innerHTML = '';
+            
+            const targetSizeMB = parseInt(document.getElementById('targetSize').value);
+            const overlapSeconds = parseInt(document.getElementById('overlap').value);
+            const enableSmartSplit = document.getElementById('smartSplit').checked;
+            const estimateOnly = document.getElementById('estimateOnly').checked;
+            
+            try {
+                if (estimateOnly) {
+                    // 僅估算
+                    const estimate = await splitter.estimateSplitResult(file, {
+                        targetSizeMB,
+                        overlapSeconds,
+                        enableSmartSplit
+                    });
+                    
+                    resultsDiv.innerHTML = `
+                        <div class="success">
+                            <h3>📊 分割估算結果</h3>
+                            <pre>${JSON.stringify({
+                                檔案大小: `${(estimate.fileSize / 1024 / 1024).toFixed(2)} MB`,
+                                檔案格式: estimate.format,
+                                分割方法: estimate.method === 'smart' ? '智慧分割' : '簡單分割',
+                                預計分段數: estimate.estimatedSegments,
+                                每段大小: `${(estimate.segmentSize / 1024 / 1024).toFixed(2)} MB`,
+                                總時長: `${estimate.totalDuration} 秒`,
+                                每段時長: `${estimate.segmentDuration.toFixed(2)} 秒`
+                            }, null, 2)}</pre>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // 顯示進度條
+                progressBar.style.display = 'block';
+                progressFill.style.width = '0%';
+                progressFill.textContent = '0%';
+                
+                // 執行分割
+                const startTime = performance.now();
+                const segments = await splitter.split(file, {
+                    targetSizeMB,
+                    overlapSeconds,
+                    enableSmartSplit,
+                    onProgress: (progress) => {
+                        const percent = Math.round(progress * 100);
+                        progressFill.style.width = `${percent}%`;
+                        progressFill.textContent = `${percent}%`;
+                    }
+                });
+                
+                const splitTime = performance.now() - startTime;
+                
+                // 隱藏進度條
+                progressBar.style.display = 'none';
+                
+                // 顯示結果
+                let html = `
+                    <div class="success">
+                        <h3>✅ 分割完成</h3>
+                        <p>檔案: ${file.name}</p>
+                        <p>分段數: ${segments.length}</p>
+                        <p>分割時間: ${splitTime.toFixed(2)} ms</p>
+                    </div>
+                `;
+                
+                // 顯示每個分段的資訊
+                segments.forEach((segment, index) => {
+                    const url = URL.createObjectURL(segment.file);
+                    html += `
+                        <div class="segment-info">
+                            <h4>分段 ${segment.index + 1}</h4>
+                            <pre>${JSON.stringify({
+                                位置: `${segment.start} - ${segment.end}`,
+                                大小: `${(segment.size / 1024 / 1024).toFixed(2)} MB`,
+                                時間: segment.startTime ? 
+                                    `${segment.startTime.toFixed(2)}s - ${segment.endTime.toFixed(2)}s` : 
+                                    '未知',
+                                時長: segment.duration ? `${segment.duration.toFixed(2)} 秒` : '未知',
+                                方法: segment.metadata?.method || '未知'
+                            }, null, 2)}</pre>
+                            <a href="${url}" download="segment_${index + 1}.${file.name.split('.').pop()}" 
+                               class="segment-download">
+                                下載分段 ${index + 1}
+                            </a>
+                        </div>
+                    `;
+                });
+                
+                resultsDiv.innerHTML = html;
+                
+                // 測試串流分割器
+                if (file.size > 10 * 1024 * 1024) {
+                    const streamerDiv = document.createElement('div');
+                    streamerDiv.className = 'test-container';
+                    streamerDiv.innerHTML = '<h3>🌊 測試串流分割器</h3>';
+                    
+                    const streamer = await splitter.createStreamer(file, {
+                        chunkSize: 5 * 1024 * 1024 // 5MB chunks
+                    });
+                    
+                    let chunkCount = 0;
+                    const maxChunks = 3; // 只顯示前 3 個 chunks
+                    
+                    for await (const chunk of streamer.getChunks()) {
+                        if (chunkCount >= maxChunks) break;
+                        
+                        const chunkInfo = document.createElement('div');
+                        chunkInfo.className = 'segment-info';
+                        chunkInfo.innerHTML = `
+                            <h4>Chunk ${chunk.index + 1}</h4>
+                            <p>位置: ${chunk.start} - ${chunk.end}</p>
+                            <p>大小: ${(chunk.size / 1024 / 1024).toFixed(2)} MB</p>
+                            <p>進度: ${(chunk.progress * 100).toFixed(1)}%</p>
+                        `;
+                        streamerDiv.appendChild(chunkInfo);
+                        chunkCount++;
+                    }
+                    
+                    if (chunkCount === maxChunks) {
+                        const moreInfo = document.createElement('p');
+                        moreInfo.textContent = `... 還有更多 chunks (總共約 ${Math.ceil(file.size / (5 * 1024 * 1024))} 個)`;
+                        streamerDiv.appendChild(moreInfo);
+                    }
+                    
+                    document.body.appendChild(streamerDiv);
+                }
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <div class="error">
+                        <h3>❌ 分割失敗</h3>
+                        <p>${error.message}</p>
+                        <pre>${error.stack}</pre>
+                    </div>
+                `;
+                progressBar.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
