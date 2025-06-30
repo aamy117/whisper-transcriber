@@ -33,6 +33,28 @@ const defaultConfig = {
     concurrentSegments: 4      // 同時處理的分段數
   },
   
+  // 並行處理進階配置
+  parallelProcessing: {
+    maxWorkers: navigator.hardwareConcurrency || 4,
+    minWorkers: 2,             // 最小 Worker 數量
+    taskTimeout: 300000,       // 任務超時時間 (5分鐘)
+    idleTimeout: 60000,        // Worker 閒置超時 (1分鐘)
+    autoScale: true,           // 自動擴縮容
+    loadBalancing: 'roundRobin', // 負載平衡策略: 'roundRobin', 'leastBusy', 'random'
+    workerType: 'auto'         // Worker 類型: 'auto', 'wasm', 'api'
+  },
+  
+  // 錯誤處理配置
+  errorHandling: {
+    retryConfig: {
+      maxRetries: 3,
+      retryDelay: 1000,        // 重試延遲 (ms)
+      backoffMultiplier: 2     // 退避乘數
+    },
+    fallbackStrategy: 'skip', // 'skip', 'retry', 'manual'
+    errorThreshold: 0.1        // 錯誤率閾值 (10%)
+  },
+  
   // 記憶體管理配置
   memory: {
     maxMemoryUsageMB: 200,     // 最大記憶體使用量
@@ -344,7 +366,20 @@ export class LargeFileConfig {
 }
 
 // 建立單例實例
+let instance = null;
+
 export const largeFileConfig = new LargeFileConfig();
+
+// 獲取單例實例的方法
+export function getInstance() {
+  if (!instance) {
+    instance = new LargeFileConfig();
+  }
+  return instance;
+}
+
+// 為了相容性，同時匯出類別的靜態方法
+LargeFileConfig.getInstance = getInstance;
 
 // 匯出預設配置供參考
 export { defaultConfig };

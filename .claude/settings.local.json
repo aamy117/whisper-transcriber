@@ -38,7 +38,8 @@
       "Bash(chmod:*)",
       "Bash(bash:*)",
       "Bash(touch:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(./scripts/start-day.sh:*)"
     ],
     "deny": []
   }
