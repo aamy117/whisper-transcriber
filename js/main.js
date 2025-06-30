@@ -14,6 +14,7 @@ import { floatingCancelButton } from './floating-cancel-button.js';
 import { progressManager, showProcessingProgress } from './progress-manager.js';
 import { WhisperWASMManager } from './wasm/whisper-wasm-manager.js';
 import { preloadIndicator } from './preload-indicator.js';
+import { largeFileIntegration } from './large-file/large-file-integration.js';
 
 // 主應用程式類別
 class WhisperApp {
@@ -67,6 +68,9 @@ class WhisperApp {
     
     // 初始化 WASM 管理器和預載入
     this.initializeWASM();
+    
+    // 初始化大檔案處理系統
+    this.initializeLargeFileSystem();
 
     // 初始化編輯器
     const editorContainer = document.getElementById('editorContent');
@@ -539,6 +543,18 @@ class WhisperApp {
       DEBUG && console.error('WASM 初始化失敗:', error);
     }
   }
+  
+  // 初始化大檔案處理系統
+  async initializeLargeFileSystem() {
+    try {
+      const isEnabled = await largeFileIntegration.initialize();
+      if (isEnabled) {
+        DEBUG && console.log('大檔案處理系統已初始化');
+      }
+    } catch (error) {
+      DEBUG && console.error('大檔案處理系統初始化失敗:', error);
+    }
+  }
 
   // 主題管理
   setTheme(theme) {
@@ -726,6 +742,9 @@ class WhisperApp {
       } else if (preprocessResult.strategy === 'wasm') {
         stages.push('準備環境', '載入模型', '執行轉譯', '處理結果');
         totalStages = 4;
+      } else if (preprocessResult.strategy === 'large-file-system') {
+        stages.push('分析檔案', '智慧分割', '並行處理', '合併結果');
+        totalStages = 4;
       } else {
         stages.push('準備檔案', '執行轉譯', '處理結果');
         totalStages = 3;
@@ -840,6 +859,64 @@ class WhisperApp {
           }
           if (typeof DEBUG !== 'undefined' && DEBUG) console.error('WASM 轉譯失敗:', error);
           throw new Error(`本地轉譯失敗: ${error.message}`);
+        }
+      } else if (preprocessResult.strategy === 'large-file-system') {
+        // 使用新的大檔案處理系統
+        this.progressControl.setStage(currentStage++); // 分析檔案
+        this.progressControl.update(10, '分析音訊檔案...');
+        this.progressControl.addDetail('轉譯方式', '大檔案處理系統');
+        
+        floatingCancelButton.updateStatus('處理大檔案...');
+        
+        try {
+          // 檢查 API Key（大檔案系統需要 API）
+          if (!this.apiKey) {
+            this.showNotification('大檔案處理需要設定 API Key', 'error');
+            this.showModal(document.getElementById('settingsModal'));
+            throw new Error('缺少 API Key');
+          }
+          
+          // 初始化 API（如果還沒有）
+          if (!this.whisperAPI) {
+            this.whisperAPI = new WhisperAPI();
+          }
+          
+          // 關閉當前的進度控制（大檔案系統有自己的進度管理）
+          if (this.progressControl) {
+            this.progressControl.close();
+            this.progressControl = null;
+          }
+          
+          // 使用大檔案處理系統
+          const result = await largeFileIntegration.processLargeFile(preprocessResult.file, {
+            cancellationToken: this.transcriptionCancellationToken,
+            transcribeCallback: async (segment) => {
+              // 對每個片段調用 API 轉譯
+              return await this.whisperAPI.transcribe(segment.file, {
+                language: 'zh',
+                prompt: '以下是普通話的對話內容。',
+                skipSizeCheck: true,
+                signal: this.transcriptionCancellationToken.signal
+              });
+            }
+          });
+          
+          // 將結果格式化為標準格式
+          finalResult = {
+            text: result.text,
+            segments: result.segments,
+            language: 'zh',
+            duration: result.duration || 0,
+            method: 'large-file-system',
+            processingInfo: result.processingInfo
+          };
+          
+        } catch (error) {
+          if (error.name === 'CancellationError') {
+            throw error;
+          }
+          if (typeof DEBUG !== 'undefined' && DEBUG) console.error('大檔案處理失敗:', error);
+          throw new Error(`大檔案處理失敗: ${error.message}`);
         }
       } else {
         // 需要分段或壓縮處理 - 這些都需要 API

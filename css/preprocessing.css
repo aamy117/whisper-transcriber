@@ -485,3 +485,112 @@
     text-align: center;
   }
 }
+
+/* 大檔案處理系統選擇對話框樣式 */
+.large-file-system-choice {
+  padding: var(--spacing-md);
+}
+
+.large-file-system-choice .info-message {
+  margin-bottom: var(--spacing-lg);
+  padding: var(--spacing-md);
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: var(--radius-md);
+  color: var(--primary-color);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+[data-theme="dark"] .large-file-system-choice .info-message {
+  background: rgba(59, 130, 246, 0.2);
+}
+
+.system-comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-lg);
+  margin: var(--spacing-lg) 0;
+}
+
+.system-option {
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-lg);
+  border: 2px solid var(--border-color);
+  transition: all 0.3s;
+  background: var(--bg-secondary);
+}
+
+.system-option.new-system {
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, rgba(139, 92, 246, 0.05) 100%);
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
+[data-theme="dark"] .system-option.new-system {
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, rgba(139, 92, 246, 0.1) 100%);
+}
+
+.system-option.old-system {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+.system-option h4 {
+  margin: 0 0 var(--spacing-md) 0;
+  color: var(--text-primary);
+  font-size: 1.1rem;
+}
+
+.benefits-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.benefits-list li {
+  padding: var(--spacing-sm) 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  display: flex;
+  align-items: flex-start;
+}
+
+.benefits-list li:before {
+  margin-right: var(--spacing-sm);
+  flex-shrink: 0;
+  color: var(--success-color);
+}
+
+.system-option .estimate {
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.recommendation-note {
+  padding: var(--spacing-md);
+  background: rgba(251, 191, 36, 0.1);
+  border-radius: var(--radius-md);
+  border-left: 4px solid var(--warning-color);
+  margin-top: var(--spacing-lg);
+}
+
+[data-theme="dark"] .recommendation-note {
+  background: rgba(251, 191, 36, 0.2);
+}
+
+.recommendation-note p {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.recommendation-note strong {
+  color: var(--warning-color);
+}
+
+/* 響應式設計 - 大檔案系統選擇 */
+@media (max-width: 768px) {
+  .system-comparison {
+    grid-template-columns: 1fr;
+  }
+}

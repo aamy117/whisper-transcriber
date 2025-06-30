@@ -14,6 +14,7 @@ import { audioSplitter } from './audio-splitter.js';
 import { audioCompressor } from './audio-compressor.js';
 import { WhisperWASMManager } from './wasm/whisper-wasm-manager.js';
 import { progressManager } from './progress-manager.js';
+import { largeFileIntegration } from './large-file/large-file-integration.js';
 
 export class TranscriptionPreprocessor {
   constructor() {
@@ -81,6 +82,26 @@ export class TranscriptionPreprocessor {
 
     } else if (transcriptionMethod === 'api') {
       // API 轉譯流程
+
+      // 首先檢查是否應該使用新的大檔案處理系統
+      if (largeFileIntegration.shouldUseLargeFileSystem(file)) {
+        DEBUG && console.log('使用新的大檔案處理系統');
+        
+        // 取得處理建議
+        const recommendation = largeFileIntegration.getProcessingRecommendation(file);
+        
+        // 顯示建議給使用者
+        const useNewSystem = await this.showLargeFileSystemChoice(file, recommendation, cancellationToken);
+        
+        if (useNewSystem) {
+          // 使用新的大檔案處理系統
+          return {
+            strategy: 'large-file-system',
+            file: file,
+            recommendation: recommendation
+          };
+        }
+      }
 
       // 檢查檔案大小
       if (file.size <= this.maxFileSize) {
@@ -298,6 +319,112 @@ export class TranscriptionPreprocessor {
 
         closeModal();
         resolve(selectedMethod);
+      });
+    });
+  }
+
+  /**
+   * 顯示大檔案處理系統選擇對話框
+   * @param {File} file - 檔案
+   * @param {Object} recommendation - 處理建議
+   * @param {CancellationToken} cancellationToken - 取消令牌
+   */
+  async showLargeFileSystemChoice(file, recommendation, cancellationToken) {
+    const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
+    
+    const content = `
+      <div class="large-file-system-choice">
+        <p class="info-message">
+          檔案 <strong>${file.name}</strong> 大小為 ${fileSizeMB} MB，
+          建議使用新的大檔案處理系統。
+        </p>
+
+        <div class="system-comparison">
+          <div class="system-option new-system">
+            <h4>🚀 新的大檔案處理系統</h4>
+            <ul class="benefits-list">
+              ${recommendation.benefits.map(benefit => `<li>✓ ${benefit}</li>`).join('')}
+            </ul>
+            <p class="estimate">預估處理時間：約 ${recommendation.estimatedTime} 秒</p>
+          </div>
+          
+          <div class="system-option old-system">
+            <h4>📋 傳統處理方式</h4>
+            <ul class="benefits-list">
+              <li>✓ 簡單的分割或壓縮</li>
+              <li>✓ 適合較小的檔案</li>
+              <li>• 可能需要手動管理進度</li>
+              <li>• 無法暫停和恢復</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="recommendation-note">
+          <p><strong>建議：</strong>使用新系統以獲得最佳體驗</p>
+        </div>
+      </div>
+    `;
+
+    return new Promise((resolve, reject) => {
+      const overlay = document.createElement('div');
+      overlay.className = 'dialog-overlay';
+      overlay.style.zIndex = '10010';
+      overlay.innerHTML = `
+        <div class="dialog" style="max-width: 700px;">
+          <div class="dialog-header">
+            <h3>選擇處理方式</h3>
+          </div>
+          <div class="dialog-content">
+            ${content}
+          </div>
+          <div class="dialog-footer">
+            <button class="btn btn-secondary" id="useOldSystem">使用傳統方式</button>
+            <button class="btn btn-primary" id="useNewSystem">使用新系統（推薦）</button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(overlay);
+
+      // 添加顯示動畫
+      requestAnimationFrame(() => {
+        overlay.classList.add('show');
+      });
+
+      const closeModal = () => {
+        overlay.classList.remove('show');
+        setTimeout(() => {
+          if (overlay.parentNode) {
+            document.body.removeChild(overlay);
+          }
+        }, 300);
+      };
+
+      // 如果有取消令牌，監聽取消事件
+      let cancelHandler = null;
+      if (cancellationToken) {
+        cancelHandler = () => {
+          closeModal();
+          reject(new Error('使用者取消'));
+        };
+        cancellationToken.onCancel(cancelHandler);
+      }
+
+      // 綁定按鈕事件
+      overlay.querySelector('#useOldSystem').addEventListener('click', () => {
+        if (cancelHandler && cancellationToken) {
+          cancellationToken.offCancel(cancelHandler);
+        }
+        closeModal();
+        resolve(false);
+      });
+
+      overlay.querySelector('#useNewSystem').addEventListener('click', () => {
+        if (cancelHandler && cancellationToken) {
+          cancellationToken.offCancel(cancelHandler);
+        }
+        closeModal();
+        resolve(true);
       });
     });
   }

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>測試進度管理器修復</title>
+    <style>
+        body {
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        #output {
+            background: #f5f5f5;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>測試進度管理器 API 修復</h1>
+    
+    <button id="testProgress">測試進度顯示</button>
+    <button id="testLargeFile">測試大檔案處理（模擬）</button>
+    
+    <div id="output">等待測試...</div>
+    
+    <script type="module">
+        import { progressManager } from './js/progress-manager.js';
+        import { LargeFileIntegration } from './js/large-file/large-file-integration.js';
+        import { largeFileConfig } from './js/large-file/large-file-config.js';
+        
+        const output = document.getElementById('output');
+        
+        function log(msg) {
+            const time = new Date().toLocaleTimeString();
+            output.textContent += `[${time}] ${msg}\n`;
+            console.log(msg);
+        }
+        
+        // 測試進度管理器
+        document.getElementById('testProgress').addEventListener('click', () => {
+            log('測試進度管理器...');
+            
+            try {
+                const progress = progressManager.showProgress({
+                    title: '測試進度',
+                    message: '正在執行測試...',
+                    cancellable: true,
+                    onCancel: () => {
+                        log('進度被取消');
+                    }
+                });
+                
+                log('進度控制物件方法:');
+                for (const method in progress) {
+                    log(`  - ${method}: ${typeof progress[method]}`);
+                }
+                
+                // 測試更新
+                setTimeout(() => {
+                    progress.update(50, '處理到一半...');
+                    log('更新進度到 50%');
+                }, 1000);
+                
+                // 測試完成
+                setTimeout(() => {
+                    progress.complete();
+                    log('進度完成');
+                }, 2000);
+                
+            } catch (error) {
+                log(`錯誤: ${error.message}`);
+                console.error(error);
+            }
+        });
+        
+        // 測試大檔案處理
+        document.getElementById('testLargeFile').addEventListener('click', async () => {
+            log('測試大檔案處理（模擬）...');
+            
+            try {
+                // 啟用大檔案系統
+                await largeFileConfig.set('enabled', true);
+                log('已啟用大檔案處理系統');
+                
+                // 初始化
+                const integration = new LargeFileIntegration();
+                await integration.initialize();
+                log('系統初始化成功');
+                
+                // 建立模擬檔案
+                const mockFile = new File(['test content'], 'test.mp3', {
+                    type: 'audio/mp3',
+                    lastModified: Date.now()
+                });
+                
+                // 定義大小屬性
+                Object.defineProperty(mockFile, 'size', {
+                    value: 100 * 1024 * 1024, // 100MB
+                    writable: false
+                });
+                
+                log(`模擬檔案: ${mockFile.name} (${mockFile.size / 1024 / 1024} MB)`);
+                
+                // 檢查是否應使用大檔案系統
+                const shouldUse = integration.shouldUseLargeFileSystem(mockFile);
+                log(`應使用大檔案系統: ${shouldUse}`);
+                
+                if (shouldUse) {
+                    log('✅ progressManager API 修復成功！');
+                } else {
+                    log('⚠️ 檔案大小未達閾值，請調整配置');
+                }
+                
+            } catch (error) {
+                log(`錯誤: ${error.message}`);
+                console.error(error);
+            }
+        });
+    </script>
+</body>
+</html>

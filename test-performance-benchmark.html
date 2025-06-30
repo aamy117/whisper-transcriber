@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>效能基準測試 - 大檔案處理系統</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+            margin: 0 0 10px 0;
+        }
+        .subtitle {
+            color: #666;
+            font-size: 16px;
+        }
+        .card {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #666;
+            margin-top: 0;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 10px;
+        }
+        .control-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .control-group {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .control-group h3 {
+            margin: 0 0 10px 0;
+            color: #555;
+            font-size: 16px;
+        }
+        .checkbox-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .checkbox-group label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+        .checkbox-group input[type="checkbox"] {
+            cursor: pointer;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        button {
+            padding: 12px 24px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+        }
+        button:hover:not(:disabled) {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        button.secondary {
+            background: #6c757d;
+        }
+        button.secondary:hover:not(:disabled) {
+            background: #5a6268;
+        }
+        .progress-section {
+            margin: 20px 0;
+        }
+        .progress-container {
+            background: #e9ecef;
+            border-radius: 8px;
+            padding: 4px;
+            margin: 10px 0;
+            height: 40px;
+        }
+        .progress-bar {
+            background: linear-gradient(90deg, #007bff 0%, #0056b3 100%);
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            min-width: 40px;
+        }
+        .status-message {
+            color: #666;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .result-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+        }
+        .result-card.success {
+            border-left-color: #28a745;
+        }
+        .result-card.warning {
+            border-left-color: #ffc107;
+        }
+        .result-card.error {
+            border-left-color: #dc3545;
+        }
+        .result-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .result-metric {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            font-size: 14px;
+        }
+        .result-metric label {
+            color: #666;
+        }
+        .result-metric value {
+            font-weight: 500;
+            color: #333;
+        }
+        .chart-container {
+            margin: 20px 0;
+            height: 400px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        .summary-section {
+            background: #e3f2fd;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        .summary-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #1565c0;
+            margin-bottom: 15px;
+        }
+        .recommendation-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .recommendation-item {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            border-left: 4px solid #ffc107;
+        }
+        .recommendation-item.high {
+            border-left-color: #dc3545;
+        }
+        .recommendation-item.low {
+            border-left-color: #28a745;
+        }
+        .recommendation-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        .recommendation-text {
+            color: #666;
+            font-size: 14px;
+        }
+        .export-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .log {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 13px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .log-entry {
+            margin: 2px 0;
+        }
+        .log-entry.info {
+            color: #666;
+        }
+        .log-entry.success {
+            color: #28a745;
+        }
+        .log-entry.warning {
+            color: #ffc107;
+        }
+        .log-entry.error {
+            color: #dc3545;
+        }
+        /* 圖表樣式 */
+        canvas {
+            max-width: 100%;
+            height: auto !important;
+        }
+    </style>
+    <!-- Chart.js for visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 效能基準測試</h1>
+            <p class="subtitle">大檔案處理系統效能評估與優化</p>
+        </div>
+
+        <!-- 測試配置 -->
+        <div class="card">
+            <h2>⚙️ 測試配置</h2>
+            <div class="control-panel">
+                <div class="control-group">
+                    <h3>測試項目</h3>
+                    <div class="checkbox-group">
+                        <label>
+                            <input type="checkbox" id="testFileSize" checked>
+                            檔案大小測試
+                        </label>
+                        <label>
+                            <input type="checkbox" id="testWorkerCount" checked>
+                            Worker 數量測試
+                        </label>
+                        <label>
+                            <input type="checkbox" id="testChunkSize" checked>
+                            區塊大小測試
+                        </label>
+                        <label>
+                            <input type="checkbox" id="testConcurrency" checked>
+                            並發處理測試
+                        </label>
+                        <label>
+                            <input type="checkbox" id="testMemoryPressure" checked>
+                            記憶體壓力測試
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="control-group">
+                    <h3>測試參數</h3>
+                    <p>預設使用標準測試配置</p>
+                    <p style="font-size: 14px; color: #666;">
+                        • 檔案大小: 10MB - 500MB<br>
+                        • Worker 數量: 2, 4, 8, 16<br>
+                        • 區塊大小: 2MB - 25MB
+                    </p>
+                </div>
+                
+                <div class="control-group">
+                    <h3>系統資訊</h3>
+                    <p id="systemInfo" style="font-size: 14px; color: #666;">
+                        載入中...
+                    </p>
+                </div>
+            </div>
+            
+            <div class="button-group">
+                <button id="startBenchmark" onclick="startBenchmark()">
+                    開始基準測試
+                </button>
+                <button id="cancelBenchmark" class="secondary" onclick="cancelBenchmark()" disabled>
+                    取消測試
+                </button>
+            </div>
+        </div>
+
+        <!-- 進度顯示 -->
+        <div class="card" id="progressCard" style="display: none;">
+            <h2>📊 測試進度</h2>
+            <div class="progress-section">
+                <div class="progress-container">
+                    <div class="progress-bar" id="progressBar" style="width: 0%">
+                        0%
+                    </div>
+                </div>
+                <p class="status-message" id="statusMessage">準備開始測試...</p>
+            </div>
+            <div class="log" id="testLog"></div>
+        </div>
+
+        <!-- 即時結果 -->
+        <div class="card" id="resultsCard" style="display: none;">
+            <h2>📈 測試結果</h2>
+            <div class="results-grid" id="resultsGrid">
+                <!-- 動態生成結果卡片 -->
+            </div>
+        </div>
+
+        <!-- 效能圖表 -->
+        <div class="card" id="chartsCard" style="display: none;">
+            <h2>📊 效能分析圖表</h2>
+            
+            <!-- 檔案大小 vs 處理時間 -->
+            <div class="chart-container">
+                <canvas id="fileSizeChart"></canvas>
+            </div>
+            
+            <!-- Worker 數量 vs 吞吐量 -->
+            <div class="chart-container">
+                <canvas id="workerChart"></canvas>
+            </div>
+            
+            <!-- 區塊大小 vs 效能 -->
+            <div class="chart-container">
+                <canvas id="chunkSizeChart"></canvas>
+            </div>
+            
+            <!-- 記憶體使用趨勢 -->
+            <div class="chart-container">
+                <canvas id="memoryChart"></canvas>
+            </div>
+        </div>
+
+        <!-- 測試總結 -->
+        <div class="card" id="summaryCard" style="display: none;">
+            <h2>📋 測試總結與建議</h2>
+            <div class="summary-section">
+                <div class="summary-title">效能總結</div>
+                <div id="summaryContent">
+                    <!-- 動態生成總結內容 -->
+                </div>
+            </div>
+            
+            <div class="summary-section" style="background: #fff3cd; margin-top: 20px;">
+                <div class="summary-title" style="color: #856404;">優化建議</div>
+                <ul class="recommendation-list" id="recommendationList">
+                    <!-- 動態生成建議列表 -->
+                </ul>
+            </div>
+            
+            <div class="export-buttons">
+                <button onclick="exportJSON()">📄 JSON 報告</button>
+                <button onclick="exportCSV()">📊 CSV 資料</button>
+                <button onclick="exportHTML()">🌐 HTML 報告</button>
+                <button onclick="exportMarkdown()">📝 Markdown 文檔</button>
+                <button onclick="showSummary()">📋 執行摘要</button>
+                <button onclick="printReport()">🖨️ 列印</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { performanceBenchmark } from './js/large-file/performance-benchmark.js';
+        import { largeFileIntegration } from './js/large-file/large-file-integration.js';
+        import { reportExporter } from './js/large-file/report-exporter.js';
+        
+        // 全域變數
+        let currentBenchmark = null;
+        let benchmarkReport = null;
+        let charts = {};
+        
+        // 初始化
+        async function initialize() {
+            // 顯示系統資訊
+            displaySystemInfo();
+            
+            // 初始化大檔案系統
+            await largeFileIntegration.initialize();
+            
+            // 監聽進度事件
+            window.addEventListener('benchmark-progress', handleProgress);
+        }
+        
+        // 顯示系統資訊
+        function displaySystemInfo() {
+            const info = [];
+            
+            // CPU 核心數
+            info.push(`CPU 核心: ${navigator.hardwareConcurrency || '未知'}`);
+            
+            // 記憶體資訊
+            if (performance.memory) {
+                const limit = performance.memory.jsHeapSizeLimit;
+                info.push(`記憶體限制: ${formatSize(limit)}`);
+            }
+            
+            // WebAssembly 支援
+            info.push(`WebAssembly: ${typeof WebAssembly !== 'undefined' ? '支援' : '不支援'}`);
+            
+            // Worker 支援
+            info.push(`Web Workers: ${typeof Worker !== 'undefined' ? '支援' : '不支援'}`);
+            
+            document.getElementById('systemInfo').innerHTML = info.join('<br>');
+        }
+        
+        // 開始基準測試
+        window.startBenchmark = async function() {
+            // 取得測試配置
+            const options = {
+                testFileSize: document.getElementById('testFileSize').checked,
+                testWorkerCount: document.getElementById('testWorkerCount').checked,
+                testChunkSize: document.getElementById('testChunkSize').checked,
+                testConcurrency: document.getElementById('testConcurrency').checked,
+                testMemoryPressure: document.getElementById('testMemoryPressure').checked,
+            };
+            
+            // 檢查是否有選擇測試項目
+            if (!Object.values(options).some(v => v)) {
+                alert('請至少選擇一個測試項目');
+                return;
+            }
+            
+            // 更新 UI
+            document.getElementById('startBenchmark').disabled = true;
+            document.getElementById('cancelBenchmark').disabled = false;
+            document.getElementById('progressCard').style.display = 'block';
+            document.getElementById('resultsCard').style.display = 'block';
+            
+            // 清空之前的結果
+            document.getElementById('resultsGrid').innerHTML = '';
+            document.getElementById('testLog').innerHTML = '';
+            clearCharts();
+            
+            try {
+                // 確保系統已初始化
+                addLog('🔄 正在初始化測試環境...', 'info');
+                await largeFileIntegration.initialize();
+                
+                // 執行基準測試
+                currentBenchmark = performanceBenchmark;
+                benchmarkReport = await currentBenchmark.runFullBenchmark(options);
+                
+                // 確保報告有基本結構
+                if (!benchmarkReport) {
+                    throw new Error('基準測試未返回報告');
+                }
+                
+                // 顯示結果
+                if (benchmarkReport.results && benchmarkReport.results.length > 0) {
+                    displayResults(benchmarkReport);
+                } else {
+                    addLog('⚠️ 沒有測試結果', 'warning');
+                }
+                
+                // 顯示圖表
+                displayCharts(benchmarkReport);
+                
+                // 顯示總結
+                displaySummary(benchmarkReport);
+                
+                addLog('✅ 基準測試完成！', 'success');
+                
+            } catch (error) {
+                addLog(`❌ 測試失敗: ${error.message}`, 'error');
+                console.error('測試錯誤詳情:', error);
+                
+                // 建立錯誤報告
+                benchmarkReport = {
+                    timestamp: new Date().toISOString(),
+                    totalTests: 0,
+                    successfulTests: 0,
+                    failedTests: 0,
+                    results: [],
+                    error: error.message,
+                    summary: {},
+                    recommendations: []
+                };
+            } finally {
+                document.getElementById('startBenchmark').disabled = false;
+                document.getElementById('cancelBenchmark').disabled = true;
+            }
+        };
+        
+        // 取消測試
+        window.cancelBenchmark = function() {
+            // TODO: 實作取消邏輯
+            addLog('⚠️ 測試已取消', 'warning');
+            document.getElementById('startBenchmark').disabled = false;
+            document.getElementById('cancelBenchmark').disabled = true;
+        };
+        
+        // 處理進度更新
+        function handleProgress(event) {
+            const progress = event.detail;
+            const progressBar = document.getElementById('progressBar');
+            const percentage = progress.percentage || 0;
+            
+            progressBar.style.width = `${percentage}%`;
+            progressBar.textContent = `${percentage}%`;
+            
+            if (progress.message) {
+                document.getElementById('statusMessage').textContent = progress.message;
+            }
+        }
+        
+        // 顯示結果
+        function displayResults(report) {
+            const grid = document.getElementById('resultsGrid');
+            
+            report.results.forEach(result => {
+                const card = createResultCard(result);
+                grid.appendChild(card);
+            });
+        }
+        
+        // 建立結果卡片
+        function createResultCard(result) {
+            const card = document.createElement('div');
+            card.className = `result-card ${result.success ? 'success' : 'error'}`;
+            
+            // 根據效能評估狀態
+            if (result.success && result.config && result.config.expectedTime) {
+                const efficiency = result.config.expectedTime / result.processingTime;
+                if (efficiency < 0.8) card.className = 'result-card warning';
+            }
+            
+            card.innerHTML = `
+                <div class="result-title">${result.testName || '未命名測試'}</div>
+                <div class="result-metric">
+                    <label>測試類型:</label>
+                    <value>${result.testType || 'unknown'}</value>
+                </div>
+                <div class="result-metric">
+                    <label>檔案大小:</label>
+                    <value>${formatSize(result.fileSize || 0)}</value>
+                </div>
+                <div class="result-metric">
+                    <label>處理時間:</label>
+                    <value>${formatTime(result.processingTime || 0)}</value>
+                </div>
+                <div class="result-metric">
+                    <label>吞吐量:</label>
+                    <value>${result.throughput ? formatSize(result.throughput) + '/s' : 'N/A'}</value>
+                </div>
+                <div class="result-metric">
+                    <label>記憶體使用:</label>
+                    <value>${formatSize(result.memoryUsed || 0)}</value>
+                </div>
+                <div class="result-metric">
+                    <label>狀態:</label>
+                    <value style="color: ${result.success ? '#28a745' : '#dc3545'}">
+                        ${result.success ? '成功' : '失敗'}
+                    </value>
+                </div>
+            `;
+            
+            return card;
+        }
+        
+        // 顯示圖表
+        function displayCharts(report) {
+            document.getElementById('chartsCard').style.display = 'block';
+            
+            // 檔案大小 vs 處理時間圖表
+            createFileSizeChart(report);
+            
+            // Worker 數量 vs 吞吐量圖表
+            createWorkerChart(report);
+            
+            // 區塊大小 vs 效能圖表
+            createChunkSizeChart(report);
+            
+            // 記憶體使用圖表
+            createMemoryChart(report);
+        }
+        
+        // 建立檔案大小圖表
+        function createFileSizeChart(report) {
+            const ctx = document.getElementById('fileSizeChart').getContext('2d');
+            const fileSizeTests = report.results.filter(r => r.testType === 'fileSize');
+            
+            if (fileSizeTests.length === 0) {
+                console.warn('沒有檔案大小測試資料');
+                return;
+            }
+            
+            charts.fileSize = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: fileSizeTests.map(t => formatSize(t.fileSize)),
+                    datasets: [{
+                        label: '處理時間',
+                        data: fileSizeTests.map(t => t.processingTime / 1000),
+                        borderColor: '#007bff',
+                        backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                        yAxisID: 'y-time',
+                    }, {
+                        label: '吞吐量',
+                        data: fileSizeTests.map(t => t.throughput / 1024 / 1024),
+                        borderColor: '#28a745',
+                        backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                        yAxisID: 'y-throughput',
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '檔案大小 vs 效能'
+                        }
+                    },
+                    scales: {
+                        'y-time': {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: '處理時間 (秒)'
+                            }
+                        },
+                        'y-throughput': {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: '吞吐量 (MB/s)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 建立 Worker 圖表
+        function createWorkerChart(report) {
+            const ctx = document.getElementById('workerChart').getContext('2d');
+            const workerTests = report.results.filter(r => r.testType === 'workerCount');
+            
+            if (workerTests.length === 0) {
+                console.warn('沒有 Worker 數量測試資料');
+                return;
+            }
+            
+            charts.worker = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: workerTests.map(t => `${t.config.workerCount} Workers`),
+                    datasets: [{
+                        label: '吞吐量 (MB/s)',
+                        data: workerTests.map(t => t.throughput / 1024 / 1024),
+                        backgroundColor: '#007bff',
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Worker 數量 vs 吞吐量'
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 建立區塊大小圖表
+        function createChunkSizeChart(report) {
+            const ctx = document.getElementById('chunkSizeChart').getContext('2d');
+            const chunkTests = report.results.filter(r => r.testType === 'chunkSize');
+            
+            if (chunkTests.length === 0) {
+                console.warn('沒有區塊大小測試資料');
+                return;
+            }
+            
+            charts.chunk = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: chunkTests.map(t => formatSize(t.config.chunkSize)),
+                    datasets: [{
+                        label: '處理時間 (秒)',
+                        data: chunkTests.map(t => t.processingTime / 1000),
+                        backgroundColor: '#ffc107',
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '區塊大小 vs 處理時間'
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 建立記憶體圖表
+        function createMemoryChart(report) {
+            const ctx = document.getElementById('memoryChart').getContext('2d');
+            const memoryTest = report.results.find(r => r.testType === 'memoryPressure');
+            
+            if (memoryTest && memoryTest.memoryStats && memoryTest.memoryStats.readings && memoryTest.memoryStats.readings.length > 0) {
+                const readings = memoryTest.memoryStats.readings;
+                const startTime = readings[0].timestamp;
+                
+                charts.memory = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: readings.map(r => ((r.timestamp - startTime) / 1000).toFixed(1)),
+                        datasets: [{
+                            label: '記憶體使用 (MB)',
+                            data: readings.map(r => r.usage / 1024 / 1024),
+                            borderColor: '#dc3545',
+                            backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                            tension: 0.1,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: '記憶體使用趨勢'
+                            }
+                        },
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: '時間 (秒)'
+                                }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: '記憶體 (MB)'
+                                }
+                            }
+                        }
+                    }
+                });
+            } else {
+                // 如果沒有記憶體資料，顯示預設圖表
+                charts.memory = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: ['無資料'],
+                        datasets: [{
+                            label: '記憶體使用',
+                            data: [0],
+                            borderColor: '#dc3545',
+                            backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: '記憶體使用趨勢 (無資料)'
+                            }
+                        }
+                    }
+                });
+            }
+        }
+        
+        // 顯示總結
+        function displaySummary(report) {
+            document.getElementById('summaryCard').style.display = 'block';
+            
+            // 顯示總結內容
+            const summaryContent = document.getElementById('summaryContent');
+            const summary = report.summary;
+            
+            let html = '<div class="results-grid">';
+            
+            // 總體統計
+            html += `
+                <div class="result-card">
+                    <div class="result-title">總體統計</div>
+                    <div class="result-metric">
+                        <label>總測試數:</label>
+                        <value>${report.totalTests}</value>
+                    </div>
+                    <div class="result-metric">
+                        <label>成功測試:</label>
+                        <value style="color: #28a745">${report.successfulTests}</value>
+                    </div>
+                    <div class="result-metric">
+                        <label>失敗測試:</label>
+                        <value style="color: #dc3545">${report.failedTests}</value>
+                    </div>
+                </div>
+            `;
+            
+            // 最佳配置
+            if (summary.optimalWorkerCount || summary.optimalChunkSize) {
+                html += `
+                    <div class="result-card success">
+                        <div class="result-title">最佳配置</div>
+                        ${summary.optimalWorkerCount ? `
+                            <div class="result-metric">
+                                <label>Worker 數量:</label>
+                                <value>${summary.optimalWorkerCount}</value>
+                            </div>
+                        ` : ''}
+                        ${summary.optimalChunkSize ? `
+                            <div class="result-metric">
+                                <label>區塊大小:</label>
+                                <value>${formatSize(summary.optimalChunkSize)}</value>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }
+            
+            // 效能指標
+            if (summary.concurrencyEfficiency || summary.memoryEfficiency) {
+                html += `
+                    <div class="result-card">
+                        <div class="result-title">效能指標</div>
+                        ${summary.concurrencyEfficiency ? `
+                            <div class="result-metric">
+                                <label>並發效率:</label>
+                                <value>${summary.concurrencyEfficiency.toFixed(1)}%</value>
+                            </div>
+                        ` : ''}
+                        ${summary.memoryEfficiency ? `
+                            <div class="result-metric">
+                                <label>記憶體效率:</label>
+                                <value>${summary.memoryEfficiency.efficiency}</value>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }
+            
+            html += '</div>';
+            summaryContent.innerHTML = html;
+            
+            // 顯示建議
+            const recommendationList = document.getElementById('recommendationList');
+            recommendationList.innerHTML = '';
+            
+            report.recommendations.forEach(rec => {
+                const item = document.createElement('li');
+                item.className = `recommendation-item ${rec.priority}`;
+                item.innerHTML = `
+                    <div class="recommendation-title">${rec.suggestion}</div>
+                    <div class="recommendation-text">${rec.reason}</div>
+                `;
+                recommendationList.appendChild(item);
+            });
+        }
+        
+        // 清除圖表
+        function clearCharts() {
+            Object.values(charts).forEach(chart => {
+                if (chart) chart.destroy();
+            });
+            charts = {};
+        }
+        
+        // 添加日誌
+        function addLog(message, type = 'info') {
+            const log = document.getElementById('testLog');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        // 格式化函數
+        function formatSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        function formatTime(ms) {
+            if (ms < 1000) return `${ms} ms`;
+            if (ms < 60000) return `${(ms / 1000).toFixed(1)} 秒`;
+            return `${(ms / 60000).toFixed(1)} 分鐘`;
+        }
+        
+        // 匯出功能
+        window.exportJSON = function() {
+            if (!benchmarkReport) {
+                alert('請先執行基準測試');
+                return;
+            }
+            reportExporter.exportJSON(benchmarkReport);
+            addLog('📄 已匯出 JSON 報告', 'success');
+        };
+        
+        window.exportCSV = function() {
+            if (!benchmarkReport) {
+                alert('請先執行基準測試');
+                return;
+            }
+            reportExporter.exportCSV(benchmarkReport);
+            addLog('📊 已匯出 CSV 資料', 'success');
+        };
+        
+        window.exportHTML = function() {
+            if (!benchmarkReport) {
+                alert('請先執行基準測試');
+                return;
+            }
+            reportExporter.exportHTML(benchmarkReport);
+            addLog('🌐 已匯出 HTML 報告', 'success');
+        };
+        
+        window.exportMarkdown = function() {
+            if (!benchmarkReport) {
+                alert('請先執行基準測試');
+                return;
+            }
+            reportExporter.exportMarkdown(benchmarkReport);
+            addLog('📝 已匯出 Markdown 文檔', 'success');
+        };
+        
+        window.showSummary = async function() {
+            if (!benchmarkReport) {
+                alert('請先執行基準測試');
+                return;
+            }
+            const summary = reportExporter.generateExecutiveSummary(benchmarkReport);
+            const summaryText = JSON.stringify(summary, null, 2);
+            
+            // 顯示摘要對話框
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: white;
+                padding: 30px;
+                border-radius: 8px;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                max-width: 600px;
+                max-height: 80vh;
+                overflow-y: auto;
+                z-index: 10000;
+            `;
+            
+            modal.innerHTML = `
+                <h2 style="margin-top: 0;">📋 執行摘要</h2>
+                <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;">${summaryText}</pre>
+                <div style="margin-top: 20px; text-align: right;">
+                    <button onclick="this.parentElement.parentElement.remove()" style="margin-right: 10px;">關閉</button>
+                    <button onclick="copyExecutiveSummary()">複製到剪貼簿</button>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // 添加背景遮罩
+            const overlay = document.createElement('div');
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0,0,0,0.5);
+                z-index: 9999;
+            `;
+            overlay.onclick = () => {
+                modal.remove();
+                overlay.remove();
+            };
+            document.body.appendChild(overlay);
+            
+            window.copyExecutiveSummary = async () => {
+                const copied = await reportExporter.copyToClipboard(summaryText);
+                if (copied) {
+                    alert('已複製到剪貼簿！');
+                    addLog('📋 執行摘要已複製到剪貼簿', 'success');
+                } else {
+                    alert('複製失敗，請手動選擇複製');
+                }
+            };
+        };
+        
+        window.printReport = function() {
+            window.print();
+        };
+        
+        // 覆蓋 console.log 以顯示在日誌中
+        const originalLog = console.log;
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            const message = args.map(arg => 
+                typeof arg === 'object' ? JSON.stringify(arg) : arg
+            ).join(' ');
+            if (document.getElementById('testLog')) {
+                addLog(message, 'info');
+            }
+        };
+        
+        // 初始化
+        initialize();
+    </script>
+</body>
+</html>

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>測試效能優化器修復</title>
+    <style>
+        body {
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        #output {
+            background: #f5f5f5;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>測試效能優化器修復</h1>
+    
+    <button id="testOptimizer">測試 PerformanceOptimizer</button>
+    <button id="testController">測試 Controller recordPerformance</button>
+    
+    <div id="output">等待測試...</div>
+    
+    <script type="module">
+        import { PerformanceOptimizer } from './js/large-file/performance-optimizer.js';
+        import { LargeFileController } from './js/large-file/large-file-controller.js';
+        
+        const output = document.getElementById('output');
+        
+        function log(msg) {
+            const time = new Date().toLocaleTimeString();
+            output.textContent += `[${time}] ${msg}\n`;
+            console.log(msg);
+        }
+        
+        // 測試 PerformanceOptimizer
+        document.getElementById('testOptimizer').addEventListener('click', () => {
+            log('測試 PerformanceOptimizer...');
+            
+            try {
+                const optimizer = new PerformanceOptimizer();
+                
+                // 檢查方法
+                log(`recordProcessingPerformance 存在: ${typeof optimizer.recordProcessingPerformance === 'function'}`);
+                log(`recordMetrics 存在: ${typeof optimizer.recordMetrics === 'function'}`);
+                
+                // 測試 recordProcessingPerformance
+                const testMetric = {
+                    fileSize: 10 * 1024 * 1024, // 10MB
+                    duration: 5000, // 5秒
+                    chunkCount: 5
+                };
+                
+                optimizer.recordProcessingPerformance(testMetric);
+                log('recordProcessingPerformance 呼叫成功');
+                
+                // 檢查記錄的數據
+                log(`處理時間記錄數: ${optimizer.metrics.processingTimes.length}`);
+                log(`吞吐量記錄數: ${optimizer.metrics.throughput.length}`);
+                
+                log('✅ PerformanceOptimizer 測試通過');
+                
+            } catch (error) {
+                log(`錯誤: ${error.message}`);
+                console.error(error);
+            }
+        });
+        
+        // 測試 Controller
+        document.getElementById('testController').addEventListener('click', async () => {
+            log('測試 Controller recordPerformance...');
+            
+            try {
+                const controller = new LargeFileController();
+                
+                // 初始化子系統
+                await controller.initializeSubsystems();
+                log('子系統初始化完成');
+                
+                // 測試成功記錄
+                const successMetrics = {
+                    duration: 3000,
+                    fileSize: 5 * 1024 * 1024,
+                    strategy: 'smart-split',
+                    success: true,
+                    chunkCount: 3
+                };
+                
+                controller.recordPerformance('test-1', successMetrics);
+                log('成功指標記錄完成');
+                
+                // 測試失敗記錄
+                const failMetrics = {
+                    duration: 1000,
+                    fileSize: 2 * 1024 * 1024,
+                    error: 'Test error',
+                    success: false
+                };
+                
+                controller.recordPerformance('test-2', failMetrics);
+                log('失敗指標記錄完成（不應觸發 performanceOptimizer）');
+                
+                // 檢查 performanceOptimizer 狀態
+                if (controller.performanceOptimizer) {
+                    const times = controller.performanceOptimizer.metrics.processingTimes;
+                    log(`效能優化器記錄數: ${times.length}`);
+                    if (times.length > 0) {
+                        log(`最後一筆記錄: ${JSON.stringify(times[times.length - 1], null, 2)}`);
+                    }
+                }
+                
+                log('✅ Controller recordPerformance 修復成功！');
+                
+            } catch (error) {
+                log(`錯誤: ${error.message}`);
+                console.error(error);
+            }
+        });
+    </script>
+</body>
+</html>

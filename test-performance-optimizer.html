@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>效能優化器測試</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .card {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        h2 {
+            color: #666;
+            margin-top: 0;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .metric-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+        }
+        .metric-card.warning {
+            border-left-color: #ffc107;
+        }
+        .metric-card.danger {
+            border-left-color: #dc3545;
+        }
+        .metric-card.success {
+            border-left-color: #28a745;
+        }
+        .metric-label {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+        .metric-trend {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .recommendations {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+        .recommendation-item {
+            margin: 10px 0;
+            padding: 10px;
+            background: white;
+            border-radius: 4px;
+        }
+        .log {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #007bff;
+            padding-left: 10px;
+        }
+        .simulation-controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .simulation-button {
+            padding: 8px 16px;
+            background: #6c757d;
+            font-size: 14px;
+        }
+        .report-section {
+            white-space: pre-wrap;
+            font-family: monospace;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 效能優化器測試</h1>
+
+        <!-- 控制面板 -->
+        <div class="card">
+            <h2>控制面板</h2>
+            <div class="controls">
+                <button id="startBtn">開始監控</button>
+                <button id="stopBtn" disabled>停止監控</button>
+                <button id="resetBtn">重置指標</button>
+                <button id="reportBtn">生成報告</button>
+            </div>
+        </div>
+
+        <!-- 即時指標 -->
+        <div class="card">
+            <h2>即時效能指標</h2>
+            <div class="metrics-grid" id="metricsGrid">
+                <div class="metric-card">
+                    <div class="metric-label">記憶體使用率</div>
+                    <div class="metric-value" id="memoryUsage">--</div>
+                    <div class="metric-trend" id="memoryTrend">--</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Worker 效率</div>
+                    <div class="metric-value" id="workerEfficiency">--</div>
+                    <div class="metric-trend" id="workerCount">--</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">吞吐量</div>
+                    <div class="metric-value" id="throughput">--</div>
+                    <div class="metric-trend">MB/s</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">API 延遲</div>
+                    <div class="metric-value" id="apiLatency">--</div>
+                    <div class="metric-trend">ms</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 模擬控制 -->
+        <div class="card">
+            <h2>效能模擬</h2>
+            <div class="simulation-controls">
+                <button class="simulation-button" onclick="simulateHighMemory()">模擬高記憶體使用</button>
+                <button class="simulation-button" onclick="simulateLowThroughput()">模擬低吞吐量</button>
+                <button class="simulation-button" onclick="simulateWorkerErrors()">模擬 Worker 錯誤</button>
+                <button class="simulation-button" onclick="simulateHighLatency()">模擬高 API 延遲</button>
+                <button class="simulation-button" onclick="simulateNormalOperation()">模擬正常運作</button>
+            </div>
+        </div>
+
+        <!-- 優化建議 -->
+        <div class="card">
+            <h2>優化建議</h2>
+            <div id="recommendations" class="recommendations">
+                <p>等待監控資料...</p>
+            </div>
+        </div>
+
+        <!-- 效能報告 -->
+        <div class="card">
+            <h2>效能報告</h2>
+            <div id="report" class="report-section">
+                點擊「生成報告」按鈕查看詳細報告
+            </div>
+        </div>
+
+        <!-- 系統日誌 -->
+        <div class="card">
+            <h2>系統日誌</h2>
+            <div id="log" class="log"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { performanceOptimizer } from './js/large-file/performance-optimizer.js';
+
+        // UI 元素
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const reportBtn = document.getElementById('reportBtn');
+        const logDiv = document.getElementById('log');
+
+        // 監控狀態
+        let isMonitoring = false;
+        let updateTimer = null;
+
+        // 開始監控
+        startBtn.addEventListener('click', async () => {
+            await performanceOptimizer.startMonitoring();
+            isMonitoring = true;
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+            addLog('🟢 效能監控已啟動');
+            
+            // 開始定期更新 UI
+            updateTimer = setInterval(updateMetrics, 1000);
+        });
+
+        // 停止監控
+        stopBtn.addEventListener('click', () => {
+            performanceOptimizer.stopMonitoring();
+            isMonitoring = false;
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            addLog('🔴 效能監控已停止');
+            
+            if (updateTimer) {
+                clearInterval(updateTimer);
+                updateTimer = null;
+            }
+        });
+
+        // 重置指標
+        resetBtn.addEventListener('click', () => {
+            performanceOptimizer.resetMetrics();
+            addLog('🔄 效能指標已重置');
+            updateMetrics();
+        });
+
+        // 生成報告
+        reportBtn.addEventListener('click', () => {
+            const report = performanceOptimizer.generateReport();
+            document.getElementById('report').textContent = JSON.stringify(report, null, 2);
+            addLog('📊 效能報告已生成');
+        });
+
+        // 更新指標顯示
+        function updateMetrics() {
+            const summary = performanceOptimizer.getMetricsSummary();
+            
+            // 更新記憶體使用率
+            const memoryCard = document.querySelector('.metric-card:nth-child(1)');
+            const memoryUsage = summary.memoryUsage.avgUsage * 100;
+            document.getElementById('memoryUsage').textContent = `${memoryUsage.toFixed(1)}%`;
+            document.getElementById('memoryTrend').textContent = `趨勢: ${summary.memoryUsage.trend}`;
+            
+            // 更新卡片狀態
+            memoryCard.classList.remove('success', 'warning', 'danger');
+            if (summary.memoryUsage.status === 'critical') {
+                memoryCard.classList.add('danger');
+            } else if (summary.memoryUsage.status === 'warning') {
+                memoryCard.classList.add('warning');
+            } else {
+                memoryCard.classList.add('success');
+            }
+            
+            // 更新 Worker 效率
+            const workerCard = document.querySelector('.metric-card:nth-child(2)');
+            const workerEfficiency = summary.workerPerformance.avgEfficiency * 100;
+            document.getElementById('workerEfficiency').textContent = `${workerEfficiency.toFixed(1)}%`;
+            document.getElementById('workerCount').textContent = `最佳 Workers: ${summary.workerPerformance.optimalWorkerCount}`;
+            
+            workerCard.classList.remove('success', 'warning', 'danger');
+            if (summary.workerPerformance.status === 'poor') {
+                workerCard.classList.add('warning');
+            } else {
+                workerCard.classList.add('success');
+            }
+            
+            // 更新吞吐量
+            const throughputCard = document.querySelector('.metric-card:nth-child(3)');
+            const throughput = summary.throughput.avgThroughput / 1024 / 1024;
+            document.getElementById('throughput').textContent = throughput.toFixed(2);
+            
+            throughputCard.classList.remove('success', 'warning', 'danger');
+            if (summary.throughput.status === 'poor') {
+                throughputCard.classList.add('warning');
+            } else {
+                throughputCard.classList.add('success');
+            }
+            
+            // 更新 API 延遲
+            const latencyCard = document.querySelector('.metric-card:nth-child(4)');
+            const latency = summary.apiLatency.avgLatency;
+            document.getElementById('apiLatency').textContent = latency.toFixed(0);
+            
+            latencyCard.classList.remove('success', 'warning', 'danger');
+            if (summary.apiLatency.status === 'poor') {
+                latencyCard.classList.add('danger');
+            } else {
+                latencyCard.classList.add('success');
+            }
+            
+            // 更新優化建議
+            updateRecommendations(summary.recommendations);
+        }
+
+        // 更新優化建議
+        function updateRecommendations(recommendations) {
+            const recDiv = document.getElementById('recommendations');
+            recDiv.innerHTML = '';
+            
+            let hasRecommendations = false;
+            
+            if (recommendations.workerCount !== null) {
+                hasRecommendations = true;
+                recDiv.innerHTML += `
+                    <div class="recommendation-item">
+                        <strong>Worker 數量優化：</strong>
+                        建議調整為 ${recommendations.workerCount} 個 Workers
+                    </div>
+                `;
+            }
+            
+            if (recommendations.chunkSize !== null) {
+                hasRecommendations = true;
+                const size = recommendations.chunkSize / 1024 / 1024;
+                recDiv.innerHTML += `
+                    <div class="recommendation-item">
+                        <strong>區塊大小優化：</strong>
+                        建議調整為 ${size.toFixed(1)} MB
+                    </div>
+                `;
+            }
+            
+            if (recommendations.bufferSize !== null) {
+                hasRecommendations = true;
+                recDiv.innerHTML += `
+                    <div class="recommendation-item">
+                        <strong>緩衝區優化：</strong>
+                        建議${recommendations.bufferSize === 'reduce' ? '減小' : '增加'}緩衝區大小
+                    </div>
+                `;
+            }
+            
+            if (recommendations.cacheStrategy !== null) {
+                hasRecommendations = true;
+                recDiv.innerHTML += `
+                    <div class="recommendation-item">
+                        <strong>快取策略優化：</strong>
+                        建議使用${recommendations.cacheStrategy === 'aggressive' ? '積極' : '平衡'}的快取清理策略
+                    </div>
+                `;
+            }
+            
+            if (!hasRecommendations) {
+                recDiv.innerHTML = '<p>目前系統運作正常，暫無優化建議</p>';
+            }
+        }
+
+        // 添加日誌
+        function addLog(message) {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        // 監聽優化事件
+        window.addEventListener('performance-optimization', (event) => {
+            addLog('⚡ 收到效能優化建議');
+        });
+
+        // 模擬函數
+        window.simulateHighMemory = function() {
+            // 模擬高記憶體使用
+            const largeArray = new Array(10000000).fill(0);
+            performanceOptimizer.collectMetrics();
+            addLog('🔴 模擬高記憶體使用');
+            setTimeout(() => {
+                // 釋放記憶體
+                largeArray.length = 0;
+            }, 5000);
+        };
+
+        window.simulateLowThroughput = function() {
+            // 模擬低吞吐量
+            performanceOptimizer.recordProcessingPerformance({
+                fileSize: 1024 * 1024,  // 1MB
+                duration: 10000,         // 10秒
+                chunkCount: 10,
+            });
+            addLog('🟡 模擬低吞吐量處理');
+        };
+
+        window.simulateWorkerErrors = function() {
+            // 模擬 Worker 錯誤
+            for (let i = 0; i < 5; i++) {
+                performanceOptimizer.recordWorkerPerformance(`worker-${i}`, {
+                    type: 'error',
+                });
+            }
+            addLog('🔴 模擬 Worker 錯誤');
+        };
+
+        window.simulateHighLatency = function() {
+            // 模擬高 API 延遲
+            performanceOptimizer.metrics.apiLatency.push({
+                timestamp: Date.now(),
+                duration: 8000,  // 8秒
+                transferSize: 1024 * 1024,
+            });
+            addLog('🟡 模擬高 API 延遲');
+        };
+
+        window.simulateNormalOperation = function() {
+            // 模擬正常運作
+            for (let i = 0; i < 3; i++) {
+                performanceOptimizer.recordWorkerPerformance(`worker-${i}`, {
+                    type: 'task_complete',
+                    duration: 1000 + Math.random() * 2000,
+                });
+            }
+            
+            performanceOptimizer.recordProcessingPerformance({
+                fileSize: 10 * 1024 * 1024,  // 10MB
+                duration: 5000,               // 5秒
+                chunkCount: 10,
+            });
+            
+            addLog('🟢 模擬正常運作');
+        };
+
+        // 初始化
+        addLog('🚀 效能優化器測試頁面已載入');
+    </script>
+</body>
+</html>

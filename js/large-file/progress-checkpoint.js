@@ -164,6 +164,11 @@ export class ProgressCheckpoint {
    * 查找未完成的會話
    */
   async findUnfinishedSession(fileHash) {
+    // 確保資料庫已初始化
+    if (!this.db) {
+      await this.initialize();
+    }
+    
     return new Promise((resolve, reject) => {
       const transaction = this.db.transaction([this.storeName], 'readonly');
       const store = transaction.objectStore(this.storeName);
@@ -188,6 +193,11 @@ export class ProgressCheckpoint {
    * 保存會話
    */
   async saveSession(session) {
+    // 確保資料庫已初始化
+    if (!this.db) {
+      await this.initialize();
+    }
+    
     return new Promise((resolve, reject) => {
       session.updatedAt = Date.now();
       

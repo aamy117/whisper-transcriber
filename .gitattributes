@@ -1,0 +1,18 @@
+# 預設所有文字檔案使用 LF
+* text=auto
+
+# 指定 Markdown 檔案使用 LF
+*.md text eol=lf
+
+# 指定 Python 檔案使用 LF
+*.py text eol=lf
+
+# 二進位檔案不處理
+*.jpg binary
+*.png binary
+*.docx binary
+
+# 特定檔案類型的設定
+*.js text eol=lf
+*.md text eol=lf
+*.bat text eol=crlf

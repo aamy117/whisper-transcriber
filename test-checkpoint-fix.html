@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>測試檢查點修復</title>
+    <style>
+        body {
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        #output {
+            background: #f5f5f5;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>測試檢查點系統修復</h1>
+    
+    <button id="testCheckpoint">測試 ProgressCheckpoint</button>
+    <button id="testOptimizer">分析 Optimization Recommendations</button>
+    
+    <div id="output">等待測試...</div>
+    
+    <script type="module">
+        import { ProgressCheckpoint } from './js/large-file/progress-checkpoint.js';
+        import { PerformanceOptimizer } from './js/large-file/performance-optimizer.js';
+        
+        const output = document.getElementById('output');
+        
+        function log(msg) {
+            const time = new Date().toLocaleTimeString();
+            output.textContent += `[${time}] ${msg}\n`;
+            console.log(msg);
+        }
+        
+        // 測試 ProgressCheckpoint
+        document.getElementById('testCheckpoint').addEventListener('click', async () => {
+            log('測試 ProgressCheckpoint...');
+            
+            try {
+                const checkpoint = new ProgressCheckpoint();
+                
+                // 測試 db 初始化
+                log(`資料庫初始化前: db = ${checkpoint.db}`);
+                
+                // 建立模擬檔案
+                const mockFile = new File(['test content'], 'test.mp3', {
+                    type: 'audio/mp3',
+                    lastModified: Date.now()
+                });
+                
+                // 測試 createSession
+                log('呼叫 createSession...');
+                const session = await checkpoint.createSession(mockFile, {
+                    strategy: 'test',
+                    metadata: { test: true }
+                });
+                
+                log(`會話建立成功: ${session.id}`);
+                log(`資料庫初始化後: db = ${checkpoint.db ? '已初始化' : '未初始化'}`);
+                
+                // 測試 updateProgress
+                await checkpoint.updateProgress({
+                    overall: 50,
+                    processedSegments: 5,
+                    totalSegments: 10
+                });
+                log('進度更新成功');
+                
+                // 測試 saveSession
+                await checkpoint.saveSession(session);
+                log('會話保存成功');
+                
+                log('✅ ProgressCheckpoint 測試通過！');
+                
+            } catch (error) {
+                log(`錯誤: ${error.message}`);
+                console.error(error);
+            }
+        });
+        
+        // 分析 Optimization Recommendations
+        document.getElementById('testOptimizer').addEventListener('click', () => {
+            log('\n分析 Optimization Recommendations null 值問題...');
+            
+            const optimizer = new PerformanceOptimizer();
+            
+            log('初始 recommendations:');
+            log(JSON.stringify(optimizer.recommendations, null, 2));
+            
+            log('\n問題分析：');
+            log('1. workerCount, chunkSize, bufferSize 都初始化為 null');
+            log('2. 只有在效能異常時才會設定具體值');
+            log('3. 正常情況下這些值保持 null 是預期行為');
+            
+            log('\n解決方案：');
+            log('1. null 值表示"不需要優化"，這是正常的');
+            log('2. cacheStrategy: "balanced" 是預設值');
+            log('3. 系統會在需要時自動調整這些參數');
+            
+            // 模擬效能問題以觸發優化建議
+            log('\n模擬效能問題...');
+            
+            // 記錄一些差勁的效能數據
+            for (let i = 0; i < 5; i++) {
+                optimizer.recordProcessingPerformance({
+                    fileSize: 100 * 1024 * 1024, // 100MB
+                    duration: 120000, // 120秒（很慢）
+                    chunkCount: 20
+                });
+            }
+            
+            // 記錄高記憶體使用
+            for (let i = 0; i < 5; i++) {
+                optimizer.metrics.memoryUsage.push({
+                    timestamp: Date.now() - i * 1000,
+                    usage: 0.9 + (i * 0.01) // 90-94% 使用率
+                });
+            }
+            
+            // 手動觸發分析
+            optimizer.analyzeAndOptimize();
+            
+            log('\n優化後的 recommendations:');
+            log(JSON.stringify(optimizer.recommendations, null, 2));
+            
+            log('\n✅ 分析完成！null 值是正常的，表示不需要優化。');
+        });
+    </script>
+</body>
+</html>

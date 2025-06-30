@@ -264,6 +264,18 @@ export class LargeFileController {
    * 執行智慧分割策略
    */
   async executeSmartSplit(processId, file, params, onProgress) {
+    // 建立檢查點會話（如果啟用）
+    if (this.progressCheckpoint && this.config.get('features.checkpoints')) {
+      await this.progressCheckpoint.createSession(file, {
+        strategy: 'smart-split',
+        metadata: {
+          processId: processId,
+          chunkSize: params.chunkSize,
+          overlap: params.overlap
+        }
+      });
+    }
+    
     // 使用智慧分割器分割檔案
     const segments = await this.smartSplitter.split(file, {
       targetSize: params.chunkSize * 1024 * 1024,
@@ -287,12 +299,16 @@ export class LargeFileController {
       }
       
       // 儲存檢查點
-      if (this.progressCheckpoint) {
-        await this.progressCheckpoint.save(processId, {
-          fileId: file.name,
-          progress: i / segments.length,
-          completedSegments: i,
-          totalSegments: segments.length
+      if (this.progressCheckpoint && this.progressCheckpoint.currentSession) {
+        await this.progressCheckpoint.updateProgress({
+          overall: (i / segments.length) * 100,
+          processedSegments: i,
+          totalSegments: segments.length,
+          currentSegment: `segment_${i}`,
+          metadata: {
+            fileId: file.name,
+            processId: processId
+          }
         });
       }
       
@@ -308,6 +324,15 @@ export class LargeFileController {
       onProgress({
         stage: 'processing',
         progress: 0.3 + (0.7 * (i + 1) / segments.length)
+      });
+    }
+    
+    // 完成檢查點會話
+    if (this.progressCheckpoint && this.progressCheckpoint.currentSession) {
+      await this.progressCheckpoint.completeSession({
+        results: results,
+        segments: segments.length,
+        processingTime: performance.now() - this.activeProcesses.get(processId).startTime
       });
     }
     
@@ -434,8 +459,13 @@ export class LargeFileController {
     this.performanceMetrics.set(processId, metrics);
     
     // 通知效能優化器
-    if (this.performanceOptimizer) {
-      this.performanceOptimizer.recordMetrics(metrics);
+    if (this.performanceOptimizer && metrics.success) {
+      // 只在成功時記錄處理效能
+      this.performanceOptimizer.recordProcessingPerformance({
+        fileSize: metrics.fileSize,
+        duration: metrics.duration,
+        chunkCount: metrics.chunkCount || 1, // 預設為1如果沒有提供
+      });
     }
     
     // 在開發模式下輸出
