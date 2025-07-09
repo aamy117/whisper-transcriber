@@ -309,8 +309,9 @@ body {
 }
 
 .bookmark-btn .icon {
-  width: 16px;
-  height: 16px;
+  font-size: 16px;
+  line-height: 1;
+  display: inline-block;
 }
 
 .bookmark-btn .icon-text {
