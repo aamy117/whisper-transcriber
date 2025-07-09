@@ -363,6 +363,16 @@ body {
   border-color: #b45309;
 }
 
+/* 深色模式下跳轉按鈕的 hover 樣式修復 */
+[data-theme="dark"] .bookmark-btn:not(.bookmark-set):hover {
+  background-color: #374151;  /* 較淺的灰色背景 */
+  border-color: #6b7280;      /* 淺灰色邊框 */
+}
+
+[data-theme="dark"] .bookmark-btn:not(.bookmark-set):hover .icon-text {
+  color: #f3f4f6;  /* 淺色文字，確保可讀性 */
+}
+
 /* 隱藏元素的類別 */
 .hidden {
   display: none !important;
