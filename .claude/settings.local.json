@@ -39,7 +39,8 @@
       "Bash(bash:*)",
       "Bash(touch:*)",
       "Bash(pkill:*)",
-      "Bash(./scripts/start-day.sh:*)"
+      "Bash(./scripts/start-day.sh:*)",
+      "Bash(./scripts/end-day.sh:*)"
     ],
     "deny": []
   }

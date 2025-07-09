@@ -477,11 +477,11 @@ class WhisperApp {
       // 創建 WASM 管理器實例
       this.wasmManager = new WhisperWASMManager();
       
-      // 設定預載入配置
+      // 設定預載入配置 - 改為手動載入模式
       this.wasmManager.setPreloadConfig({
-        autoPreload: true,
-        preloadOnIdle: true,
-        preloadPriority: ['tiny', 'base', 'small']
+        autoPreload: false,      // 停用自動預載入
+        preloadOnIdle: false,    // 停用空閒時預載入
+        preloadPriority: ['tiny', 'base', 'small']  // 保留優先順序供手動使用
       });
       
       // 訂閱預載入事件（安全地）

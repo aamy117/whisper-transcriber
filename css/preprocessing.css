@@ -240,6 +240,45 @@
   color: var(--text-primary);
 }
 
+/* 模型快取狀態樣式 */
+.model-cached-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  background-color: var(--success-color);
+  color: white;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-left: var(--spacing-sm);
+}
+
+.model-download-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  background-color: var(--warning-color);
+  color: white;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-left: var(--spacing-sm);
+}
+
+.model-item.cached {
+  border-color: rgba(34, 197, 94, 0.3);
+  background-color: rgba(34, 197, 94, 0.05);
+}
+
+[data-theme="dark"] .model-item.cached {
+  background-color: rgba(34, 197, 94, 0.1);
+}
+
+.model-download-note {
+  margin: var(--spacing-sm) 0 0 0;
+  font-size: 0.813rem;
+  color: var(--warning-color);
+  font-style: italic;
+}
+
 /* WASM 選項特殊樣式 */
 .option-item[data-strategy="wasm"] {
   background: linear-gradient(135deg, var(--bg-secondary) 0%, rgba(139, 92, 246, 0.05) 100%);

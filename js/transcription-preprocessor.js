@@ -1003,26 +1003,38 @@ export class TranscriptionPreprocessor {
       { id: 'small', name: 'Small', size: '466MB', speed: '慢', accuracy: '高', description: '最佳品質，速度較慢' }
     ];
 
+    // 檢查每個模型是否已快取
+    const modelCacheStatus = {};
+    if (this.wasmManager) {
+      for (const model of models) {
+        modelCacheStatus[model.id] = await this.wasmManager.isModelCached(model.id);
+      }
+    }
+
     const content = `
       <div class="model-selection">
         <p>請選擇轉譯模型：</p>
         <div class="model-list">
-          ${models.map(model => `
-            <div class="model-item" data-model="${model.id}">
+          ${models.map(model => {
+            const isCached = modelCacheStatus[model.id];
+            return `
+            <div class="model-item ${isCached ? 'cached' : ''}" data-model="${model.id}">
               <div class="model-header">
                 <h4>${model.name}</h4>
                 <span class="model-size">${model.size}</span>
+                ${isCached ? '<span class="model-cached-badge">已下載</span>' : '<span class="model-download-badge">需下載</span>'}
               </div>
               <div class="model-info">
                 <span class="model-speed">速度：${model.speed}</span>
                 <span class="model-accuracy">準確度：${model.accuracy}</span>
               </div>
               <p class="model-desc">${model.description}</p>
+              ${!isCached ? '<p class="model-download-note">⬇️ 首次使用需要下載模型檔案</p>' : ''}
             </div>
-          `).join('')}
+          `}).join('')}
         </div>
         <p class="model-note">
-          <strong>注意：</strong>首次使用需要下載模型檔案，之後會從快取載入。
+          <strong>提示：</strong>已下載的模型可以立即使用，未下載的模型會在選擇後自動下載。
         </p>
       </div>
     `;
