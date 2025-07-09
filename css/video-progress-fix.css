@@ -74,3 +74,37 @@ video::-ms-media-controls-panel {
     border: none !important;
     outline: none !important;
 }
+
+/* 6. 修復滑塊（thumb）太大的問題 */
+.progress-thumb {
+    width: 6px !important;
+    height: 6px !important;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3) !important;
+}
+
+/* 確保 hover 時滑塊也不要太大 */
+.progress-container:hover .progress-thumb {
+    width: 8px !important;
+    height: 8px !important;
+}
+
+/* 如果有使用 input range 的情況 */
+.progress-slider::-webkit-slider-thumb {
+    width: 6px !important;
+    height: 6px !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    background-color: var(--primary-color, #3B82F6) !important;
+    border-radius: 50% !important;
+    cursor: pointer !important;
+}
+
+.progress-slider::-moz-range-thumb {
+    width: 6px !important;
+    height: 6px !important;
+    appearance: none !important;
+    background-color: var(--primary-color, #3B82F6) !important;
+    border-radius: 50% !important;
+    cursor: pointer !important;
+    border: none !important;
+}
