@@ -148,11 +148,12 @@
 
 .progress-container {
   position: relative;
-  height: 6px;
+  height: 4px;  /* 調整進度條粗細：從 6px 改為 4px */
   background-color: rgba(255, 255, 255, 0.2);
-  border-radius: 3px;
+  border-radius: 2px;  /* 相應調整圓角半徑 */
   cursor: pointer;
   margin-bottom: var(--spacing-sm);
+  transition: height 0.2s ease;  /* 添加過渡效果 */
 }
 
 .progress-buffered {
@@ -161,7 +162,7 @@
   left: 0;
   height: 100%;
   background-color: rgba(255, 255, 255, 0.4);
-  border-radius: 3px;
+  border-radius: 2px;  /* 調整圓角半徑以匹配容器 */
   width: 0%;
 }
 
@@ -171,7 +172,7 @@
   left: 0;
   height: 100%;
   background-color: var(--primary-color);
-  border-radius: 3px;
+  border-radius: 2px;  /* 調整圓角半徑以匹配容器 */
   width: 0%;
 }
 
@@ -179,11 +180,11 @@
   position: absolute;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: 14px;
-  height: 14px;
+  width: 12px;  /* 調整滑塊大小：從 14px 改為 12px */
+  height: 12px;
   background-color: var(--primary-color);
   border-radius: 50%;
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);  /* 調整陰影大小 */
   left: 0%;
   opacity: 0;
   transition: opacity 0.2s;
@@ -192,6 +193,11 @@
 .progress-container:hover .progress-thumb,
 .progress-slider:focus + .progress-thumb {
   opacity: 1;
+}
+
+/* hover 時稍微增加進度條高度，改善互動體驗 */
+.progress-container:hover {
+  height: 6px;  /* hover 時恢復到原本的高度 */
 }
 
 .progress-slider {
