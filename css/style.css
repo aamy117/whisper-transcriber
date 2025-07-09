@@ -314,13 +314,22 @@ body {
 }
 
 .bookmark-btn .icon-text {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
   color: #374151;
+  white-space: nowrap;
 }
 
 .bookmark-btn:disabled .icon-text {
   color: #9ca3af;
+}
+
+/* 跳轉按鈕需要更寬以顯示時間 */
+#gotoBookmark1Btn,
+#gotoBookmark2Btn {
+  width: auto;
+  min-width: 45px;
+  padding: 0 8px;
 }
 
 /* 標記點已設定時的樣式 */

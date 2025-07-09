@@ -494,6 +494,27 @@ export class AudioPlayer {
     return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
 
+  // 格式化簡短時間（用於按鈕顯示）
+  formatShortTime(seconds) {
+    const totalSeconds = Math.floor(seconds);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const secs = totalSeconds % 60;
+    
+    // 如果超過一小時，顯示 h:mm 格式
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, '0')}`;
+    }
+    // 如果分鐘數是個位數，顯示 m:ss 格式
+    else if (minutes < 10) {
+      return `${minutes}:${secs.toString().padStart(2, '0')}`;
+    }
+    // 否則只顯示分鐘數
+    else {
+      return `${minutes}m`;
+    }
+  }
+
   showError(message) {
     notify.error(message);
   }
@@ -557,11 +578,23 @@ export class AudioPlayer {
       this.elements.bookmark1Btn.title = `清除標記點 1 (${this.formatTime(this.bookmarks.point1)})`;
       this.elements.gotoBookmark1Btn.disabled = false;
       this.elements.gotoBookmark1Btn.title = `跳轉到標記點 1 (${this.formatTime(this.bookmarks.point1)})`;
+      
+      // 更新跳轉按鈕顯示的文字 - 使用簡短時間格式
+      const btnText1 = this.elements.gotoBookmark1Btn.querySelector('.icon-text');
+      if (btnText1) {
+        btnText1.textContent = this.formatShortTime(this.bookmarks.point1);
+      }
     } else {
       this.elements.bookmark1Btn.classList.remove('bookmark-set');
       this.elements.bookmark1Btn.title = '設定標記點 1';
       this.elements.gotoBookmark1Btn.disabled = true;
       this.elements.gotoBookmark1Btn.title = '跳轉到標記點 1';
+      
+      // 恢復顯示數字
+      const btnText1 = this.elements.gotoBookmark1Btn.querySelector('.icon-text');
+      if (btnText1) {
+        btnText1.textContent = '1';
+      }
     }
 
     // 更新標記按鈕 2
@@ -570,11 +603,23 @@ export class AudioPlayer {
       this.elements.bookmark2Btn.title = `清除標記點 2 (${this.formatTime(this.bookmarks.point2)})`;
       this.elements.gotoBookmark2Btn.disabled = false;
       this.elements.gotoBookmark2Btn.title = `跳轉到標記點 2 (${this.formatTime(this.bookmarks.point2)})`;
+      
+      // 更新跳轉按鈕顯示的文字 - 使用簡短時間格式
+      const btnText2 = this.elements.gotoBookmark2Btn.querySelector('.icon-text');
+      if (btnText2) {
+        btnText2.textContent = this.formatShortTime(this.bookmarks.point2);
+      }
     } else {
       this.elements.bookmark2Btn.classList.remove('bookmark-set');
       this.elements.bookmark2Btn.title = '設定標記點 2';
       this.elements.gotoBookmark2Btn.disabled = true;
       this.elements.gotoBookmark2Btn.title = '跳轉到標記點 2';
+      
+      // 恢復顯示數字
+      const btnText2 = this.elements.gotoBookmark2Btn.querySelector('.icon-text');
+      if (btnText2) {
+        btnText2.textContent = '2';
+      }
     }
   }
 
