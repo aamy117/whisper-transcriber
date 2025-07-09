@@ -456,24 +456,26 @@ export class AudioPlayer {
         }
         break;
       case '1':
-        if (!e.shiftKey && !e.ctrlKey) {
+        if (e.shiftKey) {
+          // Shift+1: 跳轉到標記點 1
+          e.preventDefault();
+          this.gotoBookmark(1);
+        } else if (!e.ctrlKey) {
+          // 單獨按 1: 設定標記點 1
           e.preventDefault();
           this.setBookmark(1);
         }
         break;
       case '2':
-        if (!e.shiftKey && !e.ctrlKey) {
+        if (e.shiftKey) {
+          // Shift+2: 跳轉到標記點 2
+          e.preventDefault();
+          this.gotoBookmark(2);
+        } else if (!e.ctrlKey) {
+          // 單獨按 2: 設定標記點 2
           e.preventDefault();
           this.setBookmark(2);
         }
-        break;
-      case '!':
-        e.preventDefault();
-        this.gotoBookmark(1);
-        break;
-      case '@':
-        e.preventDefault();
-        this.gotoBookmark(2);
         break;
     }
   }
