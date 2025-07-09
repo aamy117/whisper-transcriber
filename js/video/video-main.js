@@ -484,7 +484,11 @@ ${error.stack}
   }
 
   showHelp() {
-    // 檢查瀏覽器支援
+    // 開啟說明頁面並跳轉到視訊工具部分
+    window.open('help.html#video-tools', '_blank');
+    return;
+    
+    // 以下是原始的模態框程式碼（保留但不執行）
     const browserSupport = this.player?.constructor.checkBrowserSupport ? this.player.constructor.checkBrowserSupport() : {};
     let supportInfo = '<ul style="margin-left: 20px;">';
     for (const [format, support] of Object.entries(browserSupport)) {
