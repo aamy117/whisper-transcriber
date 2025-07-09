@@ -95,9 +95,34 @@ export class VideoFeaturesIntegration {
             if (e.key === 'Enter') addBookmark();
         });
 
-        // 匯入/匯出
-        document.getElementById('exportBookmarksBtn')?.addEventListener('click', () => {
-            this.timeBookmarks.exportBookmarks();
+        // 匯出下拉選單
+        const exportBtn = document.getElementById('exportBookmarksBtn');
+        const exportMenu = document.getElementById('exportMenu');
+        const exportDropdown = exportBtn?.closest('.export-dropdown');
+        
+        exportBtn?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            exportDropdown?.classList.toggle('active');
+            exportMenu?.classList.toggle('hidden');
+        });
+
+        // 點擊外部關閉選單
+        document.addEventListener('click', () => {
+            exportDropdown?.classList.remove('active');
+            exportMenu?.classList.add('hidden');
+        });
+
+        // 匯出選項
+        document.querySelectorAll('.export-option').forEach(option => {
+            option.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const format = option.dataset.format;
+                this.timeBookmarks.exportBookmarks(format);
+                
+                // 關閉選單
+                exportDropdown?.classList.remove('active');
+                exportMenu?.classList.add('hidden');
+            });
         });
         
         const importInput = document.getElementById('importBookmarkInput');

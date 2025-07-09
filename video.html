@@ -297,9 +297,20 @@
                                 <div class="bookmark-header">
                                     <h3>標記列表</h3>
                                     <div class="bookmark-actions">
-                                        <button class="btn btn-sm" id="exportBookmarksBtn" title="匯出標記">
-                                            <span class="icon">💾</span>
-                                        </button>
+                                        <div class="export-dropdown">
+                                            <button class="btn btn-sm" id="exportBookmarksBtn" title="匯出標記">
+                                                <span class="icon">💾</span>
+                                                <span class="dropdown-arrow">▼</span>
+                                            </button>
+                                            <div class="export-menu hidden" id="exportMenu">
+                                                <button class="export-option" data-format="youtube">
+                                                    <span class="icon">▶️</span> YouTube 章節
+                                                </button>
+                                                <button class="export-option" data-format="json">
+                                                    <span class="icon">📄</span> JSON (可重新匯入)
+                                                </button>
+                                            </div>
+                                        </div>
                                         <button class="btn btn-sm" id="importBookmarksBtn" title="匯入標記">
                                             <span class="icon">📁</span>
                                         </button>

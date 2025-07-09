@@ -20,11 +20,17 @@ class ExportManager {
         mimeType: 'text/plain',
         handler: this.exportToSrt.bind(this)
       },
-      'vtt': {
-        name: 'WebVTT 字幕檔',
-        extension: 'vtt',
-        mimeType: 'text/vtt',
-        handler: this.exportToVtt.bind(this)
+      'youtube': {
+        name: 'YouTube 時間戳',
+        extension: 'txt',
+        mimeType: 'text/plain',
+        handler: this.exportToYouTubeTimestamps.bind(this)
+      },
+      'markdown': {
+        name: 'Markdown 格式',
+        extension: 'md',
+        mimeType: 'text/markdown',
+        handler: this.exportToMarkdown.bind(this)
       }
     };
   }
@@ -96,28 +102,7 @@ class ExportManager {
       .join('\n');
   }
 
-  // WebVTT 字幕格式匯出
-  exportToVtt(segments) {
-    if (!segments || segments.length === 0) {
-      return 'WEBVTT\n\n';
-    }
-
-    // VTT 檔案必須以 WEBVTT 開頭
-    let content = 'WEBVTT\n\n';
-
-    content += segments
-      .map(segment => {
-        const start = this.formatVttTime(segment.start);
-        const end = this.formatVttTime(segment.end);
-        const text = segment.edited || segment.text || '';
-
-        // VTT 格式：時間 --> 時間，然後是文字
-        return `${start} --> ${end}\n${text}\n`;
-      })
-      .join('\n');
-
-    return content;
-  }
+  // [已移除 WebVTT 匯出方法]
 
   // 下載檔案
   download(content, filename, mimeType = 'text/plain') {
@@ -163,10 +148,76 @@ class ExportManager {
            `${ms.toString().padStart(3, '0')}`;
   }
 
-  // 格式化 VTT 時間（hh:mm:ss.mmm）
-  formatVttTime(seconds) {
-    // VTT 使用點(.)而不是逗號(,)
-    return this.formatSrtTime(seconds).replace(',', '.');
+  // [已移除 formatVttTime 方法 - VTT 格式已不再支援]
+
+  // YouTube 時間戳格式匯出
+  exportToYouTubeTimestamps(segments) {
+    if (!segments || segments.length === 0) {
+      return '00:00 開始';
+    }
+
+    const timestamps = [];
+    
+    // YouTube 格式要求從 00:00 開始
+    const hasStart = segments.some(seg => seg.start === 0);
+    if (!hasStart) {
+      timestamps.push('00:00 開始');
+    }
+
+    // 加入所有段落的時間戳
+    segments.forEach(segment => {
+      const time = this.formatYouTubeTime(segment.start);
+      const text = segment.edited || segment.text || '';
+      
+      // 取前 50 個字元作為標題（YouTube 限制）
+      const title = text.substring(0, 50).trim() || '段落';
+      timestamps.push(`${time} ${title}`);
+    });
+
+    // 複製到剪貼簿（如果支援）
+    const content = timestamps.join('\n');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(content).catch(() => {
+        // 失敗時不顯示錯誤，因為檔案會下載
+      });
+    }
+
+    return content;
+  }
+
+  // Markdown 格式匯出
+  exportToMarkdown(segments) {
+    if (!segments || segments.length === 0) {
+      return '# 轉譯結果\n\n暫無內容';
+    }
+
+    let markdown = '# 轉譯結果\n\n';
+    markdown += `**日期**：${new Date().toLocaleDateString()}\n`;
+    markdown += `**段落數**：${segments.length}\n\n`;
+    markdown += '---\n\n';
+
+    // 加入每個段落
+    segments.forEach((segment, index) => {
+      const time = this.formatTime(segment.start);
+      const text = segment.edited || segment.text || '';
+      
+      markdown += `## ${index + 1}. [${time}]\n\n`;
+      markdown += `${text}\n\n`;
+    });
+
+    return markdown;
+  }
+
+  // 格式化 YouTube 時間（不顯示小時如果是 0）
+  formatYouTubeTime(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    
+    if (hours > 0) {
+      return `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
 
   // 取得支援的格式列表

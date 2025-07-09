@@ -131,8 +131,19 @@ export class TimeBookmarks {
         }
     }
 
-    // 匯出書籤
-    exportBookmarks() {
+    // 匯出書籤（支援多種格式）
+    exportBookmarks(format = 'json') {
+        switch (format) {
+            case 'youtube':
+                return this.exportAsYouTubeChapters();
+            case 'json':
+            default:
+                return this.exportAsJSON();
+        }
+    }
+
+    // 匯出為 JSON 格式
+    exportAsJSON() {
         const data = {
             version: '1.0',
             exportDate: new Date().toISOString(),
@@ -149,6 +160,67 @@ export class TimeBookmarks {
         a.click();
         
         URL.revokeObjectURL(url);
+    }
+
+    // 匯出為 YouTube 章節格式
+    exportAsYouTubeChapters() {
+        const videoBookmarks = this.getBookmarksForCurrentVideo();
+        
+        if (videoBookmarks.length === 0) {
+            alert('沒有可匯出的時間標記');
+            return;
+        }
+
+        // YouTube 章節格式要求必須從 00:00 開始
+        let chapters = [];
+        
+        // 檢查是否有 00:00 的標記
+        const hasStartChapter = videoBookmarks.some(b => b.time === 0);
+        if (!hasStartChapter) {
+            chapters.push('00:00 開始');
+        }
+
+        // 加入所有標記，按時間排序
+        videoBookmarks.forEach(bookmark => {
+            const timeStr = this.formatTimeForYouTube(bookmark.time);
+            const title = bookmark.note || '未命名章節';
+            chapters.push(`${timeStr} ${title}`);
+        });
+
+        // 建立文字內容
+        const content = chapters.join('\n');
+        
+        // 建立下載
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `youtube-chapters-${this.getVideoName()}-${new Date().getTime()}.txt`;
+        a.click();
+        
+        URL.revokeObjectURL(url);
+
+        // 同時複製到剪貼簿（如果瀏覽器支援）
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(content).then(() => {
+                alert('YouTube 章節已複製到剪貼簿！\n您可以直接貼到 YouTube 影片描述中。');
+            }).catch(() => {
+                // 如果複製失敗，不顯示錯誤，因為檔案已經下載
+            });
+        }
+    }
+
+    // 格式化時間為 YouTube 格式（不顯示小時如果是 0）
+    formatTimeForYouTube(seconds) {
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = Math.floor(seconds % 60);
+        
+        if (h > 0) {
+            return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     }
 
     // 匯入書籤
