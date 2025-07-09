@@ -1,0 +1,74 @@
+/* 修復：移除視訊進度條的隱形滑動區 */
+
+/* 1. 限制進度條容器的實際高度 */
+.video-controls .controls-progress-area {
+    /* 移除多餘的空間 */
+    padding: 0 !important;
+    margin-bottom: 8px !important;
+}
+
+/* 2. 限制進度條點擊區域 */
+.video-controls .progress-container {
+    position: relative;
+    height: 3px !important;
+    /* 增加一點點點擊區域，但不要太多 */
+    padding: 4px 0 !important;
+    margin: -4px 0 !important;
+    overflow: visible !important;
+}
+
+/* 3. 隱藏或調整 range input */
+.video-controls .progress-slider {
+    /* 方案一：完全移除（需要 JavaScript 處理點擊） */
+    display: none !important;
+    
+    /* 方案二：如果需要保留功能，限制高度 */
+    /* height: 11px !important; */ /* 3px 進度條 + 8px padding */
+    /* top: -4px !important; */
+}
+
+/* 4. 確保進度條組件正確顯示 */
+.video-controls .progress-buffered,
+.video-controls .progress-played {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 3px !important;
+}
+
+/* 5. 調整滑塊位置 */
+.video-controls .progress-thumb {
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    /* 滑塊稍微小一點 */
+    width: 8px !important;
+    height: 8px !important;
+}
+
+/* 6. 如果使用方案二（保留 range input），調整其樣式 */
+.progress-slider::-webkit-slider-runnable-track {
+    height: 11px !important;
+    background: transparent !important;
+}
+
+.progress-slider::-moz-range-track {
+    height: 11px !important;
+    background: transparent !important;
+}
+
+/* 7. 移除 hover 時的高度變化 */
+.video-controls .progress-container:hover {
+    height: 3px !important;
+    /* 保持相同高度，不要變化 */
+}
+
+/* 8. 調整整個控制列的間距 */
+.video-controls {
+    /* 減少底部 padding，因為進度條區域變小了 */
+    padding-bottom: 12px !important;
+}
+
+/* 9. 確保時間顯示不會太靠近進度條 */
+.video-controls .time-display {
+    margin-top: 4px !important;
+}

@@ -19,6 +19,8 @@
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/video.css">
     <link rel="stylesheet" href="css/video-progress-fix.css">
+    <link rel="stylesheet" href="css/video-progress-no-transparent-fix.css">
+    <link rel="stylesheet" href="css/video-features.css">
 </head>
 
 <body>
@@ -227,12 +229,93 @@
 
                     <!-- 字幕面板 -->
                     <div class="panel-content hidden" id="subtitlesPanel">
-                        <p class="panel-placeholder">字幕功能開發中...</p>
+                        <div class="subtitle-search">
+                            <!-- 字幕上傳 -->
+                            <div class="subtitle-upload">
+                                <h3>字幕檔案</h3>
+                                <div class="upload-area" id="subtitleUploadArea">
+                                    <input type="file" id="subtitleInput" accept=".srt,.vtt" hidden>
+                                    <button class="btn btn-secondary" id="uploadSubtitleBtn">
+                                        <span class="icon">📄</span> 上傳字幕
+                                    </button>
+                                    <span class="subtitle-filename" id="subtitleFileName">尚未載入字幕</span>
+                                </div>
+                            </div>
+
+                            <!-- 搜尋功能 -->
+                            <div class="search-section">
+                                <h3>搜尋字幕</h3>
+                                <div class="search-box">
+                                    <input type="text" id="subtitleSearchInput" 
+                                           placeholder="輸入關鍵字搜尋..." 
+                                           class="search-input">
+                                    <button class="btn btn-primary" id="subtitleSearchBtn">
+                                        <span class="icon">🔍</span> 搜尋
+                                    </button>
+                                </div>
+                                
+                                <!-- 搜尋控制 -->
+                                <div class="search-controls hidden" id="searchControls">
+                                    <button class="btn btn-sm" id="prevResultBtn">
+                                        <span class="icon">⬅️</span> 上一個
+                                    </button>
+                                    <span class="search-info" id="searchInfo">0 / 0</span>
+                                    <button class="btn btn-sm" id="nextResultBtn">
+                                        下一個 <span class="icon">➡️</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- 搜尋結果 -->
+                            <div class="search-results" id="searchResults">
+                                <!-- 動態生成結果 -->
+                            </div>
+                        </div>
                     </div>
 
                     <!-- 標記面板 -->
                     <div class="panel-content hidden" id="bookmarksPanel">
-                        <p class="panel-placeholder">標記功能開發中...</p>
+                        <div class="time-bookmarks">
+                            <!-- 新增標記 -->
+                            <div class="bookmark-add">
+                                <h3>新增時間標記</h3>
+                                <div class="bookmark-form">
+                                    <input type="text" id="bookmarkNote" 
+                                           placeholder="輸入備註（選填）..." 
+                                           class="bookmark-input">
+                                    <button class="btn btn-primary" id="addBookmarkBtn">
+                                        <span class="icon">🔖</span> 標記目前時間
+                                    </button>
+                                </div>
+                                <div class="current-time-info">
+                                    目前時間：<span id="currentTimeDisplay">00:00</span>
+                                </div>
+                            </div>
+
+                            <!-- 標記列表 -->
+                            <div class="bookmark-list-section">
+                                <div class="bookmark-header">
+                                    <h3>標記列表</h3>
+                                    <div class="bookmark-actions">
+                                        <button class="btn btn-sm" id="exportBookmarksBtn" title="匯出標記">
+                                            <span class="icon">💾</span>
+                                        </button>
+                                        <button class="btn btn-sm" id="importBookmarksBtn" title="匯入標記">
+                                            <span class="icon">📁</span>
+                                        </button>
+                                        <button class="btn btn-sm btn-danger" id="clearBookmarksBtn" title="清除標記">
+                                            <span class="icon">🗑️</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="bookmark-list" id="bookmarkList">
+                                    <!-- 動態生成標記列表 -->
+                                </div>
+                                
+                                <input type="file" id="importBookmarkInput" accept=".json" hidden>
+                            </div>
+                        </div>
                     </div>
                 </aside>
             </div>
@@ -241,6 +324,7 @@
 
     <!-- Scripts -->
     <script type="module" src="js/video/video-main.js"></script>
+    <script src="js/video-progress-click-handler.js"></script>
 </body>
 
 </html>

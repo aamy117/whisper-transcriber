@@ -1,0 +1,333 @@
+/* 字幕搜尋和時間標記功能樣式 */
+
+/* === 字幕搜尋樣式 === */
+.subtitle-search {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+    height: 100%;
+}
+
+/* 字幕上傳區域 */
+.subtitle-upload {
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: var(--spacing-md);
+}
+
+.subtitle-upload h3 {
+    font-size: 1rem;
+    margin-bottom: var(--spacing-sm);
+    color: var(--text-primary);
+}
+
+.upload-area {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.subtitle-filename {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+/* 搜尋區域 */
+.search-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.search-section h3 {
+    font-size: 1rem;
+    color: var(--text-primary);
+}
+
+.search-box {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+.search-input {
+    flex: 1;
+    padding: var(--spacing-sm);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+/* 搜尋控制按鈕 */
+.search-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-sm);
+    background-color: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+}
+
+.search-info {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    min-width: 60px;
+    text-align: center;
+}
+
+/* 搜尋結果 */
+.search-results {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.search-result-item {
+    padding: var(--spacing-sm);
+    background-color: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.search-result-item:hover {
+    background-color: var(--bg-secondary);
+    transform: translateX(4px);
+}
+
+.search-result-item.active {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.result-time {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--primary-color);
+    margin-bottom: 4px;
+}
+
+.search-result-item.active .result-time {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.result-text {
+    font-size: 0.875rem;
+    line-height: 1.4;
+}
+
+.result-highlight {
+    background-color: rgba(var(--primary-rgb), 0.3);
+    padding: 0 2px;
+    border-radius: 2px;
+}
+
+/* === 時間標記樣式 === */
+.time-bookmarks {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+    height: 100%;
+}
+
+/* 新增標記區域 */
+.bookmark-add {
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: var(--spacing-md);
+}
+
+.bookmark-add h3 {
+    font-size: 1rem;
+    margin-bottom: var(--spacing-sm);
+    color: var(--text-primary);
+}
+
+.bookmark-form {
+    display: flex;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+}
+
+.bookmark-input {
+    flex: 1;
+    padding: var(--spacing-sm);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+}
+
+.bookmark-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.current-time-info {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+/* 標記列表 */
+.bookmark-list-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.bookmark-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+}
+
+.bookmark-header h3 {
+    font-size: 1rem;
+    color: var(--text-primary);
+}
+
+.bookmark-actions {
+    display: flex;
+    gap: var(--spacing-xs);
+}
+
+.bookmark-list {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+/* 標記項目 */
+.bookmark-item {
+    display: flex;
+    align-items: start;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm);
+    background-color: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+    transition: all 0.2s;
+}
+
+.bookmark-item:hover {
+    background-color: var(--bg-secondary);
+}
+
+.bookmark-time {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--primary-color);
+    cursor: pointer;
+    min-width: 60px;
+}
+
+.bookmark-time:hover {
+    text-decoration: underline;
+}
+
+.bookmark-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.bookmark-note {
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    line-height: 1.4;
+}
+
+.bookmark-date {
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+}
+
+.bookmark-delete {
+    padding: 4px;
+    background: none;
+    border: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition: all 0.2s;
+}
+
+.bookmark-delete:hover {
+    background-color: rgba(var(--danger-rgb), 0.1);
+    color: var(--danger-color);
+}
+
+/* 空狀態 */
+.empty-state {
+    text-align: center;
+    padding: var(--spacing-xl);
+    color: var(--text-tertiary);
+}
+
+.empty-state .icon {
+    font-size: 3rem;
+    opacity: 0.5;
+    margin-bottom: var(--spacing-md);
+}
+
+.empty-state p {
+    font-size: 0.875rem;
+}
+
+/* 通用按鈕樣式 */
+.btn-sm {
+    padding: 4px 12px;
+    font-size: 0.875rem;
+}
+
+.btn-danger {
+    background-color: var(--danger-color);
+}
+
+.btn-danger:hover {
+    background-color: var(--danger-hover);
+}
+
+/* 深色模式調整 */
+[data-theme="dark"] .search-result-item {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .search-result-item:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .bookmark-item {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .bookmark-item:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+/* 響應式設計 */
+@media (max-width: 768px) {
+    .search-box,
+    .bookmark-form {
+        flex-direction: column;
+    }
+    
+    .bookmark-actions {
+        flex-wrap: wrap;
+    }
+}

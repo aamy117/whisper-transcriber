@@ -6,11 +6,13 @@ import VideoConfig from './video-config.js';
 import { VideoPlayer } from './video-player.js';
 import { VideoUI } from './video-ui.js';
 import domReadyManager from './dom-ready-manager.js';
+import { VideoFeaturesIntegration } from './video-features-integration.js';
 
 class VideoApp {
   constructor() {
     this.player = null;
     this.ui = null;
+    this.features = null;
     this.currentProject = null;
     this.isInitialized = false;
     this.initPromise = null;
@@ -109,6 +111,10 @@ class VideoApp {
       this.ui = new VideoUI(this.player);
       this.initStages.uiCreated = true;
 
+      // 創建新功能整合（字幕搜尋和時間標記）
+      DEBUG && console.log('  創建 VideoFeaturesIntegration...');
+      this.features = new VideoFeaturesIntegration(videoElement);
+      
       DEBUG && console.log('✅ 核心組件創建完成');
     } catch (error) {
       throw new Error(`組件創建失敗: ${error.message}`);

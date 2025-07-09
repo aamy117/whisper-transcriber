@@ -40,7 +40,13 @@
       "Bash(touch:*)",
       "Bash(pkill:*)",
       "Bash(./scripts/start-day.sh:*)",
-      "Bash(./scripts/end-day.sh:*)"
+      "Bash(./scripts/end-day.sh:*)",
+      "WebFetch(domain:aamy117.github.io)",
+      "Bash(echo:*)",
+      "mcp__puppeteer__puppeteer_navigate",
+      "WebFetch(domain:github.com)",
+      "Bash(sudo lsof:*)",
+      "Bash(ss:*)"
     ],
     "deny": []
   }
