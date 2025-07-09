@@ -335,17 +335,32 @@ body {
 
 /* 標記點已設定時的樣式 */
 .bookmark-btn.bookmark-set {
-  background-color: #ef4444;
-  border-color: #ef4444;
+  background-color: #fef3c7;  /* 淺黃色背景 */
+  border-color: #fbbf24;      /* 黃色邊框 */
 }
 
 .bookmark-btn.bookmark-set .icon {
-  color: white;
+  color: #d97706;  /* 深黃色圖示 */
 }
 
 .bookmark-btn.bookmark-set:hover {
-  background-color: #dc2626;
-  border-color: #dc2626;
+  background-color: #fde68a;  /* hover 時稍微深一點的黃色 */
+  border-color: #f59e0b;      /* hover 時邊框顏色 */
+}
+
+/* 深色模式下的標記點樣式 */
+[data-theme="dark"] .bookmark-btn.bookmark-set {
+  background-color: #78350f;  /* 深色模式下的深黃褐色 */
+  border-color: #92400e;
+}
+
+[data-theme="dark"] .bookmark-btn.bookmark-set .icon {
+  color: #fbbf24;  /* 深色模式下的亮黃色 */
+}
+
+[data-theme="dark"] .bookmark-btn.bookmark-set:hover {
+  background-color: #92400e;
+  border-color: #b45309;
 }
 
 /* 隱藏元素的類別 */
