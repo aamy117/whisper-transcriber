@@ -272,7 +272,15 @@ export class VideoFeaturesIntegration {
                     ${this.timeBookmarks.formatTime(bookmark.time)}
                 </div>
                 <div class="bookmark-content">
-                    ${bookmark.note ? `<div class="bookmark-note">${bookmark.note}</div>` : ''}
+                    <div class="bookmark-note-wrapper">
+                        ${bookmark.note ? 
+                            `<div class="bookmark-note" data-id="${bookmark.id}">${bookmark.note}</div>` : 
+                            `<div class="bookmark-note bookmark-note-empty" data-id="${bookmark.id}">點擊新增備註</div>`
+                        }
+                        <button class="bookmark-edit" data-id="${bookmark.id}" title="編輯">
+                            <span class="icon">✏️</span>
+                        </button>
+                    </div>
                     <div class="bookmark-date">${new Date(bookmark.timestamp).toLocaleString()}</div>
                 </div>
                 <button class="bookmark-delete" data-id="${bookmark.id}" title="刪除">
@@ -284,6 +292,61 @@ export class VideoFeaturesIntegration {
             div.querySelector('.bookmark-time').addEventListener('click', () => {
                 this.timeBookmarks.jumpToBookmark(bookmark.id);
             });
+            
+            // 編輯功能
+            const noteElement = div.querySelector('.bookmark-note');
+            const editBtn = div.querySelector('.bookmark-edit');
+            
+            // 點擊編輯按鈕或空白備註
+            const startEdit = () => {
+                const currentText = bookmark.note || '';
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'bookmark-edit-input';
+                input.value = currentText;
+                input.placeholder = '輸入備註...';
+                
+                // 替換顯示元素為輸入框
+                noteElement.style.display = 'none';
+                editBtn.style.display = 'none';
+                noteElement.parentNode.insertBefore(input, noteElement);
+                input.focus();
+                input.select();
+                
+                // 儲存編輯
+                const saveEdit = () => {
+                    const newNote = input.value.trim();
+                    this.timeBookmarks.updateBookmark(bookmark.id, newNote);
+                    this.updateBookmarkList();
+                };
+                
+                // 取消編輯
+                const cancelEdit = () => {
+                    input.remove();
+                    noteElement.style.display = '';
+                    editBtn.style.display = '';
+                };
+                
+                // 事件處理
+                input.addEventListener('blur', saveEdit);
+                input.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        saveEdit();
+                    }
+                });
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        e.preventDefault();
+                        cancelEdit();
+                    }
+                });
+            };
+            
+            editBtn.addEventListener('click', startEdit);
+            if (noteElement.classList.contains('bookmark-note-empty')) {
+                noteElement.addEventListener('click', startEdit);
+            }
             
             // 刪除按鈕
             div.querySelector('.bookmark-delete').addEventListener('click', () => {
