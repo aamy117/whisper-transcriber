@@ -1,0 +1,76 @@
+/* 緊急修復：視頻進度條太粗的問題 */
+
+/* 1. 強制隱藏所有瀏覽器原生控制條 */
+video::-webkit-media-controls,
+video::-webkit-media-controls-enclosure,
+video::-webkit-media-controls-panel,
+video::-webkit-media-controls-play-button,
+video::-webkit-media-controls-timeline,
+video::-webkit-media-controls-timeline-container,
+video::-webkit-media-controls-current-time-display,
+video::-webkit-media-controls-time-remaining-display,
+video::-webkit-media-controls-seek-back-button,
+video::-webkit-media-controls-seek-forward-button,
+video::-webkit-media-controls-fullscreen-button,
+video::-webkit-media-controls-mute-button,
+video::-webkit-media-controls-volume-slider {
+    display: none !important;
+    -webkit-appearance: none !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+/* Firefox */
+video::-moz-media-controls,
+video::-moz-media-controls-panel {
+    display: none !important;
+}
+
+/* Edge */
+video::-ms-media-controls,
+video::-ms-media-controls-panel {
+    display: none !important;
+}
+
+/* 2. 確保我們的進度條樣式優先級最高 */
+.video-controls .progress-container {
+    height: 3px !important;
+    max-height: 3px !important;
+}
+
+.video-controls .progress-played {
+    height: 100% !important;
+    max-height: 3px !important;
+}
+
+.video-controls .progress-buffered {
+    height: 100% !important;
+    max-height: 3px !important;
+}
+
+/* 3. 如果有任何藍色的粗條，強制覆蓋 */
+.video-controls [style*="height: 10px"],
+.video-controls [style*="height: 12px"],
+.video-controls [style*="height: 14px"],
+.video-controls [style*="height: 16px"],
+.video-controls [style*="height: 20px"] {
+    height: 3px !important;
+    max-height: 3px !important;
+}
+
+/* 4. 確保視頻元素本身沒有控制條 */
+#videoPlayer {
+    -webkit-media-controls: none !important;
+    -moz-media-controls: none !important;
+    -ms-media-controls: none !important;
+    controls: none !important;
+}
+
+/* 5. 處理可能的陰影或邊框造成的視覺厚度 */
+.progress-container,
+.progress-played,
+.progress-buffered {
+    box-shadow: none !important;
+    border: none !important;
+    outline: none !important;
+}

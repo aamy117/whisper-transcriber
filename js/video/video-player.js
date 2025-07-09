@@ -84,6 +84,23 @@ export class VideoPlayer {
     this.isPlaying = false;
     this.isLoading = false;
 
+    // 確保移除原生控制條
+    this.video.controls = false;
+    this.video.removeAttribute('controls');
+    
+    // 強制移除所有可能的控制條屬性
+    this.video.setAttribute('controls', 'false');
+    this.video.setAttribute('controlslist', 'nodownload nofullscreen noremoteplayback');
+    this.video.setAttribute('disablepictureinpicture', 'true');
+    
+    // 定期檢查並移除控制條（某些瀏覽器可能會重新添加）
+    setInterval(() => {
+      if (this.video.controls) {
+        this.video.controls = false;
+        this.video.removeAttribute('controls');
+      }
+    }, 100);
+    
     // 串流載入器
     this.streamingLoader = null;
     this.useStreaming = false;

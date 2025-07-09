@@ -93,6 +93,39 @@
   background-color: #000;
 }
 
+/* 隱藏瀏覽器原生視頻控制條 */
+#videoPlayer::-webkit-media-controls {
+  display: none !important;
+}
+
+#videoPlayer::-webkit-media-controls-enclosure {
+  display: none !important;
+}
+
+#videoPlayer::-webkit-media-controls-panel {
+  display: none !important;
+}
+
+#videoPlayer::-webkit-media-controls-play-button,
+#videoPlayer::-webkit-media-controls-timeline,
+#videoPlayer::-webkit-media-controls-current-time-display,
+#videoPlayer::-webkit-media-controls-time-remaining-display,
+#videoPlayer::-webkit-media-controls-mute-button,
+#videoPlayer::-webkit-media-controls-volume-slider,
+#videoPlayer::-webkit-media-controls-fullscreen-button {
+  display: none !important;
+}
+
+/* Firefox */
+#videoPlayer::-moz-media-controls {
+  display: none !important;
+}
+
+/* Edge/IE */
+#videoPlayer::-ms-media-controls {
+  display: none !important;
+}
+
 /* 	e:h */
 .video-loading {
   position: absolute;
@@ -148,9 +181,9 @@
 
 .progress-container {
   position: relative;
-  height: 4px;  /* 調整進度條粗細：從 6px 改為 4px */
+  height: 3px;  /* 進一步調整進度條粗細：改為 3px */
   background-color: rgba(255, 255, 255, 0.2);
-  border-radius: 2px;  /* 相應調整圓角半徑 */
+  border-radius: 1.5px;  /* 相應調整圓角半徑 */
   cursor: pointer;
   margin-bottom: var(--spacing-sm);
   transition: height 0.2s ease;  /* 添加過渡效果 */
@@ -162,7 +195,7 @@
   left: 0;
   height: 100%;
   background-color: rgba(255, 255, 255, 0.4);
-  border-radius: 2px;  /* 調整圓角半徑以匹配容器 */
+  border-radius: 1.5px;  /* 調整圓角半徑以匹配容器 */
   width: 0%;
 }
 
@@ -172,7 +205,7 @@
   left: 0;
   height: 100%;
   background-color: var(--primary-color);
-  border-radius: 2px;  /* 調整圓角半徑以匹配容器 */
+  border-radius: 1.5px;  /* 調整圓角半徑以匹配容器 */
   width: 0%;
 }
 
@@ -180,8 +213,8 @@
   position: absolute;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: 12px;  /* 調整滑塊大小：從 14px 改為 12px */
-  height: 12px;
+  width: 10px;  /* 進一步調整滑塊大小：改為 10px */
+  height: 10px;
   background-color: var(--primary-color);
   border-radius: 50%;
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);  /* 調整陰影大小 */
@@ -197,7 +230,7 @@
 
 /* hover 時稍微增加進度條高度，改善互動體驗 */
 .progress-container:hover {
-  height: 6px;  /* hover 時恢復到原本的高度 */
+  height: 5px;  /* hover 時增加到 5px */
 }
 
 .progress-slider {
