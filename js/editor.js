@@ -32,7 +32,7 @@ export class TranscriptionEditor {
 
     // 虛擬滾動管理器
     this.virtualScrollManager = null;
-    this.useVirtualScroll = true; // 預設啟用虛擬滾動
+    this.useVirtualScroll = false; // 暫時關閉虛擬滾動
     this.virtualScrollThreshold = 100; // 超過100個段落時啟用虛擬滾動
 
     // 批次編輯器
