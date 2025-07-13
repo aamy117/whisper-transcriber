@@ -665,10 +665,10 @@ class WhisperApp {
   // API Key 檢查
   checkApiKey() {
     if (!this.apiKey) {
-      // 只顯示提示，不強制開啟設定視窗
-      setTimeout(() => {
-        this.showNotification('提示：可以使用本地 WASM 轉譯（免費）或設定 API Key 使用雲端轉譯', 'info');
-      }, 1500);
+      // 暫時關閉自動提示，避免干擾使用者體驗
+      // setTimeout(() => {
+      //   this.showNotification('提示：可以使用本地 WASM 轉譯（免費）或設定 API Key 使用雲端轉譯', 'info');
+      // }, 1500);
     }
   }
 
