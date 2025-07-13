@@ -39,6 +39,9 @@ export class VirtualScrollManager {
       lastRenderTime: 0,
       averageRenderTime: 0
     };
+    
+    // 防止無限遞迴的標記
+    this.isMeasuring = false;
   }
 
   /**
@@ -325,10 +328,14 @@ export class VirtualScrollManager {
     // 如果高度有變化，需要重新渲染以更新位置
     if (heightChanged) {
       this.recalculateTotalHeight();
-      // 如果變化的項目在當前可見範圍內，需要重新渲染
-      requestAnimationFrame(() => {
-        this.render();
-      });
+      // 避免無限遞迴：只有當容器未在測量狀態時才重新渲染
+      if (!this.isMeasuring) {
+        this.isMeasuring = true;
+        requestAnimationFrame(() => {
+          this.render();
+          this.isMeasuring = false;
+        });
+      }
     }
   }
 
@@ -418,10 +425,12 @@ export class VirtualScrollManager {
     this.container.scrollTop = Math.max(0, scrollTop);
     
     // 確保滾動後立即更新可見範圍並渲染
-    requestAnimationFrame(() => {
-      this.calculateVisibleRange();
-      this.render();
-    });
+    if (!this.isMeasuring) {
+      requestAnimationFrame(() => {
+        this.calculateVisibleRange();
+        this.render();
+      });
+    }
   }
 
   /**
