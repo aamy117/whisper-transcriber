@@ -6,7 +6,7 @@ const VideoConfig = {
     progressUpdateInterval: 100,
 
     // 尋找間隔 (秒)
-    seekStep: 5,
+    seekStep: 3,
 
     // 音量步階
     volumeStep: 0.1,
