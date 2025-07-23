@@ -28,6 +28,14 @@ export class VideoUI {
     // 元素將在初始化時收集
     this.elements = {};
 
+    // 存儲事件處理函數引用，用於清理
+    this.eventHandlers = {
+      dom: new Map(),        // DOM 元素事件
+      document: new Map(),   // document 全域事件
+      video: new Map(),      // video 元素自訂事件
+      temp: new Map()        // 臨時事件（如拖曳時）
+    };
+
     // 定義必要的 DOM 元素
     this.requiredElements = [
       // 容器
@@ -202,28 +210,34 @@ export class VideoUI {
    */
   bindEvents() {
     // 播放控制
-    this.elements.playPauseBtn?.addEventListener('click', () => this.togglePlayPause());
-    this.elements.skipBackBtn?.addEventListener('click', () => this.skipBack());
-    this.elements.skipForwardBtn?.addEventListener('click', () => this.skipForward());
+    this.addEventHandler(this.elements.playPauseBtn, 'click', () => this.togglePlayPause());
+    this.addEventHandler(this.elements.skipBackBtn, 'click', () => this.skipBack());
+    this.addEventHandler(this.elements.skipForwardBtn, 'click', () => this.skipForward());
 
     // 進度條控制
     this.setupProgressControl();
 
     // 音量控制
-    this.elements.muteBtn?.addEventListener('click', () => this.toggleMute());
-    this.elements.volumeSlider?.addEventListener('input', (e) => this.setVolume(e.target.value / 100));
+    this.addEventHandler(this.elements.muteBtn, 'click', () => this.toggleMute());
+    this.addEventHandler(this.elements.volumeSlider, 'input', (e) => this.setVolume(e.target.value / 100));
 
     // 播放速度
-    this.elements.videoSpeedSlider?.addEventListener('input', (e) => this.handleSpeedChange(e));
+    this.addEventHandler(this.elements.videoSpeedSlider, 'input', (e) => this.handleSpeedChange(e));
 
     // 全螢幕
-    this.elements.fullscreenBtn?.addEventListener('click', () => this.toggleFullscreen());
+    this.addEventHandler(this.elements.fullscreenBtn, 'click', () => this.toggleFullscreen());
 
     // 滑鼠控制
     this.setupMouseControls();
 
     // 鍵盤控制
     this.setupKeyboardControls();
+
+    // 播放器事件
+    this.bindPlayerEvents();
+
+    // 錯誤處理器事件
+    this.bindErrorHandlerEvents();
   }
 
   /**
@@ -258,6 +272,48 @@ export class VideoUI {
   }
 
   /**
+   * 添加事件監聽器並存儲引用
+   */
+  addEventHandler(element, event, handler, category = 'dom') {
+    if (!element || !event || !handler) return;
+    
+    // 生成唯一的鍵值
+    const elementName = element === document ? 'document' : 
+                       element.tagName || element.constructor.name || 'element';
+    const key = `${elementName}_${event}_${Date.now()}_${Math.random()}`;
+    
+    element.addEventListener(event, handler);
+    this.eventHandlers[category].set(key, { element, event, handler });
+  }
+
+  /**
+   * 移除特定分類的所有事件監聽器
+   */
+  removeEventHandlers(category) {
+    const handlers = this.eventHandlers[category];
+    if (!handlers) return;
+
+    handlers.forEach(({ element, event, handler }) => {
+      try {
+        element.removeEventListener(event, handler);
+      } catch (error) {
+        DEBUG && console.warn('移除事件監聽器失敗:', error);
+      }
+    });
+    
+    handlers.clear();
+  }
+
+  /**
+   * 清理所有事件監聽器
+   */
+  clearAllEventHandlers() {
+    Object.keys(this.eventHandlers).forEach(category => {
+      this.removeEventHandlers(category);
+    });
+  }
+
+  /**
    * 銷毀實例
    */
   destroy() {
@@ -265,11 +321,14 @@ export class VideoUI {
       clearTimeout(this.state.controlsTimer);
     }
 
-    // 清理事件監聽器
-    // TODO: 實現完整的事件清理
+    // 清理所有事件監聽器
+    this.clearAllEventHandlers();
 
+    // 重置狀態
+    this.elements = {};
     this.state.initialized = false;
-    DEBUG && console.log('VideoUI 已銷毀');
+    
+    DEBUG && console.log('VideoUI 已銷毀，所有事件監聽器已清理');
   }
 
   // ========== 以下是原有的方法，保持不變 ==========
@@ -292,14 +351,14 @@ export class VideoUI {
     if (!slider) return;
 
     // 滑鼠事件
-    slider.addEventListener('mousedown', (e) => this.startProgressDrag(e));
-    slider.addEventListener('input', (e) => this.updateProgress(e));
+    this.addEventHandler(slider, 'mousedown', (e) => this.startProgressDrag(e));
+    this.addEventHandler(slider, 'input', (e) => this.updateProgress(e));
 
     // 觸控事件
-    slider.addEventListener('touchstart', (e) => this.startProgressDrag(e));
+    this.addEventHandler(slider, 'touchstart', (e) => this.startProgressDrag(e));
 
     // 進度條容器點擊
-    this.elements.progressContainer?.addEventListener('click', (e) => this.clickProgress(e));
+    this.addEventHandler(this.elements.progressContainer, 'click', (e) => this.clickProgress(e));
   }
 
   handleSpeedChange(e) {
@@ -313,18 +372,18 @@ export class VideoUI {
     if (!wrapper) return;
 
     // 滑鼠移動顯示控制列
-    wrapper.addEventListener('mousemove', () => this.showControls());
-    wrapper.addEventListener('mouseleave', () => this.hideControls());
+    this.addEventHandler(wrapper, 'mousemove', () => this.showControls());
+    this.addEventHandler(wrapper, 'mouseleave', () => this.hideControls());
 
     // 雙擊全螢幕
-    wrapper.addEventListener('dblclick', () => this.toggleFullscreen());
+    this.addEventHandler(wrapper, 'dblclick', () => this.toggleFullscreen());
 
     // 點擊播放/暫停
-    this.video.addEventListener('click', () => this.togglePlayPause());
+    this.addEventHandler(this.video, 'click', () => this.togglePlayPause(), 'video');
   }
 
   setupKeyboardControls() {
-    document.addEventListener('keydown', (e) => this.handleKeyDown(e));
+    this.addEventHandler(document, 'keydown', (e) => this.handleKeyDown(e), 'document');
   }
 
   bindPlayerEvents() {
@@ -334,22 +393,22 @@ export class VideoUI {
       return;
     }
 
-    this.video.addEventListener('video:play', () => this.updatePlayPauseButton(true));
-    this.video.addEventListener('video:pause', () => this.updatePlayPauseButton(false));
-    this.video.addEventListener('video:timeupdate', (e) => this.updateTimeDisplay(e.detail));
-    this.video.addEventListener('video:progress', (e) => this.updateBufferedProgress(e.detail));
-    this.video.addEventListener('video:volumechange', (e) => this.updateVolumeDisplay(e.detail));
-    this.video.addEventListener('video:fullscreenchange', (e) => this.updateFullscreenButton(e.detail));
-    this.video.addEventListener('video:loadeddata', (e) => this.updateVideoInfo(e.detail));
-    this.video.addEventListener('video:error', (e) => this.handleVideoError(e.detail));
-    this.video.addEventListener('video:warning', (e) => this.handleVideoWarning(e.detail));
+    this.addEventHandler(this.video, 'video:play', () => this.updatePlayPauseButton(true), 'video');
+    this.addEventHandler(this.video, 'video:pause', () => this.updatePlayPauseButton(false), 'video');
+    this.addEventHandler(this.video, 'video:timeupdate', (e) => this.updateTimeDisplay(e.detail), 'video');
+    this.addEventHandler(this.video, 'video:progress', (e) => this.updateBufferedProgress(e.detail), 'video');
+    this.addEventHandler(this.video, 'video:volumechange', (e) => this.updateVolumeDisplay(e.detail), 'video');
+    this.addEventHandler(this.video, 'video:fullscreenchange', (e) => this.updateFullscreenButton(e.detail), 'video');
+    this.addEventHandler(this.video, 'video:loadeddata', (e) => this.updateVideoInfo(e.detail), 'video');
+    this.addEventHandler(this.video, 'video:error', (e) => this.handleVideoError(e.detail), 'video');
+    this.addEventHandler(this.video, 'video:warning', (e) => this.handleVideoWarning(e.detail), 'video');
   }
 
   bindErrorHandlerEvents() {
     // 監聽錯誤處理器事件
-    document.addEventListener('memory:warning', (e) => this.handleMemoryWarning(e.detail));
-    document.addEventListener('memory:critical', (e) => this.handleMemoryCritical(e.detail));
-    document.addEventListener('error:retry', (e) => this.handleErrorRetry(e.detail));
+    this.addEventHandler(document, 'memory:warning', (e) => this.handleMemoryWarning(e.detail), 'document');
+    this.addEventHandler(document, 'memory:critical', (e) => this.handleMemoryCritical(e.detail), 'document');
+    this.addEventHandler(document, 'error:retry', (e) => this.handleErrorRetry(e.detail), 'document');
   }
 
   // ========== UI 顯示控制 ==========
@@ -386,13 +445,14 @@ export class VideoUI {
 
     const handleMouseMove = (e) => this.updateProgress(e);
     const handleMouseUp = () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+      // 移除臨時事件監聽器
+      this.removeEventHandlers('temp');
       this.state.isDragging = false;
     };
 
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    // 使用臨時事件分類
+    this.addEventHandler(document, 'mousemove', handleMouseMove, 'temp');
+    this.addEventHandler(document, 'mouseup', handleMouseUp, 'temp');
   }
 
   updateProgress(e) {
