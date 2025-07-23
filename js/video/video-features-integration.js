@@ -233,9 +233,17 @@ export class VideoFeaturesIntegration {
 
     // === 視訊事件 ===
     setupVideoEvents() {
+        // 確保 videoPlayer 和 video 元素存在
+        if (!this.videoPlayer || !this.videoPlayer.video) {
+            console.warn('VideoPlayer 或 video 元素不存在，跳過視訊事件設定');
+            return;
+        }
+
+        const videoElement = this.videoPlayer.video;
+
         // 更新當前時間顯示
-        this.videoPlayer.addEventListener('timeupdate', () => {
-            const currentTime = this.videoPlayer.currentTime;
+        videoElement.addEventListener('timeupdate', () => {
+            const currentTime = videoElement.currentTime;
             const display = document.getElementById('currentTimeDisplay');
             if (display) {
                 display.textContent = this.timeBookmarks.formatTime(currentTime);
@@ -243,9 +251,9 @@ export class VideoFeaturesIntegration {
         });
 
         // 載入新視訊時設定名稱
-        this.videoPlayer.addEventListener('loadedmetadata', () => {
-            const videoName = this.videoPlayer.getAttribute('data-filename') || 
-                           this.videoPlayer.src.split('/').pop();
+        videoElement.addEventListener('loadedmetadata', () => {
+            const videoName = videoElement.getAttribute('data-filename') || 
+                           videoElement.src.split('/').pop();
             this.timeBookmarks.setVideoName(videoName);
             this.updateBookmarkList();
         });
