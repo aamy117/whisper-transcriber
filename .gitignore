@@ -239,10 +239,17 @@ tmp/
 *.sqlite
 *.sqlite3
 
-# Package lock files (optional - uncomment if needed)
-# package-lock.json
-# yarn.lock
-# pnpm-lock.yaml
+# Package lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Package configuration files (本專案不使用 npm)
+package.json
+.mcp.json
+
+# Test files
+test-mcp.js
 
 # Python files (if any)
 __pycache__/
