@@ -139,7 +139,7 @@ export class SubtitleSearch {
         return null;
     }
 
-    // 解析時間輸入（支援 MM:SS 和 HH:MM:SS 格式）
+    // 解析時間輸入（支援多種格式：130、1:30、1:23:45）
     parseTimeInput(input) {
         if (!input || typeof input !== 'string') {
             return null;
@@ -148,7 +148,45 @@ export class SubtitleSearch {
         // 移除多餘空白
         const timeStr = input.trim();
         
-        // 支援兩種格式：MM:SS 和 HH:MM:SS
+        // 格式1: 純數字格式（如 130 = 1:30, 12345 = 1:23:45）
+        if (/^\d+$/.test(timeStr)) {
+            const num = timeStr;
+            let hours = 0, minutes = 0, seconds = 0;
+            
+            if (num.length <= 2) {
+                // 1-2位數字：直接當作秒數（如 30 = 0:30）
+                seconds = parseInt(num, 10);
+            } else if (num.length === 3) {
+                // 3位數字：M SS（如 130 = 1:30）
+                minutes = parseInt(num.substring(0, 1), 10);
+                seconds = parseInt(num.substring(1), 10);
+            } else if (num.length === 4) {
+                // 4位數字：MM SS（如 1530 = 15:30）
+                minutes = parseInt(num.substring(0, 2), 10);
+                seconds = parseInt(num.substring(2), 10);
+            } else if (num.length === 5) {
+                // 5位數字：H MM SS（如 12345 = 1:23:45）
+                hours = parseInt(num.substring(0, 1), 10);
+                minutes = parseInt(num.substring(1, 3), 10);
+                seconds = parseInt(num.substring(3), 10);
+            } else if (num.length === 6) {
+                // 6位數字：HH MM SS（如 123456 = 12:34:56）
+                hours = parseInt(num.substring(0, 2), 10);
+                minutes = parseInt(num.substring(2, 4), 10);
+                seconds = parseInt(num.substring(4), 10);
+            } else {
+                return null; // 超過6位數字，不支援
+            }
+            
+            // 驗證時間範圍
+            if (minutes >= 60 || seconds >= 60) {
+                return null;
+            }
+            
+            return hours * 3600 + minutes * 60 + seconds;
+        }
+        
+        // 格式2: 冒號格式（MM:SS 和 HH:MM:SS）
         const timeRegex = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/;
         const match = timeStr.match(timeRegex);
         
@@ -219,7 +257,7 @@ export class SubtitleSearch {
         if (seconds === null) {
             return {
                 success: false,
-                error: '時間格式無效，請使用 1:30 或 1:23:45 格式'
+                error: '時間格式無效，請使用 130（1:30）或 12345（1:23:45）格式'
             };
         }
         
