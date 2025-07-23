@@ -440,10 +440,49 @@ export class VideoFeaturesIntegration {
 
     // 顯示訊息
     showMessage(message, type = 'info') {
-        // 簡單的訊息顯示，可以後續改進
         console.log(`[${type.toUpperCase()}] ${message}`);
         
-        // TODO: 實作更好的 UI 訊息提示
-        // 例如：toast notification
+        // 實作簡單的 toast 通知
+        const toast = document.createElement('div');
+        toast.className = `video-toast video-toast-${type}`;
+        toast.textContent = message;
+        
+        // 樣式設定
+        toast.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 6px;
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+            z-index: 10000;
+            max-width: 300px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            ${type === 'success' ? 'background-color: #10b981;' : 
+              type === 'error' ? 'background-color: #ef4444;' : 
+              type === 'warning' ? 'background-color: #f59e0b;' : 
+              'background-color: #3b82f6;'}
+        `;
+        
+        document.body.appendChild(toast);
+        
+        // 動畫進入
+        requestAnimationFrame(() => {
+            toast.style.transform = 'translateX(0)';
+        });
+        
+        // 3秒後自動移除
+        setTimeout(() => {
+            toast.style.transform = 'translateX(100%)';
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                }
+            }, 300);
+        }, 3000);
     }
 }
