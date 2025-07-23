@@ -113,7 +113,7 @@ class VideoApp {
 
       // 創建新功能整合（字幕搜尋和時間標記）
       DEBUG && console.log('  創建 VideoFeaturesIntegration...');
-      this.features = new VideoFeaturesIntegration(videoElement);
+      this.features = new VideoFeaturesIntegration(this.player);
       
       DEBUG && console.log('✅ 核心組件創建完成');
     } catch (error) {

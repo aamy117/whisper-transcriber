@@ -106,9 +106,14 @@ export class SubtitleSearch {
 
     // 跳到指定時間
     jumpToTime(time) {
-        if (this.videoPlayer) {
-            this.videoPlayer.currentTime = time;
-            this.videoPlayer.play();
+        if (this.videoPlayer && this.videoPlayer.video) {
+            this.videoPlayer.video.currentTime = time;
+            // 只有在影片載入完成且未播放時才自動播放
+            if (this.videoPlayer.video.paused && this.videoPlayer.video.readyState >= 2) {
+                this.videoPlayer.video.play().catch(error => {
+                    console.warn('自動播放失敗:', error);
+                });
+            }
         }
     }
 
@@ -182,7 +187,7 @@ export class SubtitleSearch {
 
     // 驗證時間是否在影片範圍內
     validateTimeForVideo(seconds) {
-        if (!this.videoPlayer || !this.videoPlayer.duration) {
+        if (!this.videoPlayer || !this.videoPlayer.video || !this.videoPlayer.video.duration) {
             return {
                 valid: false,
                 error: '影片尚未載入或無效'
@@ -196,8 +201,8 @@ export class SubtitleSearch {
             };
         }
         
-        if (seconds > this.videoPlayer.duration) {
-            const maxTime = this.formatTime(this.videoPlayer.duration);
+        if (seconds > this.videoPlayer.video.duration) {
+            const maxTime = this.formatTime(this.videoPlayer.video.duration);
             return {
                 valid: false,
                 error: `時間超出影片長度 (最大: ${maxTime})`
