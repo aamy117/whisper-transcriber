@@ -59,8 +59,8 @@ export class VideoUI {
       { id: 'volumeSlider', optional: false },
 
       // 播放速度
-      { id: 'speedBtn', optional: false },
-      { id: 'speedMenu', optional: false },
+      { id: 'videoSpeedSlider', optional: false },
+      { id: 'videoSpeedValue', optional: false },
 
       // 全螢幕
       { id: 'fullscreenBtn', optional: false },
@@ -214,8 +214,7 @@ export class VideoUI {
     this.elements.volumeSlider?.addEventListener('input', (e) => this.setVolume(e.target.value / 100));
 
     // 播放速度
-    this.elements.speedBtn?.addEventListener('click', () => this.toggleSpeedMenu());
-    this.setupSpeedMenu();
+    this.elements.videoSpeedSlider?.addEventListener('input', (e) => this.handleSpeedChange(e));
 
     // 全螢幕
     this.elements.fullscreenBtn?.addEventListener('click', () => this.toggleFullscreen());
@@ -282,6 +281,9 @@ export class VideoUI {
     }
 
     // 初始化播放速度
+    if (this.elements.videoSpeedSlider) {
+      this.elements.videoSpeedSlider.value = this.player.state.playbackRate || 1;
+    }
     this.updateSpeedDisplay();
   }
 
@@ -300,22 +302,10 @@ export class VideoUI {
     this.elements.progressContainer?.addEventListener('click', (e) => this.clickProgress(e));
   }
 
-  setupSpeedMenu() {
-    const speedOptions = document.querySelectorAll('.speed-option');
-    speedOptions.forEach(option => {
-      option.addEventListener('click', () => {
-        const speed = parseFloat(option.dataset.speed);
-        this.setPlaybackRate(speed);
-        this.hideSpeedMenu();
-      });
-    });
-
-    // 點擊外部隱藏選單
-    document.addEventListener('click', (e) => {
-      if (!this.elements.speedBtn?.contains(e.target) && !this.elements.speedMenu?.contains(e.target)) {
-        this.hideSpeedMenu();
-      }
-    });
+  handleSpeedChange(e) {
+    const speed = parseFloat(e.target.value);
+    this.setPlaybackRate(speed);
+    this.updateSpeedDisplay();
   }
 
   setupMouseControls() {
@@ -442,21 +432,13 @@ export class VideoUI {
 
   // ========== 播放速度控制 ==========
 
-  toggleSpeedMenu() {
-    const menu = this.elements.speedMenu;
-    if (menu) {
-      menu.classList.toggle('hidden');
-    }
-  }
-
-  hideSpeedMenu() {
-    this.elements.speedMenu?.classList.add('hidden');
-  }
-
   setPlaybackRate(rate) {
     this.player.setPlaybackRate(rate);
+    // 更新滑桿值（如果不是從滑桿觸發的）
+    if (this.elements.videoSpeedSlider && this.elements.videoSpeedSlider.value !== rate.toString()) {
+      this.elements.videoSpeedSlider.value = rate;
+    }
     this.updateSpeedDisplay();
-    this.updateSpeedOptions(rate);
   }
 
   // ========== 全螢幕控制 ==========
@@ -616,24 +598,11 @@ export class VideoUI {
   }
 
   updateSpeedDisplay() {
-    const btn = this.elements.speedBtn;
-    if (btn) {
-      const speedText = btn.querySelector('.speed-text');
-      if (speedText) {
-        speedText.textContent = `${this.player.state.playbackRate}x`;
-      } else {
-        // 如果沒有 speed-text 元素，直接更新按鈕文字
-        btn.textContent = `${this.player.state.playbackRate}x`;
-      }
+    const speedValue = this.elements.videoSpeedValue;
+    if (speedValue && this.player && this.player.state) {
+      const speed = this.player.state.playbackRate || 1;
+      speedValue.textContent = `${speed.toFixed(1)}x`;
     }
-  }
-
-  updateSpeedOptions(activeSpeed) {
-    const options = document.querySelectorAll('.speed-option');
-    options.forEach(option => {
-      const speed = parseFloat(option.dataset.speed);
-      option.classList.toggle('active', speed === activeSpeed);
-    });
   }
 
   updateVideoInfo({ file, info }) {

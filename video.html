@@ -163,17 +163,15 @@
                                     <div class="controls-right">
                                         <!-- 播放速度 -->
                                         <div class="speed-control">
-                                            <button class="control-btn" id="speedBtn" title="播放速度">
-                                                <span class="speed-text">1x</span>
-                                            </button>
-                                            <div class="speed-menu hidden" id="speedMenu">
-                                                <button class="speed-option" data-speed="0.5">0.5x</button>
-                                                <button class="speed-option" data-speed="0.75">0.75x</button>
-                                                <button class="speed-option active" data-speed="1">1x</button>
-                                                <button class="speed-option" data-speed="1.25">1.25x</button>
-                                                <button class="speed-option" data-speed="1.5">1.5x</button>
-                                                <button class="speed-option" data-speed="2">2x</button>
-                                            </div>
+                                            <label for="videoSpeedSlider" class="speed-label">速度：</label>
+                                            <input type="range" id="videoSpeedSlider" 
+                                                   class="speed-slider"
+                                                   min="0.5" max="2" value="1" step="0.05"
+                                                   aria-label="播放速度控制" 
+                                                   aria-valuemin="0.5" 
+                                                   aria-valuemax="2" 
+                                                   aria-valuenow="1">
+                                            <span id="videoSpeedValue" class="speed-value">1.0x</span>
                                         </div>
 
                                         <!-- 全螢幕 -->

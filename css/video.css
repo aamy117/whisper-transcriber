@@ -340,46 +340,71 @@
 }
 
 /* ��6 */
+/* 播放速度控制 - 滑桿樣式 */
 .speed-control {
-  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-right: var(--spacing-md);
 }
 
-.speed-text {
+.speed-label {
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.7);
+  white-space: nowrap;
+}
+
+.speed-slider {
+  width: 100px;
+  height: 4px;
+  background-color: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+  outline: none;
+  transition: opacity 0.2s;
+}
+
+.speed-slider:hover {
+  background-color: rgba(255, 255, 255, 0.4);
+}
+
+.speed-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  background-color: white;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.speed-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.speed-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  background-color: white;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+  transition: transform 0.2s;
+}
+
+.speed-slider::-moz-range-thumb:hover {
+  transform: scale(1.2);
+}
+
+.speed-value {
   font-size: 0.875rem;
   font-weight: 500;
-}
-
-.speed-menu {
-  position: absolute;
-  bottom: 100%;
-  right: 0;
-  background-color: rgba(0, 0, 0, 0.9);
-  border-radius: var(--radius-md);
-  padding: var(--spacing-xs);
-  margin-bottom: var(--spacing-sm);
-  min-width: 80px;
-}
-
-.speed-option {
-  display: block;
-  width: 100%;
-  padding: var(--spacing-sm);
-  background: none;
-  border: none;
   color: white;
-  cursor: pointer;
-  font-size: 0.875rem;
-  text-align: center;
-  border-radius: var(--radius-sm);
-  transition: background-color 0.2s;
-}
-
-.speed-option:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-.speed-option.active {
-  background-color: var(--primary-color);
+  min-width: 3.5em;
+  text-align: left;
 }
 
 /* t�b */
@@ -516,6 +541,19 @@
   
   .volume-control {
     display: none;
+  }
+  
+  /* 行動裝置上調整速度控制 */
+  .speed-control {
+    margin-right: var(--spacing-sm);
+  }
+  
+  .speed-label {
+    display: none;  /* 隱藏標籤以節省空間 */
+  }
+  
+  .speed-slider {
+    width: 80px;  /* 縮小寬度 */
   }
   
   .controls-buttons {
