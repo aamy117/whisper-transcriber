@@ -17,6 +17,7 @@ export class VideoFeaturesIntegration {
         
         // 設定事件監聽器
         this.setupSubtitleEvents();
+        this.setupTimeJumpEvents();
         this.setupBookmarkEvents();
         this.setupVideoEvents();
         
@@ -72,6 +73,83 @@ export class VideoFeaturesIntegration {
             const result = this.subtitleSearch.nextResult();
             if (result) this.highlightSearchResult(result);
         });
+    }
+
+    // === 時間跳轉事件 ===
+    setupTimeJumpEvents() {
+        const timeJumpInput = document.getElementById('timeJumpInput');
+        const timeJumpBtn = document.getElementById('timeJumpBtn');
+        
+        const performTimeJump = () => {
+            const input = timeJumpInput?.value.trim();
+            if (!input) {
+                this.showTimeJumpError('請輸入時間');
+                return;
+            }
+            
+            const result = this.subtitleSearch.handleTimeJumpInput(input);
+            
+            if (result.success) {
+                this.showMessage(`已跳轉到 ${result.formattedTime}`, 'success');
+                this.clearTimeJumpError();
+                // 清空輸入框（可選）
+                // timeJumpInput.value = '';
+            } else {
+                this.showTimeJumpError(result.error);
+                this.showMessage(result.error, 'error');
+            }
+        };
+        
+        // 按鈕點擊事件
+        timeJumpBtn?.addEventListener('click', performTimeJump);
+        
+        // 輸入框 Enter 鍵事件
+        timeJumpInput?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                performTimeJump();
+            }
+        });
+        
+        // 即時驗證（輸入時清除錯誤狀態）
+        timeJumpInput?.addEventListener('input', () => {
+            this.clearTimeJumpError();
+        });
+        
+        // 失焦時進行格式預檢查
+        timeJumpInput?.addEventListener('blur', (e) => {
+            const input = e.target.value.trim();
+            if (input) {
+                const seconds = this.subtitleSearch.parseTimeInput(input);
+                if (seconds === null) {
+                    this.showTimeJumpError('時間格式無效');
+                } else {
+                    // 檢查是否超出影片長度
+                    const validation = this.subtitleSearch.validateTimeForVideo(seconds);
+                    if (!validation.valid) {
+                        this.showTimeJumpError(validation.error);
+                    }
+                }
+            }
+        });
+    }
+    
+    // 顯示時間跳轉錯誤
+    showTimeJumpError(message) {
+        const input = document.getElementById('timeJumpInput');
+        if (input) {
+            input.classList.add('error');
+            input.title = message;
+        }
+    }
+    
+    // 清除時間跳轉錯誤
+    clearTimeJumpError() {
+        const input = document.getElementById('timeJumpInput');
+        if (input) {
+            input.classList.remove('error');
+            input.title = '';
+        }
     }
 
     // === 時間標記事件 ===

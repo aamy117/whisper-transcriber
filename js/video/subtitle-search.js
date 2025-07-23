@@ -134,6 +134,108 @@ export class SubtitleSearch {
         return null;
     }
 
+    // 解析時間輸入（支援 MM:SS 和 HH:MM:SS 格式）
+    parseTimeInput(input) {
+        if (!input || typeof input !== 'string') {
+            return null;
+        }
+
+        // 移除多餘空白
+        const timeStr = input.trim();
+        
+        // 支援兩種格式：MM:SS 和 HH:MM:SS
+        const timeRegex = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/;
+        const match = timeStr.match(timeRegex);
+        
+        if (!match) {
+            return null;
+        }
+        
+        const part1 = parseInt(match[1], 10);
+        const part2 = parseInt(match[2], 10);
+        const part3 = match[3] ? parseInt(match[3], 10) : null;
+        
+        let hours, minutes, seconds;
+        
+        if (part3 !== null) {
+            // HH:MM:SS 格式
+            hours = part1;
+            minutes = part2;
+            seconds = part3;
+        } else {
+            // MM:SS 格式
+            hours = 0;
+            minutes = part1;
+            seconds = part2;
+        }
+        
+        // 驗證時間範圍
+        if (minutes >= 60 || seconds >= 60) {
+            return null;
+        }
+        
+        // 計算總秒數
+        const totalSeconds = hours * 3600 + minutes * 60 + seconds;
+        
+        return totalSeconds;
+    }
+
+    // 驗證時間是否在影片範圍內
+    validateTimeForVideo(seconds) {
+        if (!this.videoPlayer || !this.videoPlayer.duration) {
+            return {
+                valid: false,
+                error: '影片尚未載入或無效'
+            };
+        }
+        
+        if (seconds < 0) {
+            return {
+                valid: false,
+                error: '時間不能為負數'
+            };
+        }
+        
+        if (seconds > this.videoPlayer.duration) {
+            const maxTime = this.formatTime(this.videoPlayer.duration);
+            return {
+                valid: false,
+                error: `時間超出影片長度 (最大: ${maxTime})`
+            };
+        }
+        
+        return { valid: true };
+    }
+
+    // 處理時間跳轉輸入
+    handleTimeJumpInput(input) {
+        const seconds = this.parseTimeInput(input);
+        
+        if (seconds === null) {
+            return {
+                success: false,
+                error: '時間格式無效，請使用 1:30 或 1:23:45 格式'
+            };
+        }
+        
+        const validation = this.validateTimeForVideo(seconds);
+        if (!validation.valid) {
+            return {
+                success: false,
+                error: validation.error
+            };
+        }
+        
+        // 執行跳轉
+        this.jumpToTime(seconds);
+        
+        return {
+            success: true,
+            time: seconds,
+            formattedTime: this.formatTime(seconds)
+        };
+    }
+
     // 格式化時間顯示
     formatTime(seconds) {
         const h = Math.floor(seconds / 3600);
