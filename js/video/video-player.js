@@ -5,6 +5,7 @@ const DEBUG = typeof process !== 'undefined' ? process.env.NODE_ENV !== 'product
 import VideoConfig from './video-config.js';
 import { StreamingLoader } from './video-streaming.js';
 import videoErrorHandler from './video-error-handler.js';
+import { checkMp4MoovAtom } from './mp4-diagnostic.js';
 
 // 檢查 MSE (Media Source Extensions) 支援
 function isMSESupported() {
@@ -260,13 +261,17 @@ export class VideoPlayer {
       // 開始記憶體監控
       this.errorHandler.startMemoryMonitoring();
 
-      // 決定載入策略 - 大檔案強制使用串流
-      // 對於小檔案（<10MB）直接使用傳統載入，避免串流的複雜性
+      // 決定載入策略 - 整合 MP4 'moov' 原子頭診斷
+      const mp4Info = await checkMp4MoovAtom(file);
+      const isMoovAtStart = mp4Info.found && mp4Info.position === 'start';
+
+      // 如果 'moov' 原子頭不在開頭，串流是必要的
+      const forceStreaming = !isMoovAtStart && file.type.includes('mp4');
+
       const minStreamingSize = 10 * 1024 * 1024; // 10MB
       const shouldUseStreaming = VideoConfig.streaming.enabled &&
-        file.size >= minStreamingSize && // 檔案必須大於最小串流大小
-        (file.size >= VideoConfig.streaming.threshold ||
-         file.size > VideoConfig.file.warnSize) &&
+        (forceStreaming || (file.size >= minStreamingSize &&
+         (file.size >= VideoConfig.streaming.threshold || file.size > VideoConfig.file.warnSize))) &&
         isMSESupported() &&
         this.isMSESupportedFormat(detectedType);
 
@@ -276,6 +281,8 @@ export class VideoPlayer {
         warnSize: this.formatFileSize(VideoConfig.file.warnSize),
         mseSupported: isMSESupported(),
         formatSupported: this.isMSESupportedFormat(detectedType),
+        moovAtStart: isMoovAtStart,
+        forceStreaming: forceStreaming,
         willUseStreaming: shouldUseStreaming
       });
         if (shouldUseStreaming) {

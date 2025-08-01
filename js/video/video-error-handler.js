@@ -3,6 +3,7 @@ const DEBUG = typeof process !== 'undefined' ? process.env.NODE_ENV !== 'product
 
 // 視訊錯誤處理和回復策略模組
 import VideoConfig from './video-config.js';
+import { checkMp4MoovAtom } from './mp4-diagnostic.js';
 
 export class VideoErrorHandler {
   constructor() {
@@ -251,7 +252,7 @@ export class VideoErrorHandler {
   }
 
   // 處理致命錯誤
-  handleFatalError(file, error, errorAnalysis) {
+  async handleFatalError(file, error, errorAnalysis) {
     const suggestions = [];
 
     // 根據檔案大小提供建議
@@ -264,6 +265,14 @@ export class VideoErrorHandler {
     if (errorAnalysis.isFormatError) {
       suggestions.push('視訊格式可能不受支援');
       suggestions.push(this.getTranscodingInstructions(file));
+
+      // 如果是 MP4，進行 moov 原子頭檢查
+      if (file.type.includes('mp4')) {
+        const mp4Info = await checkMp4MoovAtom(file);
+        if (!mp4Info.found || mp4Info.position !== 'start') {
+          suggestions.push("MP4 的 'moov' 原子頭不在檔案開頭，這會影響串流播放。請使用工具（如 FFMPEG）將其移至開頭。");
+        }
+      }
     }
 
     if (errorAnalysis.isMemoryError) {
