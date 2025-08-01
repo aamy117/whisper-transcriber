@@ -872,6 +872,9 @@ export class AudioPlayer {
   // 時間跳轉功能
   setupTimeJump() {
     const timeJumpInput = document.getElementById('timeJumpInput');
+    const historyBtn = document.getElementById('timeJumpHistoryBtn');
+    const historyPanel = document.getElementById('timeJumpHistory');
+    
     if (!timeJumpInput) return;
 
     // 跳轉歷史記錄
@@ -890,6 +893,25 @@ export class AudioPlayer {
     timeJumpInput.addEventListener('input', () => {
       timeJumpInput.classList.remove('error');
     });
+
+    // 設置歷史按鈕點擊事件
+    if (historyBtn && historyPanel) {
+      historyBtn.addEventListener('click', () => {
+        const isVisible = historyPanel.style.display !== 'none';
+        if (isVisible) {
+          historyPanel.style.display = 'none';
+        } else {
+          this.showJumpHistory();
+        }
+      });
+
+      // 點擊外部關閉歷史面板
+      document.addEventListener('click', (e) => {
+        if (!historyBtn.contains(e.target) && !historyPanel.contains(e.target)) {
+          historyPanel.style.display = 'none';
+        }
+      });
+    }
   }
 
   // 處理時間跳轉
@@ -990,5 +1012,48 @@ export class AudioPlayer {
     if (this.jumpHistory.length > 5) {
       this.jumpHistory.shift();
     }
+  }
+
+  // 顯示跳轉歷史
+  showJumpHistory() {
+    const historyPanel = document.getElementById('timeJumpHistory');
+    const historyList = document.getElementById('historyList');
+    
+    if (!historyPanel || !historyList) return;
+
+    // 清空列表
+    historyList.innerHTML = '';
+
+    if (this.jumpHistory.length === 0) {
+      historyList.innerHTML = '<div class="history-empty">尚無跳轉記錄</div>';
+    } else {
+      // 反向顯示（最新的在最上面）
+      const reversedHistory = [...this.jumpHistory].reverse();
+      
+      reversedHistory.forEach((seconds) => {
+        const item = document.createElement('div');
+        item.className = 'history-item';
+        
+        // 格式化時間顯示
+        const formatted = this.formatTime(seconds);
+        const shortFormatted = this.formatShortTime(seconds);
+        
+        item.innerHTML = `
+          <span class="history-time">${shortFormatted}</span>
+          <span class="history-formatted">${formatted}</span>
+        `;
+        
+        // 點擊跳轉
+        item.addEventListener('click', () => {
+          this.seekTo(seconds);
+          historyPanel.style.display = 'none';
+        });
+        
+        historyList.appendChild(item);
+      });
+    }
+
+    // 顯示面板
+    historyPanel.style.display = 'block';
   }
 }

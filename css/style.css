@@ -1787,6 +1787,7 @@ mark {
   display: flex;
   align-items: center;
   margin-left: 8px;
+  position: relative;
 }
 
 .time-jump-input {
@@ -1840,4 +1841,105 @@ mark {
 [data-theme="dark"] .time-jump-input.error {
   background-color: #7f1d1d;
   border-color: #dc2626;
+}
+
+/* 時間跳轉歷史按鈕 */
+.time-jump-history-btn {
+  margin-left: 4px;
+  font-size: 18px;
+}
+
+/* 時間跳轉歷史清單 */
+.time-jump-history {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  min-width: 160px;
+  max-width: 200px;
+  z-index: 100;
+}
+
+.history-header {
+  padding: 8px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.history-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.history-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s ease;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.history-item:hover {
+  background-color: #f3f4f6;
+}
+
+.history-item:active {
+  background-color: #e5e7eb;
+}
+
+.history-time {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.history-formatted {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.history-empty {
+  padding: 16px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+/* 深色模式適配 */
+[data-theme="dark"] .time-jump-history {
+  background-color: #374151;
+  border-color: #4b5563;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .history-header {
+  border-bottom-color: #4b5563;
+  color: #9ca3af;
+}
+
+[data-theme="dark"] .history-item:hover {
+  background-color: #4b5563;
+}
+
+[data-theme="dark"] .history-item:active {
+  background-color: #6b7280;
+}
+
+[data-theme="dark"] .history-time {
+  color: #f3f4f6;
+}
+
+[data-theme="dark"] .history-formatted {
+  color: #9ca3af;
+}
+
+[data-theme="dark"] .history-empty {
+  color: #6b7280;
 }

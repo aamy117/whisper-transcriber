@@ -150,6 +150,13 @@
                                        placeholder="MMSS" 
                                        title="輸入時間跳轉 (例如: 352 = 3:52)"
                                        maxlength="6">
+                                <button class="control-btn time-jump-history-btn" id="timeJumpHistoryBtn" title="跳轉歷史">
+                                    <span class="icon">⏰</span>
+                                </button>
+                                <div class="time-jump-history" id="timeJumpHistory" style="display: none;">
+                                    <div class="history-header">最近跳轉</div>
+                                    <div class="history-list" id="historyList"></div>
+                                </div>
                             </div>
                         </div>
                         
