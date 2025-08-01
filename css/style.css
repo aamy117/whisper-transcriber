@@ -295,6 +295,7 @@ body {
   display: flex;
   gap: 0.75rem;
   justify-content: center;
+  align-items: center;
   margin-top: var(--spacing-md);
   padding: var(--spacing-md);
   background-color: #f9fafb;
@@ -1779,4 +1780,64 @@ mark {
 
 #batchEditBtn.active .icon {
   font-weight: bold;
+}
+
+/* 時間跳轉輸入框樣式 */
+.time-jump-wrapper {
+  display: flex;
+  align-items: center;
+  margin-left: 8px;
+}
+
+.time-jump-input {
+  width: 60px;
+  height: 36px;
+  padding: 0 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+  text-align: center;
+  transition: all 0.2s ease;
+  background-color: white;
+}
+
+.time-jump-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.time-jump-input::placeholder {
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.time-jump-input.error {
+  border-color: #ef4444;
+  background-color: #fef2f2;
+  animation: shake 0.3s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  75% { transform: translateX(3px); }
+}
+
+/* 深色模式適配 */
+[data-theme="dark"] .time-jump-input {
+  background-color: #374151;
+  border-color: #4b5563;
+  color: #f3f4f6;
+}
+
+[data-theme="dark"] .time-jump-input:focus {
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
+}
+
+[data-theme="dark"] .time-jump-input.error {
+  background-color: #7f1d1d;
+  border-color: #dc2626;
 }

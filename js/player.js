@@ -62,6 +62,7 @@ export class AudioPlayer {
   init() {
     this.cacheElements();
     this.bindEvents();
+    this.setupTimeJump();
   }
 
   cacheElements() {
@@ -866,5 +867,128 @@ export class AudioPlayer {
     // 重置狀態
     this.currentFile = null;
     this.isPlaying = false;
+  }
+
+  // 時間跳轉功能
+  setupTimeJump() {
+    const timeJumpInput = document.getElementById('timeJumpInput');
+    if (!timeJumpInput) return;
+
+    // 跳轉歷史記錄
+    this.jumpHistory = [];
+    const maxHistory = 5;
+
+    // 處理 Enter 鍵事件
+    timeJumpInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        this.handleTimeJump(timeJumpInput.value);
+      }
+    });
+
+    // 處理輸入事件（移除錯誤狀態）
+    timeJumpInput.addEventListener('input', () => {
+      timeJumpInput.classList.remove('error');
+    });
+  }
+
+  // 處理時間跳轉
+  handleTimeJump(input) {
+    const timeJumpInput = document.getElementById('timeJumpInput');
+    if (!input || !this.audioElement || !this.duration) {
+      return;
+    }
+
+    // 解析時間格式
+    const seconds = this.parseTimeInput(input);
+    
+    if (seconds === null) {
+      // 無效輸入
+      this.showTimeJumpError();
+      return;
+    }
+
+    // 檢查時間範圍
+    if (seconds < 0 || seconds > this.duration) {
+      this.showTimeJumpError();
+      return;
+    }
+
+    // 執行跳轉
+    this.seekTo(seconds);
+    
+    // 記錄跳轉歷史
+    this.addToJumpHistory(seconds);
+    
+    // 清空輸入框
+    timeJumpInput.value = '';
+  }
+
+  // 解析時間輸入（支援純數字格式）
+  parseTimeInput(input) {
+    // 移除空格
+    input = input.trim();
+    
+    if (!input) return null;
+    
+    // 只允許數字
+    if (!/^\d+$/.test(input)) {
+      return null;
+    }
+
+    const len = input.length;
+    let hours = 0, minutes = 0, seconds = 0;
+
+    if (len <= 2) {
+      // 52 -> 0:52
+      seconds = parseInt(input);
+    } else if (len <= 4) {
+      // 352 -> 3:52
+      // 2352 -> 23:52
+      minutes = parseInt(input.slice(0, -2));
+      seconds = parseInt(input.slice(-2));
+    } else if (len <= 6) {
+      // 12352 -> 1:23:52
+      // 012352 -> 01:23:52
+      hours = parseInt(input.slice(0, -4));
+      minutes = parseInt(input.slice(-4, -2));
+      seconds = parseInt(input.slice(-2));
+    } else {
+      return null;
+    }
+
+    // 驗證範圍
+    if (minutes >= 60 || seconds >= 60) {
+      return null;
+    }
+
+    return hours * 3600 + minutes * 60 + seconds;
+  }
+
+  // 顯示錯誤提示
+  showTimeJumpError() {
+    const timeJumpInput = document.getElementById('timeJumpInput');
+    timeJumpInput.classList.add('error');
+    
+    // 3秒後自動移除錯誤狀態
+    setTimeout(() => {
+      timeJumpInput.classList.remove('error');
+    }, 3000);
+  }
+
+  // 加入跳轉歷史
+  addToJumpHistory(seconds) {
+    // 避免重複
+    const lastJump = this.jumpHistory[this.jumpHistory.length - 1];
+    if (lastJump && Math.abs(lastJump - seconds) < 1) {
+      return;
+    }
+
+    this.jumpHistory.push(seconds);
+    
+    // 保持最多5筆記錄
+    if (this.jumpHistory.length > 5) {
+      this.jumpHistory.shift();
+    }
   }
 }
