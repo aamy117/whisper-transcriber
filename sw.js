@@ -3,7 +3,7 @@
  * 提供離線功能、快取管理和背景同步
  */
 
-const CACHE_NAME = 'whisper-transcriber-v1.2.1';
+const CACHE_NAME = 'whisper-transcriber-v1.2.2';
 const STATIC_CACHE_NAME = `${CACHE_NAME}-static`;
 const DYNAMIC_CACHE_NAME = `${CACHE_NAME}-dynamic`;
 
@@ -16,6 +16,8 @@ const CORE_FILES = [
   '/css/splash.css',
   '/css/onboarding.css',
   '/css/progress.css',
+  '/css/preprocessing.css',  // 新增：index.html 需要的預處理樣式
+  '/js/main.js',              // 新增：index.html 的主程式入口（關鍵！）
   '/js/app-optimized.js',
   '/js/core-loader.js',
   '/js/onboarding.js',
