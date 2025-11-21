@@ -3,28 +3,28 @@
  * 提供離線功能、快取管理和背景同步
  */
 
-const CACHE_NAME = 'whisper-transcriber-v1.2.3';
+const CACHE_NAME = 'whisper-transcriber-v1.2.4';
 const STATIC_CACHE_NAME = `${CACHE_NAME}-static`;
 const DYNAMIC_CACHE_NAME = `${CACHE_NAME}-dynamic`;
 
-// 需要快取的核心檔案
+// 需要快取的核心檔案（GitHub Pages 路徑）
 const CORE_FILES = [
-  '/',
-  '/index.html',
-  '/css/style.css',
-  '/css/shared.css',
-  '/css/splash.css',
-  '/css/onboarding.css',
-  '/css/progress.css',
-  '/css/preprocessing.css',  // 新增：index.html 需要的預處理樣式
-  '/js/main.js',              // 新增：index.html 的主程式入口（關鍵！）
-  '/js/app-optimized.js',
-  '/js/core-loader.js',
-  '/js/onboarding.js',
-  '/js/notification.js',
-  '/js/dialog.js',
-  '/js/utils/debounce.js',
-  '/manifest.json'
+  '/whisper-transcriber/',
+  '/whisper-transcriber/index.html',
+  '/whisper-transcriber/css/style.css',
+  '/whisper-transcriber/css/shared.css',
+  '/whisper-transcriber/css/splash.css',
+  '/whisper-transcriber/css/onboarding.css',
+  '/whisper-transcriber/css/progress.css',
+  '/whisper-transcriber/css/preprocessing.css',
+  '/whisper-transcriber/js/main.js',
+  '/whisper-transcriber/js/app-optimized.js',
+  '/whisper-transcriber/js/core-loader.js',
+  '/whisper-transcriber/js/onboarding.js',
+  '/whisper-transcriber/js/notification.js',
+  '/whisper-transcriber/js/dialog.js',
+  '/whisper-transcriber/js/utils/debounce.js',
+  '/whisper-transcriber/manifest.json'
 ];
 
 // 需要網路優先的檔案（API 相關）
@@ -199,11 +199,11 @@ async function handleNavigationRequest(request) {
     return networkResponse;
   } catch (error) {
     // 網路失敗，返回快取的首頁
-    const cachedResponse = await caches.match('/index.html');
+    const cachedResponse = await caches.match('/whisper-transcriber/index.html');
     if (cachedResponse) {
       return cachedResponse;
     }
-    
+
     // 沒有快取，返回離線頁面
     return new Response(createOfflinePage(), {
       headers: { 'Content-Type': 'text/html' }
@@ -241,7 +241,7 @@ async function handleOfflineFallback(request) {
 
   // 根據請求類型返回不同的離線內容
   if (request.destination === 'document') {
-    const offlinePage = await caches.match('/index.html');
+    const offlinePage = await caches.match('/whisper-transcriber/index.html');
     return offlinePage || new Response(createOfflinePage(), {
       headers: { 'Content-Type': 'text/html' }
     });
