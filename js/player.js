@@ -864,6 +864,12 @@ export class AudioPlayer {
       this.audioElement.load();
     }
 
+    // 移除時間跳轉事件監聽器
+    if (this.timeJumpClickHandler) {
+      document.removeEventListener('click', this.timeJumpClickHandler);
+      this.timeJumpClickHandler = null;
+    }
+
     // 重置狀態
     this.currentFile = null;
     this.isPlaying = false;
@@ -896,7 +902,8 @@ export class AudioPlayer {
 
     // 設置歷史按鈕點擊事件
     if (historyBtn && historyPanel) {
-      historyBtn.addEventListener('click', () => {
+      historyBtn.addEventListener('click', (e) => {
+        e.stopPropagation(); // 防止事件冒泡
         const isVisible = historyPanel.style.display !== 'none';
         if (isVisible) {
           historyPanel.style.display = 'none';
@@ -905,12 +912,18 @@ export class AudioPlayer {
         }
       });
 
-      // 點擊外部關閉歷史面板
-      document.addEventListener('click', (e) => {
-        if (!historyBtn.contains(e.target) && !historyPanel.contains(e.target)) {
-          historyPanel.style.display = 'none';
-        }
-      });
+      // 點擊外部關閉歷史面板 - 只添加一次
+      if (!this.timeJumpClickHandler) {
+        this.timeJumpClickHandler = (e) => {
+          // 檢查點擊是否在相關元素外部
+          if (!historyBtn.contains(e.target) &&
+              !historyPanel.contains(e.target) &&
+              !timeJumpInput.contains(e.target)) {
+            historyPanel.style.display = 'none';
+          }
+        };
+        document.addEventListener('click', this.timeJumpClickHandler);
+      }
     }
   }
 
