@@ -29,6 +29,13 @@ export class AudioPlayer {
     // Web Audio 連接狀態
     this.isWebAudioConnected = false;
 
+    // 時間跳轉事件監聽器引用（用於清理）
+    this.timeJumpDocumentClickHandler = null;
+
+    // 時間跳轉歷史記錄設定
+    this.jumpHistory = [];
+    this.maxJumpHistory = 5; // 最多保留 5 筆歷史記錄
+
     // DOM 元素
     this.elements = {
       audioPlayer: null,
@@ -864,6 +871,12 @@ export class AudioPlayer {
       this.audioElement.load();
     }
 
+    // 清理時間跳轉的 document 事件監聽器
+    if (this.timeJumpDocumentClickHandler) {
+      document.removeEventListener('click', this.timeJumpDocumentClickHandler);
+      this.timeJumpDocumentClickHandler = null;
+    }
+
     // 重置狀態
     this.currentFile = null;
     this.isPlaying = false;
@@ -874,12 +887,8 @@ export class AudioPlayer {
     const timeJumpInput = document.getElementById('timeJumpInput');
     const historyBtn = document.getElementById('timeJumpHistoryBtn');
     const historyPanel = document.getElementById('timeJumpHistory');
-    
-    if (!timeJumpInput) return;
 
-    // 跳轉歷史記錄
-    this.jumpHistory = [];
-    const maxHistory = 5;
+    if (!timeJumpInput) return;
 
     // 處理 Enter 鍵事件
     timeJumpInput.addEventListener('keypress', (e) => {
@@ -905,12 +914,23 @@ export class AudioPlayer {
         }
       });
 
-      // 點擊外部關閉歷史面板
-      document.addEventListener('click', (e) => {
-        if (!historyBtn.contains(e.target) && !historyPanel.contains(e.target)) {
+      // 點擊外部關閉歷史面板（只添加一次）
+      // 先移除舊的監聽器（如果存在）
+      if (this.timeJumpDocumentClickHandler) {
+        document.removeEventListener('click', this.timeJumpDocumentClickHandler);
+      }
+
+      // 創建新的監聽器並儲存引用
+      this.timeJumpDocumentClickHandler = (e) => {
+        // 檢查是否點擊在輸入框、按鈕或面板之外
+        if (!historyBtn.contains(e.target) &&
+            !historyPanel.contains(e.target) &&
+            !timeJumpInput.contains(e.target)) {
           historyPanel.style.display = 'none';
         }
-      });
+      };
+
+      document.addEventListener('click', this.timeJumpDocumentClickHandler);
     }
   }
 
@@ -1007,9 +1027,9 @@ export class AudioPlayer {
     }
 
     this.jumpHistory.push(seconds);
-    
-    // 保持最多5筆記錄
-    if (this.jumpHistory.length > 5) {
+
+    // 保持最多 maxJumpHistory 筆記錄
+    if (this.jumpHistory.length > this.maxJumpHistory) {
       this.jumpHistory.shift();
     }
   }

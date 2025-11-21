@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>事件監聽器修復測試</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 3px;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        .counter {
+            font-size: 18px;
+            font-weight: bold;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <h1>事件監聽器修復測試</h1>
+
+    <div class="test-section">
+        <h2>測試 1：檢查事件監聽器是否重複添加</h2>
+        <p>模擬多次初始化 setupTimeJump()，檢查事件監聽器是否正確清理</p>
+
+        <button id="simulateInit">模擬初始化 (點擊 5 次)</button>
+        <button id="testClick">測試點擊事件</button>
+        <button id="resetTest">重置</button>
+
+        <div id="result1" class="result"></div>
+        <p>點擊次數計數器: <span id="clickCounter" class="counter">0</span></p>
+        <p>預期結果：無論初始化多少次，計數器每次只增加 1</p>
+    </div>
+
+    <div class="test-section">
+        <h2>測試 2：檢查 cleanup() 是否清理監聽器</h2>
+        <p>測試 cleanup() 方法是否正確移除事件監聽器</p>
+
+        <button id="addListener">添加監聽器</button>
+        <button id="cleanupListener">執行 cleanup()</button>
+        <button id="testClick2">測試點擊</button>
+
+        <div id="result2" class="result"></div>
+        <p>狀態: <span id="listenerStatus" class="counter">未添加</span></p>
+    </div>
+
+    <div class="test-section">
+        <h2>測試 3：檢查 timeJumpInput 點擊邏輯</h2>
+        <p>模擬點擊不同區域，檢查面板是否正確關閉</p>
+
+        <input type="text" id="mockTimeJumpInput" placeholder="時間輸入框">
+        <button id="mockHistoryBtn">歷史按鈕</button>
+        <div id="mockHistoryPanel" style="padding: 10px; background: #f0f0f0;">
+            歷史面板
+        </div>
+        <button id="outsideBtn">外部按鈕</button>
+
+        <div id="result3" class="result"></div>
+    </div>
+
+    <script type="module">
+        // 模擬 AudioPlayer 的事件監聽器邏輯
+        class MockPlayer {
+            constructor() {
+                this.timeJumpDocumentClickHandler = null;
+                this.clickCounter = 0;
+            }
+
+            setupTimeJump() {
+                // 模擬原始程式碼的邏輯
+                if (this.timeJumpDocumentClickHandler) {
+                    document.removeEventListener('click', this.timeJumpDocumentClickHandler);
+                }
+
+                this.timeJumpDocumentClickHandler = (e) => {
+                    this.clickCounter++;
+                    document.getElementById('clickCounter').textContent = this.clickCounter;
+                };
+
+                document.addEventListener('click', this.timeJumpDocumentClickHandler);
+            }
+
+            cleanup() {
+                if (this.timeJumpDocumentClickHandler) {
+                    document.removeEventListener('click', this.timeJumpDocumentClickHandler);
+                    this.timeJumpDocumentClickHandler = null;
+                }
+            }
+        }
+
+        let player = new MockPlayer();
+
+        // 測試 1：重複初始化
+        let initCount = 0;
+        document.getElementById('simulateInit').addEventListener('click', () => {
+            initCount++;
+            player.setupTimeJump();
+            document.getElementById('result1').innerHTML =
+                `<span class="success">已模擬初始化 ${initCount} 次。現在點擊「測試點擊事件」按鈕。</span>`;
+        });
+
+        document.getElementById('testClick').addEventListener('click', (e) => {
+            e.stopPropagation();
+            document.getElementById('result1').innerHTML +=
+                `<br><span class="success">測試點擊完成。檢查計數器是否只增加 1。</span>`;
+        });
+
+        document.getElementById('resetTest').addEventListener('click', () => {
+            player.cleanup();
+            player = new MockPlayer();
+            initCount = 0;
+            document.getElementById('result1').innerHTML = '';
+            document.getElementById('clickCounter').textContent = '0';
+        });
+
+        // 測試 2：cleanup 測試
+        let testPlayer = new MockPlayer();
+
+        document.getElementById('addListener').addEventListener('click', () => {
+            testPlayer.setupTimeJump();
+            document.getElementById('listenerStatus').textContent = '已添加';
+            document.getElementById('result2').innerHTML =
+                '<span class="success">監聽器已添加。點擊「測試點擊」應該會增加計數器。</span>';
+        });
+
+        document.getElementById('cleanupListener').addEventListener('click', () => {
+            testPlayer.cleanup();
+            document.getElementById('listenerStatus').textContent = '已清理';
+            document.getElementById('result2').innerHTML =
+                '<span class="success">已執行 cleanup()。現在點擊「測試點擊」，計數器應該不會增加。</span>';
+        });
+
+        document.getElementById('testClick2').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const beforeCount = testPlayer.clickCounter;
+            setTimeout(() => {
+                const afterCount = testPlayer.clickCounter;
+                if (afterCount === beforeCount) {
+                    document.getElementById('result2').innerHTML +=
+                        '<br><span class="success">✅ 正確！cleanup() 成功移除了監聽器。</span>';
+                } else {
+                    document.getElementById('result2').innerHTML +=
+                        '<br><span class="error">❌ 錯誤！cleanup() 未能移除監聽器。</span>';
+                }
+            }, 100);
+        });
+
+        // 測試 3：點擊邏輯測試
+        const mockInput = document.getElementById('mockTimeJumpInput');
+        const mockBtn = document.getElementById('mockHistoryBtn');
+        const mockPanel = document.getElementById('mockHistoryPanel');
+        const outsideBtn = document.getElementById('outsideBtn');
+
+        mockBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (mockPanel.style.display === 'none') {
+                mockPanel.style.display = 'block';
+            } else {
+                mockPanel.style.display = 'none';
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!mockBtn.contains(e.target) &&
+                !mockPanel.contains(e.target) &&
+                !mockInput.contains(e.target)) {
+                mockPanel.style.display = 'none';
+                document.getElementById('result3').innerHTML =
+                    '<span class="success">✅ 面板已關閉（點擊外部）</span>';
+            }
+        });
+
+        mockInput.addEventListener('click', (e) => {
+            e.stopPropagation();
+            document.getElementById('result3').innerHTML =
+                '<span class="success">✅ 點擊輸入框，面板保持開啟</span>';
+        });
+
+        outsideBtn.addEventListener('click', () => {
+            document.getElementById('result3').innerHTML =
+                '<span class="success">✅ 點擊外部按鈕，面板應該關閉</span>';
+        });
+    </script>
+</body>
+</html>
