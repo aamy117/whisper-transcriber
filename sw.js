@@ -3,7 +3,7 @@
  * 提供離線功能、快取管理和背景同步
  */
 
-const CACHE_NAME = 'whisper-transcriber-v1.2.4';
+const CACHE_NAME = 'whisper-transcriber-v1.2.5';
 const STATIC_CACHE_NAME = `${CACHE_NAME}-static`;
 const DYNAMIC_CACHE_NAME = `${CACHE_NAME}-dynamic`;
 
@@ -11,19 +11,39 @@ const DYNAMIC_CACHE_NAME = `${CACHE_NAME}-dynamic`;
 const CORE_FILES = [
   '/whisper-transcriber/',
   '/whisper-transcriber/index.html',
+
+  // CSS 樣式表
   '/whisper-transcriber/css/style.css',
   '/whisper-transcriber/css/shared.css',
   '/whisper-transcriber/css/splash.css',
   '/whisper-transcriber/css/onboarding.css',
   '/whisper-transcriber/css/progress.css',
   '/whisper-transcriber/css/preprocessing.css',
+
+  // 主程式入口
   '/whisper-transcriber/js/main.js',
   '/whisper-transcriber/js/app-optimized.js',
   '/whisper-transcriber/js/core-loader.js',
+
+  // main.js 的核心依賴（頁面啟動必需）
+  '/whisper-transcriber/js/config.js',
+  '/whisper-transcriber/js/player.js',
+  '/whisper-transcriber/js/api.js',
+  '/whisper-transcriber/js/editor.js',
+  '/whisper-transcriber/js/export.js',
+  '/whisper-transcriber/js/transcription-preprocessor.js',
+  '/whisper-transcriber/js/floating-cancel-button.js',
+  '/whisper-transcriber/js/progress-manager.js',
+  '/whisper-transcriber/js/preload-indicator.js',
+  '/whisper-transcriber/js/utils/cancellation-token.js',
+
+  // UI 元件
   '/whisper-transcriber/js/onboarding.js',
   '/whisper-transcriber/js/notification.js',
   '/whisper-transcriber/js/dialog.js',
   '/whisper-transcriber/js/utils/debounce.js',
+
+  // PWA 設定
   '/whisper-transcriber/manifest.json'
 ];
 
