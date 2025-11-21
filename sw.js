@@ -3,7 +3,7 @@
  * 提供離線功能、快取管理和背景同步
  */
 
-const CACHE_NAME = 'whisper-transcriber-v1.2.2';
+const CACHE_NAME = 'whisper-transcriber-v1.2.3';
 const STATIC_CACHE_NAME = `${CACHE_NAME}-static`;
 const DYNAMIC_CACHE_NAME = `${CACHE_NAME}-dynamic`;
 
@@ -232,13 +232,13 @@ async function updateCacheInBackground(request) {
  */
 async function handleOfflineFallback(request) {
   const url = new URL(request.url);
-  
+
   // 嘗試從快取獲取
   const cachedResponse = await caches.match(request);
   if (cachedResponse) {
     return cachedResponse;
   }
-  
+
   // 根據請求類型返回不同的離線內容
   if (request.destination === 'document') {
     const offlinePage = await caches.match('/index.html');
@@ -246,15 +246,34 @@ async function handleOfflineFallback(request) {
       headers: { 'Content-Type': 'text/html' }
     });
   }
-  
+
   if (request.destination === 'image') {
     return new Response(createOfflineImageSVG(), {
       headers: { 'Content-Type': 'image/svg+xml' }
     });
   }
-  
+
+  // 對於 JS/CSS 檔案，嘗試從網路載入（不返回 503）
+  if (request.destination === 'script' || request.destination === 'style') {
+    try {
+      const networkResponse = await fetch(request);
+      // 成功則快取
+      if (networkResponse.ok) {
+        const cache = await caches.open(DYNAMIC_CACHE_NAME);
+        cache.put(request, networkResponse.clone());
+      }
+      return networkResponse;
+    } catch (error) {
+      // 網路完全失敗才返回 503
+      return new Response(`/* Offline: ${url.pathname} */`, {
+        status: 503,
+        statusText: 'Service Unavailable'
+      });
+    }
+  }
+
   // 其他資源返回 503
-  return new Response('Service Unavailable', { 
+  return new Response('Service Unavailable', {
     status: 503,
     statusText: 'Service Unavailable'
   });
