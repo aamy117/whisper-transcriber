@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Service Worker 修復測試</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+        }
+        .test-section h2 {
+            margin-top: 0;
+            color: #444;
+            font-size: 18px;
+        }
+        button {
+            padding: 12px 24px;
+            margin: 5px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        .btn-success:hover {
+            background: #218838;
+        }
+        .status {
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        .status-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status-warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+        .code {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            overflow-x: auto;
+        }
+        .file-list {
+            list-style: none;
+            padding: 0;
+        }
+        .file-list li {
+            padding: 8px;
+            margin: 5px 0;
+            background: #f9f9f9;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        .file-ok { color: #28a745; }
+        .file-error { color: #dc3545; }
+        .icon { margin-right: 8px; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>Service Worker 修復測試</h1>
+        <p class="subtitle">檢查 Service Worker 是否正確安裝和運作</p>
+
+        <!-- 測試 1：Service Worker 狀態 -->
+        <div class="test-section">
+            <h2>測試 1：Service Worker 狀態檢查</h2>
+            <button class="btn-primary" onclick="checkSWStatus()">檢查狀態</button>
+            <div id="swStatus"></div>
+        </div>
+
+        <!-- 測試 2：快取檔案檢查 -->
+        <div class="test-section">
+            <h2>測試 2：快取檔案完整性檢查</h2>
+            <button class="btn-primary" onclick="checkCacheFiles()">檢查快取檔案</button>
+            <button class="btn-danger" onclick="clearAllCaches()">清除所有快取</button>
+            <div id="cacheStatus"></div>
+        </div>
+
+        <!-- 測試 3：安裝測試 -->
+        <div class="test-section">
+            <h2>測試 3：重新安裝 Service Worker</h2>
+            <p>這會強制重新註冊並安裝 Service Worker</p>
+            <button class="btn-success" onclick="reinstallSW()">重新安裝</button>
+            <div id="installStatus"></div>
+        </div>
+
+        <!-- 測試 4：檔案存在性驗證 -->
+        <div class="test-section">
+            <h2>測試 4：驗證核心檔案是否存在</h2>
+            <button class="btn-primary" onclick="verifyCoreFiles()">驗證檔案</button>
+            <div id="fileStatus"></div>
+        </div>
+
+        <!-- 操作說明 -->
+        <div class="test-section">
+            <h2>操作說明</h2>
+            <ol>
+                <li>先點擊「檢查狀態」確認 Service Worker 狀態</li>
+                <li>點擊「清除所有快取」清理舊快取</li>
+                <li>點擊「重新安裝」強制更新 Service Worker</li>
+                <li>重新整理頁面，再次檢查狀態確認修復成功</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        const EXPECTED_CORE_FILES = [
+            '/',
+            '/index.html',
+            '/css/style.css',
+            '/css/shared.css',
+            '/css/splash.css',
+            '/css/onboarding.css',
+            '/css/progress.css',
+            '/js/app-optimized.js',
+            '/js/core-loader.js',
+            '/js/onboarding.js',
+            '/js/notification.js',
+            '/js/dialog.js',
+            '/js/utils/debounce.js',
+            '/manifest.json'
+        ];
+
+        // 檢查 Service Worker 狀態
+        async function checkSWStatus() {
+            const statusDiv = document.getElementById('swStatus');
+
+            if (!('serviceWorker' in navigator)) {
+                statusDiv.innerHTML = `
+                    <div class="status status-error">
+                        <strong>不支援：</strong>您的瀏覽器不支援 Service Worker
+                    </div>
+                `;
+                return;
+            }
+
+            try {
+                const registration = await navigator.serviceWorker.getRegistration();
+
+                if (!registration) {
+                    statusDiv.innerHTML = `
+                        <div class="status status-warning">
+                            <strong>未註冊：</strong>Service Worker 尚未註冊
+                        </div>
+                    `;
+                    return;
+                }
+
+                let state = 'unknown';
+                let worker = null;
+
+                if (registration.active) {
+                    state = 'active';
+                    worker = registration.active;
+                } else if (registration.installing) {
+                    state = 'installing';
+                    worker = registration.installing;
+                } else if (registration.waiting) {
+                    state = 'waiting';
+                    worker = registration.waiting;
+                }
+
+                statusDiv.innerHTML = `
+                    <div class="status status-success">
+                        <strong>狀態：</strong>${state}<br>
+                        <strong>Scope：</strong>${registration.scope}<br>
+                        <strong>更新時間：</strong>${registration.updateViaCache}
+                    </div>
+                `;
+
+            } catch (error) {
+                statusDiv.innerHTML = `
+                    <div class="status status-error">
+                        <strong>錯誤：</strong>${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // 檢查快取檔案
+        async function checkCacheFiles() {
+            const statusDiv = document.getElementById('cacheStatus');
+            statusDiv.innerHTML = '<div class="status status-info">正在檢查快取...</div>';
+
+            try {
+                const cacheNames = await caches.keys();
+
+                if (cacheNames.length === 0) {
+                    statusDiv.innerHTML = `
+                        <div class="status status-warning">
+                            <strong>無快取：</strong>沒有找到任何快取
+                        </div>
+                    `;
+                    return;
+                }
+
+                let html = `<div class="status status-info"><strong>找到 ${cacheNames.length} 個快取：</strong></div>`;
+
+                for (const cacheName of cacheNames) {
+                    const cache = await caches.open(cacheName);
+                    const keys = await cache.keys();
+
+                    html += `
+                        <div class="status status-success">
+                            <strong>${cacheName}</strong><br>
+                            包含 ${keys.length} 個檔案
+                        </div>
+                    `;
+                }
+
+                statusDiv.innerHTML = html;
+
+            } catch (error) {
+                statusDiv.innerHTML = `
+                    <div class="status status-error">
+                        <strong>錯誤：</strong>${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // 清除所有快取
+        async function clearAllCaches() {
+            const statusDiv = document.getElementById('cacheStatus');
+
+            if (!confirm('確定要清除所有快取嗎？這會刪除所有離線資料。')) {
+                return;
+            }
+
+            statusDiv.innerHTML = '<div class="status status-info">正在清除快取...</div>';
+
+            try {
+                const cacheNames = await caches.keys();
+                await Promise.all(cacheNames.map(name => caches.delete(name)));
+
+                statusDiv.innerHTML = `
+                    <div class="status status-success">
+                        <strong>成功：</strong>已清除 ${cacheNames.length} 個快取
+                    </div>
+                `;
+
+            } catch (error) {
+                statusDiv.innerHTML = `
+                    <div class="status status-error">
+                        <strong>錯誤：</strong>${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // 重新安裝 Service Worker
+        async function reinstallSW() {
+            const statusDiv = document.getElementById('installStatus');
+            statusDiv.innerHTML = '<div class="status status-info">正在重新安裝...</div>';
+
+            try {
+                // 先註銷現有的 Service Worker
+                const registration = await navigator.serviceWorker.getRegistration();
+                if (registration) {
+                    await registration.unregister();
+                }
+
+                // 重新註冊
+                const newRegistration = await navigator.serviceWorker.register('/sw.js');
+
+                statusDiv.innerHTML = `
+                    <div class="status status-success">
+                        <strong>成功：</strong>Service Worker 已重新安裝<br>
+                        <strong>建議：</strong>請重新整理頁面以套用變更
+                    </div>
+                `;
+
+                // 5 秒後自動重新整理
+                setTimeout(() => {
+                    if (confirm('要立即重新整理頁面嗎？')) {
+                        location.reload();
+                    }
+                }, 2000);
+
+            } catch (error) {
+                statusDiv.innerHTML = `
+                    <div class="status status-error">
+                        <strong>錯誤：</strong>${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // 驗證核心檔案是否存在
+        async function verifyCoreFiles() {
+            const statusDiv = document.getElementById('fileStatus');
+            statusDiv.innerHTML = '<div class="status status-info">正在驗證檔案...</div>';
+
+            const results = [];
+
+            for (const file of EXPECTED_CORE_FILES) {
+                try {
+                    const response = await fetch(file, { method: 'HEAD' });
+                    const exists = response.ok;
+                    results.push({
+                        file,
+                        exists,
+                        status: response.status
+                    });
+                } catch (error) {
+                    results.push({
+                        file,
+                        exists: false,
+                        status: 'ERROR',
+                        error: error.message
+                    });
+                }
+            }
+
+            const existingFiles = results.filter(r => r.exists);
+            const missingFiles = results.filter(r => !r.exists);
+
+            let html = `
+                <div class="status status-${missingFiles.length > 0 ? 'warning' : 'success'}">
+                    <strong>驗證完成：</strong><br>
+                    存在：${existingFiles.length} 個<br>
+                    缺失：${missingFiles.length} 個
+                </div>
+            `;
+
+            if (missingFiles.length > 0) {
+                html += '<div class="status status-error"><strong>缺失的檔案：</strong><ul class="file-list">';
+                missingFiles.forEach(f => {
+                    html += `<li class="file-error"><span class="icon">❌</span>${f.file} (${f.status})</li>`;
+                });
+                html += '</ul></div>';
+            }
+
+            html += '<div class="status status-success"><strong>存在的檔案：</strong><ul class="file-list">';
+            existingFiles.forEach(f => {
+                html += `<li class="file-ok"><span class="icon">✅</span>${f.file}</li>`;
+            });
+            html += '</ul></div>';
+
+            statusDiv.innerHTML = html;
+        }
+
+        // 頁面載入時自動檢查
+        window.addEventListener('load', () => {
+            console.log('Service Worker 測試頁面已載入');
+            checkSWStatus();
+        });
+    </script>
+</body>
+</html>
