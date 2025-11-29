@@ -1,7 +1,9 @@
 // 時間標記功能模組
 export class TimeBookmarks {
     constructor(videoPlayer) {
-        this.videoPlayer = videoPlayer;
+        // 支援傳入 VideoPlayer 實例或原生 video 元素
+        // 如果傳入的是 VideoPlayer 實例，取其 .video 屬性
+        this.videoPlayer = videoPlayer?.video || videoPlayer;
         this.bookmarks = [];
         this.storageKey = 'video-bookmarks';
     }
