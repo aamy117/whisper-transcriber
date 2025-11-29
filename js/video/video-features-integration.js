@@ -164,7 +164,6 @@ export class VideoFeaturesIntegration {
             if (bookmark) {
                 this.updateBookmarkList();
                 noteInput.value = '';
-                this.showMessage('已新增時間標記', 'success');
             }
         };
         

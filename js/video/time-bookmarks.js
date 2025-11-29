@@ -6,6 +6,14 @@ export class TimeBookmarks {
         this.videoPlayer = videoPlayer?.video || videoPlayer;
         this.bookmarks = [];
         this.storageKey = 'video-bookmarks';
+
+        // 診斷日誌
+        console.log('[TimeBookmarks] 初始化:', {
+            傳入參數: videoPlayer,
+            有video屬性: !!videoPlayer?.video,
+            最終videoPlayer: this.videoPlayer,
+            是否為VIDEO元素: this.videoPlayer?.tagName === 'VIDEO'
+        });
     }
 
     // 初始化
@@ -15,9 +23,26 @@ export class TimeBookmarks {
 
     // 新增書籤
     addBookmark(note = '') {
-        if (!this.videoPlayer) return null;
-        
+        if (!this.videoPlayer) {
+            console.error('[TimeBookmarks] videoPlayer 不存在');
+            return null;
+        }
+
         const currentTime = this.videoPlayer.currentTime;
+
+        // 診斷日誌
+        console.log('[TimeBookmarks] addBookmark:', {
+            videoPlayer: this.videoPlayer,
+            currentTime: currentTime,
+            tagName: this.videoPlayer?.tagName
+        });
+
+        // 確保時間有效
+        if (currentTime === undefined || isNaN(currentTime)) {
+            console.error('[TimeBookmarks] currentTime 無效:', currentTime);
+            return null;
+        }
+
         const bookmark = {
             id: Date.now().toString(),
             time: currentTime,
@@ -25,11 +50,11 @@ export class TimeBookmarks {
             timestamp: new Date().toISOString(),
             videoName: this.getVideoName()
         };
-        
+
         this.bookmarks.push(bookmark);
         this.sortBookmarks();
         this.saveToStorage();
-        
+
         return bookmark;
     }
 
@@ -124,7 +149,22 @@ export class TimeBookmarks {
         try {
             const saved = localStorage.getItem(this.storageKey);
             if (saved) {
-                this.bookmarks = JSON.parse(saved);
+                let loadedBookmarks = JSON.parse(saved);
+
+                // 過濾掉無效的書籤（time 為 undefined 或 NaN）
+                const validBookmarks = loadedBookmarks.filter(b =>
+                    b.time !== undefined && !isNaN(b.time)
+                );
+
+                // 如果有無效資料被過濾，更新 storage
+                if (validBookmarks.length !== loadedBookmarks.length) {
+                    console.warn('[TimeBookmarks] 過濾了',
+                        loadedBookmarks.length - validBookmarks.length,
+                        '個無效書籤');
+                    localStorage.setItem(this.storageKey, JSON.stringify(validBookmarks));
+                }
+
+                this.bookmarks = validBookmarks;
                 this.sortBookmarks();
             }
         } catch (e) {
