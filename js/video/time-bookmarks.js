@@ -77,9 +77,9 @@ export class TimeBookmarks {
         return [...this.bookmarks];
     }
 
-    // 排序書籤（按時間）
+    // 排序書籤（按時間降序，時間後面的排在上面）
     sortBookmarks() {
-        this.bookmarks.sort((a, b) => a.time - b.time);
+        this.bookmarks.sort((a, b) => b.time - a.time);
     }
 
     // 格式化時間
