@@ -10,7 +10,6 @@ Thumbs.db
 # Editor files
 .vscode/
 .idea/
-docs/
 
 # Video files
 *.mp4
@@ -35,14 +34,10 @@ temp/
 tmp/
 draft-*
 old-del/
-scripts/
 
 # 個人筆記
 *個人筆記*
 *私人*
-
-# 但保留重要文件
-!docs/
 
 # 工作區檔案
 _workspace/
@@ -52,6 +47,9 @@ _workspace/
 logs/
 *.log
 npm-debug.log*
+
+# Claude local plans
+plans/
 
 # Dependencies
 node_modules/
@@ -96,8 +94,7 @@ coverage/
 *.lcov
 .nyc_output/
 
-# IDE directories (避免重複)
-.claude/
+# IDE directories
 .vscode/
 *.swp
 *.swo
@@ -244,8 +241,7 @@ package-lock.json
 yarn.lock
 pnpm-lock.yaml
 
-# Package configuration files (本專案不使用 npm)
-package.json
+# MCP configuration (personal settings)
 .mcp.json
 
 # Test files
@@ -324,3 +320,5 @@ debug/
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+# MCP configuration with secrets
+.claude/mcp/
